@@ -24,10 +24,16 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.everybuddy.app.R
 import com.everybuddy.app.ui.chat.ChatListScreen
+import com.everybuddy.app.ui.chat.ChatRoomScreen
+import com.everybuddy.app.ui.chat.ConversationSelectScreen
+import com.everybuddy.app.ui.chat.NewFolderScreen
+//import com.everybuddy.app.ui.chat.ScriptSaveScreen: TODO
 import com.everybuddy.app.ui.chat.StartChatScreen
 import com.everybuddy.app.ui.explore.ExploreScreen
 import com.everybuddy.app.ui.explore.FriendScreen
 import com.everybuddy.app.ui.theme.PretendardFamily
+import com.everybuddy.app.data.chat.dummyChatRooms
+import com.everybuddy.app.data.chat.dummyMessages
 import androidx.compose.foundation.background
 
 // BottomTab 정의
@@ -66,10 +72,13 @@ val bottomTabs = listOf(
 )
 
 // BottomBar 숨김 라우트 — 하위 페이지 진입 시
-// TODO: 채팅방, 유저 프로필 등 세부 화면 추가 시 여기에 라우트 등록
 private val hideBottomBarRoutes = setOf(
     "start_chat",
-    // TODO: "chat_room/{roomId}"    — 채팅방 화면 구현 후 추가
+    "chat_room/{roomId}",
+    "conversation_select/{roomId}",
+    "script_save/{roomId}",         // 단일 메시지 스크립트 저장
+    "conversation_script_save/{roomId}", // 다중 선택 스크립트 저장
+    "new_folder/{roomId}",
     // TODO: "user_profile/{userId}" — 유저 프로필 화면 구현 후 추가
     // TODO: "friend_request"        — 친구 요청 화면 구현 후 추가
 )
@@ -114,7 +123,9 @@ fun MainScreen() {
             // 채팅 탭
             composable(BottomTab.Chat.route) {
                 ChatListScreen(
-                    // onRoomClick = {/* TODO: 채팅방 리스트 화면 이동 */},
+                    onRoomClick = { room ->
+                        navController.navigate("chat_room/${room.id}")
+                    },
                     onStartChat = { navController.navigate("start_chat") },
                 )
             }
@@ -124,6 +135,122 @@ fun MainScreen() {
                 StartChatScreen(
                     onBack    = { navController.popBackStack() },
                     onSuccess = { navController.popBackStack() },
+                )
+            }
+
+            // ── 채팅방 화면 ──────────────────────────────────────────
+            composable("chat_room/{roomId}") { backStack ->
+                val roomId = backStack.arguments?.getString("roomId") ?: return@composable
+                ChatRoomScreen(
+                    roomId                   = roomId,
+                    onBack                   = { navController.popBackStack() },
+                    onNavigateToScriptSave   = { messageId ->
+                        // 단일 메시지 꾹 눌러 저장 → messageId를 SavedStateHandle로 전달
+                        navController.currentBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("pending_message_id", messageId)
+                        navController.navigate("script_save/$roomId")
+                    },
+                    onNavigateToConversation = {
+                        navController.navigate("conversation_select/$roomId")
+                    },
+                )
+            }
+
+            // ── 대화 선택 화면 ────────────────────────────────────────
+            // 미디어패널 "대화저장하기" → 다중 메시지 선택 후 스크립트 저장
+            composable("conversation_select/{roomId}") { backStack ->
+                val roomId   = backStack.arguments?.getString("roomId") ?: return@composable
+                val messages = dummyMessages[roomId] ?: emptyList()
+                val room     = dummyChatRooms.find { it.id == roomId }
+                ConversationSelectScreen(
+                    messages  = messages,
+                    roomName  = room?.name ?: "",
+                    onBack    = { navController.popBackStack() },
+                    onSave    = { selectedMessages, captureOption ->
+                        // 선택된 메시지 목록을 SavedStateHandle에 저장
+                        // TODO: SharedViewModel 또는 SavedStateHandle로 교체 권장
+                        navController.currentBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("selected_message_ids", selectedMessages.map { it.id })
+                        navController.currentBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("capture_option", captureOption.name)
+                        navController.navigate("conversation_script_save/$roomId")
+                    },
+                )
+            }
+
+            // ── 스크립트 저장 (단일 메시지) ──────────────────────────
+            // 말풍선 꾹 눌러 → "대화 스크립트 저장" 선택 시 진입
+            composable("script_save/{roomId}") { backStack ->
+                val roomId    = backStack.arguments?.getString("roomId") ?: return@composable
+                val room      = dummyChatRooms.find { it.id == roomId }
+                val messageId = navController.previousBackStackEntry
+                    ?.savedStateHandle
+                    ?.get<String>("pending_message_id")
+                val message   = dummyMessages[roomId]?.find { it.id == messageId }
+                    ?: dummyMessages[roomId]?.firstOrNull()
+                    ?: return@composable
+
+//                ScriptSaveScreen(
+//                    messages    = listOf(message),
+//                    roomName    = room?.name ?: "",
+//                    onBack      = { navController.popBackStack() },
+//                    onSave      = { _ ->
+//                        // TODO: ScriptRepository.save(items)
+//                        navController.popBackStack()
+//                    },
+//                    onAddFolder = {
+//                        navController.navigate("new_folder/$roomId")
+//                    },
+//                )
+            }
+
+            // ── 스크립트 저장 (다중 메시지 — 대화 선택 화면에서 진입) ─
+            composable("conversation_script_save/{roomId}") { backStack ->
+                val roomId     = backStack.arguments?.getString("roomId") ?: return@composable
+                val room       = dummyChatRooms.find { it.id == roomId }
+                val allMessages = dummyMessages[roomId] ?: emptyList()
+                val selectedIds = navController.previousBackStackEntry
+                    ?.savedStateHandle
+                    ?.get<List<String>>("selected_message_ids")
+                    ?: emptyList()
+                val messages = allMessages.filter { it.id in selectedIds }
+                    .ifEmpty { allMessages.take(1) }   // 폴백: 빈 경우 첫 메시지
+
+//                ScriptSaveScreen(
+//                    messages    = messages,
+//                    roomName    = room?.name ?: "",
+//                    onBack      = { navController.popBackStack() },
+//                    onSave      = { _ ->
+//                        // TODO: ScriptRepository.save(items)
+//                        // 저장 완료 후 채팅방으로 돌아가기 (선택 화면까지 pop)
+//                        navController.popBackStack(
+//                            route         = "chat_room/$roomId",
+//                            inclusive     = false,
+//                        )
+//                    },
+//                    onAddFolder = {
+//                        navController.navigate("new_folder/$roomId")
+//                    },
+//                )
+            }
+
+            // ── 새 폴더 만들기 ────────────────────────────────────────
+            // ScriptSaveScreen 내 "폴더추가" 버튼 클릭 시 진입
+            composable("new_folder/{roomId}") { backStack ->
+                val roomId = backStack.arguments?.getString("roomId") ?: return@composable
+                val room   = dummyChatRooms.find { it.id == roomId }
+                NewFolderScreen(
+                    roomName = room?.name ?: "",
+                    onBack   = { navController.popBackStack() },
+                    onSave   = { name, imageUri ->
+                        // TODO: ScriptRepository.createFolder(name, imageUri)
+                        //       성공 후 ScriptSaveScreen 폴더 목록 갱신 필요
+                        //       → SharedViewModel 또는 SavedStateHandle 활용
+                        navController.popBackStack()
+                    },
                 )
             }
 

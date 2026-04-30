@@ -215,8 +215,8 @@ fun LoginScreenContent(
                     IconButton(onClick = onTogglePasswordVisible) {
                         Image(
                             painter            = painterResource(
-                                if (uiState.isPasswordVisible) R.drawable.ic_eyes_off
-                                else                           R.drawable.ic_eyes_on
+                                if (uiState.isPasswordVisible) R.drawable.ic_eyes_on
+                                else                           R.drawable.ic_eyes_off
                             ),
                             contentDescription = if (uiState.isPasswordVisible) "비밀번호 숨기기" else "비밀번호 보기",
                             contentScale       = ContentScale.Fit,
