@@ -1,0 +1,1 @@
+// 로그인 비즈니스 로직 UseCase — 현재 LoginViewModel이 AuthRepository 직접 호출 중, UseCase 계층 도입 시 이 파일로 분리 예정
