@@ -26,7 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.everybuddy.app.ui.theme.*
 
 // Data — UiState + FieldStatus
@@ -218,7 +218,7 @@ fun SignUpScreenContent(
                         IconButton(onClick = onTogglePasswordVisible) {
                             Icon(
                                 imageVector        = if (uiState.isPasswordVisible)
-                                    Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                    Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
                                 contentDescription = null,
                                 tint               = Color(0xFF999999),
                             )
@@ -278,8 +278,8 @@ fun SignUpScreenContent(
                         IconButton(onClick = onToggleConfirmVisible) {
                             Icon(
                                 imageVector        = if (uiState.isConfirmVisible)
-                                    Icons.Outlined.VisibilityOff
-                                else Icons.Outlined.Visibility,
+                                    Icons.Outlined.Visibility
+                                else Icons.Outlined.VisibilityOff,
                                 contentDescription = null,
                                 tint               = Color(0xFF999999),
                             )

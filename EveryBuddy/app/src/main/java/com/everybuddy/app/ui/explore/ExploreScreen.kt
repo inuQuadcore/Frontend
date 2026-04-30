@@ -19,7 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.everybuddy.app.R
 import com.everybuddy.app.data.dummy.*
 import com.everybuddy.app.ui.theme.*
@@ -146,10 +146,10 @@ fun ExploreUserRow(
             .padding(horizontal = 24.dp, vertical = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.size(97.dp)) {
+        Box(modifier = Modifier.size(67.dp)) {
             Box(
                 modifier         = Modifier
-                    .size(97.dp)
+                    .size(67.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFE8EEF7))
                     .align(Alignment.TopStart),
@@ -161,7 +161,7 @@ fun ExploreUserRow(
                     painter            = painterResource(R.drawable.ic_profile_default),
                     contentDescription = user.name,
                     contentScale       = ContentScale.Crop,
-                    modifier           = Modifier.size(97.dp),
+                    modifier           = Modifier.size(67.dp),
                 )
             }
             Box(

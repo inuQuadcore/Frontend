@@ -23,7 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.R
 import com.everybuddy.app.data.dummy.*
@@ -89,7 +89,7 @@ class StartChatViewModel @Inject constructor(
         if (selected.isEmpty()) return
 
         val roomName       = if (selected.size == 1) selected.first().name
-                             else selected.joinToString(", ") { it.name }
+        else selected.joinToString(", ") { it.name }
         val participantIds = selected.map { it.id.filter(Char::isDigit).toLongOrNull() ?: 1L }
 
         viewModelScope.launch {
@@ -400,10 +400,10 @@ fun StartChatFriendItem(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // 프로필 이미지 + 국적 아이콘
-        Box(modifier = Modifier.size(97.dp)) {
+        Box(modifier = Modifier.size(67.dp)) {
             Box(
                 modifier         = Modifier
-                    .size(69.dp)
+                    .size(67.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFE8EEF7))
                     .align(Alignment.TopStart),
@@ -413,16 +413,15 @@ fun StartChatFriendItem(
                     painter            = painterResource(R.drawable.ic_profile_default),
                     contentDescription = null,
                     contentScale       = ContentScale.Crop,
-                    modifier           = Modifier.size(69.dp),
+                    modifier           = Modifier.size(67.dp),
                 )
             }
             Box(
                 modifier         = Modifier
-                    .size(28.dp)
+                    .size(22.dp)
                     .clip(CircleShape)
                     .background(Color.White)
-                    .align(Alignment.BottomEnd)
-                    .offset(x = 7.dp, y = 7.dp),  // 쉼표 오류 수정
+                    .align(Alignment.BottomEnd),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(nationFlagEmoji(user.nationCode), fontSize = 21.sp)
