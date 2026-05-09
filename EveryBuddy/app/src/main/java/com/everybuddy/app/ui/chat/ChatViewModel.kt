@@ -28,9 +28,7 @@ class ChatViewModel @Inject constructor(
 
     init { loadChatRooms() }
 
-    // ─────────────────────────────────────────────────────────────────────────
     // 채팅방 목록 로드 — GET /api/v1/chatrooms
-    // ─────────────────────────────────────────────────────────────────────────
     fun loadChatRooms() {
         viewModelScope.launch {
             _listState.update { it.copy(isLoading = true, errorMessage = null) }
@@ -70,17 +68,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
     // 채팅방 생성 — POST /api/v1/chatrooms
-    //
-    // @param roomName       채팅방 이름 (필수)
-    // @param participantIds 참여자 ID 목록 (나 자신 제외, 서버가 자동 추가)
-    //
-    // 에러 처리:
-    //   400 INVALID_INPUT_VALUE — errors.roomName / errors.participantIds
-    //   401 JWT_ENTRY_POINT     — 로그인 필요
-    //   404 USER_NOT_FOUND      — 해당 유저 없음
-    // ─────────────────────────────────────────────────────────────────────────
     fun createChatRoom(
         roomName       : String,
         participantIds : List<Long>,
@@ -128,16 +116,10 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 필터 선택
-    // ─────────────────────────────────────────────────────────────────────────
     fun onFilterSelect(filter: ChatFilter) {
         _listState.update { it.copy(activeFilter = filter) }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 검색
-    // ─────────────────────────────────────────────────────────────────────────
     fun onSearchQueryChange(query: String) {
         _listState.update { it.copy(searchQuery = query) }
     }
@@ -146,9 +128,6 @@ class ChatViewModel @Inject constructor(
         // TODO: 검색창 AnimatedVisibility 토글 + 포커스 처리
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 컨텍스트 메뉴 (채팅방 롱클릭)
-    // ─────────────────────────────────────────────────────────────────────────
     fun onContextMenu(room: ChatRoom) {
         _listState.update { it.copy(contextMenuRoom = room) }
     }
@@ -172,9 +151,6 @@ class ChatViewModel @Inject constructor(
         onDismissContextMenu()
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 필터링된 채팅방 목록 (검색어 + 필터 적용)
-    // ─────────────────────────────────────────────────────────────────────────
     val filteredRooms: StateFlow<List<ChatRoom>> = listState.map { state ->
         state.rooms
             .filter { room ->

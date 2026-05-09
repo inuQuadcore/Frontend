@@ -23,10 +23,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.everybuddy.app.R
 import com.everybuddy.app.ui.theme.*
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalContext
 
 // PretendardFamily 는 ui/theme/Font.kt 에서 정의
 
@@ -42,17 +43,34 @@ import androidx.compose.ui.focus.FocusDirection
  */
 @Composable
 fun LoginScreen(
-    onLoginSuccess     : () -> Unit,
-    onSignUpClick      : () -> Unit,
-    onGoogleLoginClick : () -> Unit,
-    viewModel          : LoginViewModel = hiltViewModel(),
+    onLoginSuccess : () -> Unit,
+    onSignUpClick  : () -> Unit,
+    onGoogleNewUser: () -> Unit,
+    viewModel      : LoginViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState    by viewModel.uiState.collectAsState()
+    val navEvent   by viewModel.navEvent.collectAsState()
     val focusManager = LocalFocusManager.current
+    val context    = LocalContext.current
 
-    // 로그인 성공 → NavGraph로 이동 트리거
+    // 이메일 로그인 성공
     LaunchedEffect(uiState.loginSuccess) {
         if (uiState.loginSuccess) onLoginSuccess()
+    }
+
+    // 구글 로그인 네비게이션 이벤트
+    LaunchedEffect(navEvent) {
+        when (navEvent) {
+            LoginNavEvent.ToMain -> {
+                onLoginSuccess()
+                viewModel.onNavEventConsumed()
+            }
+            LoginNavEvent.ToOnboarding -> {
+                onGoogleNewUser()
+                viewModel.onNavEventConsumed()
+            }
+            null -> {}
+        }
     }
 
     LoginScreenContent(
@@ -62,7 +80,10 @@ fun LoginScreen(
         onTogglePasswordVisible = viewModel::onTogglePasswordVisibility,
         onLoginClick            = { focusManager.clearFocus(); viewModel.onLoginClick() },
         onSignUpClick           = onSignUpClick,
-        onGoogleLoginClick      = onGoogleLoginClick,
+        onGoogleLoginClick      = {
+            val webClientId = context.getString(com.everybuddy.app.R.string.default_web_client_id)
+            viewModel.onGoogleLogin(context, webClientId)
+        },
     )
 }
 
@@ -238,7 +259,6 @@ fun LoginScreenContent(
 
             Spacer(Modifier.height(12.dp))
 
-            // 6. 로그인 버튼 (로딩 중 CircularProgressIndicator 표시)
             Button(
                 onClick        = onLoginClick,
                 modifier       = Modifier
@@ -253,11 +273,7 @@ fun LoginScreenContent(
                 enabled        = !uiState.isLoading,
             ) {
                 if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier    = Modifier.size(20.dp),
-                        color       = Color.White,
-                        strokeWidth = 2.dp,
-                    )
+                    LoadingIndicator(modifier = Modifier.size(20.dp), tint = Color.White)
                 } else {
                     Text(
                         text  = "로그인",

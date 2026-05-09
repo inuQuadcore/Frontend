@@ -2,10 +2,7 @@ package com.everybuddy.app.data.chat
 
 import java.time.LocalDateTime
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ChatRoom
-// [변경] createdAt, unreadCount, participantIds 추가 (API 스펙 확정)
-// ─────────────────────────────────────────────────────────────────────────────
+// ChatRoom — [변경] createdAt, unreadCount, participantIds 추가
 data class ChatRoom(
     val id             : String       = "",
     val name           : String       = "",
@@ -27,10 +24,7 @@ fun com.everybuddy.app.data.network.ChatRoomResponse.toChatRoom(): ChatRoom = Ch
     participantIds = participantIds,
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ChatListUiState
-// [변경] errorMessage 추가
-// ─────────────────────────────────────────────────────────────────────────────
+// ChatListUiState — [변경] errorMessage 추가
 data class ChatListUiState(
     val rooms           : List<ChatRoom> = emptyList(),
     val isLoading       : Boolean        = false,
@@ -46,9 +40,6 @@ enum class ChatFilter(val label: String) {
     FAVORITE("즐겨찾기"),
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ChatMessage
-// ─────────────────────────────────────────────────────────────────────────────
 enum class MessageType { TEXT, VOICE, IMAGE }
 
 data class ChatMessage(
@@ -65,10 +56,7 @@ data class ChatMessage(
     val translatedText   : String        = "",
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ChatRoomUiState
-// [변경] translatingMessageIds, contextMenuMessage, savedToastVisible 추가
-// ─────────────────────────────────────────────────────────────────────────────
+// ChatRoomUiState — [변경] translatingMessageIds, contextMenuMessage, savedToastVisible 추가
 data class ChatRoomUiState(
     val room                  : ChatRoom             = ChatRoom(),
     val messages              : List<ChatMessage>    = emptyList(),
@@ -85,9 +73,6 @@ data class ChatRoomUiState(
     val savedToastVisible     : Boolean              = false,
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 더미 데이터
-// ─────────────────────────────────────────────────────────────────────────────
 private val BASE_DATE = LocalDateTime.of(2026, 1, 25, 0, 0)
 
 val dummyChatRooms: List<ChatRoom> = listOf(

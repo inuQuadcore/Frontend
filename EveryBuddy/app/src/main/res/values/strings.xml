@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">EveryBuddy</string>
+    <!-- res/values/strings.xml -->
+    <string name="default_web_client_id">1095562508279-hjqnlu44k3op8f2c256kvpdqi4uip8m7.apps.googleusercontent.com</string>
 </resources>

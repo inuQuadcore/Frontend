@@ -28,8 +28,6 @@ val EBGray3 = Color(0xFFFFFFFF)
 /** 에러 — 빨간 에러 텍스트 */
 val EBError = Color(0xFFFF2B01)
 
-// ── 시맨틱 컬러 (컴포넌트 바인딩용) ──────────────────
-
 /** 로고 border — Figma: border(width=2.dp, color=Col…) */
 val LogoBorderColor     = EBBlack
 

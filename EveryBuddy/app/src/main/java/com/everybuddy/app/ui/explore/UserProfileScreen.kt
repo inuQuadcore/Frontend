@@ -1,0 +1,299 @@
+package com.everybuddy.app.ui.explore
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.everybuddy.app.R
+import com.everybuddy.app.ui.theme.PretendardFamily
+
+private val C = AppColors
+
+@Composable
+fun UserProfileScreen(
+    user      : DiscoverUser,
+    isFriend  : Boolean = false,
+    myTags    : List<UserTag> = ExploreDemo.myProfile.tags,
+    onBack    : () -> Unit,
+    onChat    : (DiscoverUser) -> Unit = {},
+    onAddFriend: (DiscoverUser) -> Unit = {},
+) {
+    BackHandler(onBack = onBack)
+
+    // 공통 태그 개수
+    val myTagKeys     = myTags.map { it.tag }.toSet()
+    val matchingCount = user.tags.count { it.tag in myTagKeys }
+
+    Scaffold(
+        topBar = {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = C.TextPri)
+                    }
+                    Text(user.name, style = TextStyle(fontSize = 17.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri))
+                    IconButton(onClick = { /* TODO: 신고/차단 더보기 메뉴 */ }) {
+                        // ic_more.xml (··· 점 3개)
+                        Icon(painterResource(R.drawable.ic_sidemenu), "더보기", Modifier.size(22.dp), tint = C.TextPri)
+                    }
+                }
+                HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+            }
+        },
+        containerColor = Color.White,
+    ) { innerPadding ->
+
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+        ) {
+
+            // TODO padding: 헤더 horizontal 16dp, top 20dp
+            Spacer(Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                // 프로필 이미지 + 국기 뱃지
+                Box(modifier = Modifier.size(72.dp)) {
+                    Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFD0D0D0))) {
+                        AsyncImage(
+                            model              = user.profileImageUrl,
+                            contentDescription = user.name,
+                            contentScale       = ContentScale.Crop,
+                            modifier           = Modifier.fillMaxSize(),
+                        )
+                    }
+                    Text(
+                        user.countryFlag(), fontSize = 18.sp,
+                        modifier = Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp),
+                    )
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    // 이름 + 현활 뱃지
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(user.name, style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri))
+                        if (user.isOnline) {
+                            Box(Modifier.clip(RoundedCornerShape(10.dp)).background(Color(0xFFFFF3E0)).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Box(Modifier.size(6.dp).clip(CircleShape).background(C.Online))
+                                    Text("현재활동중", style = TextStyle(fontSize = 10.sp, color = Color(0xFFE65100), fontFamily = PretendardFamily))
+                                }
+                            }
+                        }
+                    }
+                    Text("${user.consecutiveDays}세 · 여성", style = TextStyle(fontSize = 13.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // 자기소개
+            Text(
+                user.bio,
+                style    = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 22.sp),
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+
+            Spacer(Modifier.height(10.dp))
+
+            // 국적 / 연속출석 / 원문보기 정보 행
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // ic_location.xml
+                    Icon(painterResource(R.drawable.ic_location), "국적", Modifier.size(14.dp), tint = C.TextSec)
+                    Text(user.countryFlag(), fontSize = 12.sp)
+                }
+                if (user.consecutiveDays > 0) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        // ic_calendar.xml
+                        Icon(painterResource(R.drawable.ic_calendar), "출석", Modifier.size(14.dp), tint = C.TextSec)
+                        Text("연속 ${user.consecutiveDays}일 출석", style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                    }
+                }
+                // 원문보기
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.clickable { /* TODO: 원문 보기 */ },
+                ) {
+                    // ic_translate.xml
+                    Icon(painterResource(R.drawable.ic_translate), "원문보기", Modifier.size(14.dp), tint = C.TextSec)
+                    Text("원문보기", style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (isFriend) {
+                    // [나의친구] — 파란 아이콘+텍스트 outline 버튼
+                    OutlinedButton(
+                        onClick  = { /* TODO: 친구 삭제 확인 다이얼로그 */ },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape    = RoundedCornerShape(10.dp),
+                        border   = BorderStroke(1.5.dp, C.Accent),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(painterResource(R.drawable.ic_friend_add), "나의친구", Modifier.size(18.dp), tint = C.Accent)
+                            Text("나의친구", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.Accent, fontWeight = FontWeight(600)))
+                        }
+                    }
+                } else {
+                    // [친구추가] — 파란 filled 버튼
+                    Button(
+                        onClick  = { onAddFriend(user) },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape    = RoundedCornerShape(10.dp),
+                        colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(painterResource(R.drawable.ic_friend_add), "친구추가", Modifier.size(18.dp), tint = Color.White)
+                            Text("친구추가", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = Color.White, fontWeight = FontWeight(600)))
+                        }
+                    }
+                }
+
+                // [채팅하기] — 항상 outline
+                OutlinedButton(
+                    onClick  = { onChat(user) },
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape    = RoundedCornerShape(10.dp),
+                    border   = BorderStroke(1.5.dp, C.Border),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(painterResource(R.drawable.ic_nav_chat), "채팅", Modifier.size(18.dp), tint = C.TextPri)
+                        Text("채팅하기", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri, fontWeight = FontWeight(600)))
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+            HorizontalDivider(color = C.Border, thickness = 8.dp)
+
+            Spacer(Modifier.height(20.dp))
+            Text("소통 언어", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri), modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(12.dp))
+            user.languages.forEach { lang ->
+                LanguageLevelRow(lang = lang, onTap = { /* TODO: 언어 상세 */ })
+            }
+
+            Spacer(Modifier.height(20.dp))
+            HorizontalDivider(color = C.Border, thickness = 8.dp)
+
+            Spacer(Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("나의 태그", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri))
+                if (matchingCount > 0) {
+                    Text(
+                        "나와 ${matchingCount}개 일치해요!",
+                        style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.Accent, fontWeight = FontWeight(600)),
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            // 태그 wrap layout (FlowRow 대신 3열 그리드)
+            TagWrapLayout(tags = user.tags, myTagKeys = myTagKeys)
+
+            Spacer(Modifier.height(32.dp))
+        }
+    }
+}
+
+// 언어 레벨 행
+@Composable
+fun LanguageLevelRow(lang: UserLanguage, onTap: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).clickable(onClick = onTap),
+        shape    = RoundedCornerShape(12.dp),
+        color    = Color.White,
+        border   = BorderStroke(0.8.dp, C.Border),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(lang.flagEmoji(), fontSize = 22.sp)
+                Text(
+                    when (lang.language.uppercase()) {
+                        "ENGLISH" -> "영어"; "JAPANESE" -> "일본어"; "KOREAN" -> "한국어"
+                        "CHINESE" -> "중국어"; "FRENCH" -> "프랑스어"; else -> lang.language
+                    },
+                    style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = C.TextPri),
+                )
+                // 레벨 점 (● ● ● ○ ○)
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    repeat(5) { idx ->
+                        Box(
+                            modifier = Modifier.size(8.dp).clip(CircleShape)
+                                .background(if (idx < lang.level) C.Accent else C.Border),
+                        )
+                    }
+                }
+            }
+            Icon(painterResource(R.drawable.ic_chevron_right), "상세", Modifier.size(16.dp), tint = C.TextSec)
+        }
+    }
+}
+
+// 태그 Wrap 레이아웃
+@Composable
+fun TagWrapLayout(tags: List<UserTag>, myTagKeys: Set<String> = emptySet()) {
+    // 간단한 가로 LazyRow → 실제 wrap은 TODO: accompanist FlowRow
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        tags.chunked(4).forEach { rowTags ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 6.dp)) {
+                rowTags.forEach { tag ->
+                    val isMatch = tag.tag in myTagKeys
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (isMatch) C.TagBg else C.TagBgGray)
+                            .border(if (isMatch) 1.dp else 0.dp, if (isMatch) C.Accent else Color.Transparent, RoundedCornerShape(20.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Text("${tag.emoji} ${tag.displayName}", style = TextStyle(fontSize = 12.sp, color = if (isMatch) C.Accent else C.TagTextGray, fontFamily = PretendardFamily))
+                    }
+                }
+            }
+        }
+    }
+}
+
+// BorderStroke 편의
+private fun BorderStroke(width: androidx.compose.ui.unit.Dp, color: Color) =
+    androidx.compose.foundation.BorderStroke(width, color)

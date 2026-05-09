@@ -90,8 +90,8 @@ data class OnboardingUiState(
     // Step 3: 사용 언어 (내 언어)
     // 언어 검색 입력값 (실시간 필터링)
     val myLangQuery        : String              = "",
-    // 선택된 사용 언어 목록
-    val selectedMyLangs    : List<LanguageItem>  = emptyList(),
+    // 선택된 사용 언어 (단일 선택)
+    val selectedMyLang     : LanguageItem?       = null,
     // 레벨 설정 바텀시트 표시 여부
     val showLevelSheet     : Boolean             = false,
 
@@ -114,9 +114,10 @@ data class OnboardingUiState(
     // 별도 상태 없음, 순수 안내 화면
 
     // 공통
-    // API 요청 중 로딩 상태
     val isLoading          : Boolean             = false,
     val errorMessage       : String?             = null,
+    // 회원가입 API 성공 시 true → OnboardingScreen의 LaunchedEffect가 onFinish() 호출
+    val registerSuccess    : Boolean             = false,
 )
 
 // 샘플 데이터(현재는 하드 코딩, 추후 API 연동 시 교체)
@@ -268,7 +269,7 @@ val appFeatures = listOf(
     AppFeatureItem(R.drawable.ic_nav_chat,   "채팅",     "+ 버튼을 눌러 새 채팅을 시작해봐요!"),
     AppFeatureItem(R.drawable.ic_nav_friend, "친구",     "친구들과 즐겁게 이야기 나눠요!"),
     AppFeatureItem(R.drawable.ic_nav_find,   "탐색",     "나와 맞는 맞춤형 추천 친구를 찾아봐요!"),
-    AppFeatureItem(R.drawable.ic_nav_keep,   "스크립트", "대화한 표현을 저장하고 공부할 수 있어요!"),
+    AppFeatureItem(R.drawable.ic_nav_script,   "스크립트", "대화한 표현을 저장하고 공부할 수 있어요!"),
     AppFeatureItem(R.drawable.ic_nav_my,     "마이",     "설정을 여기에서 수정할 수 있어요!"),
 )
 
