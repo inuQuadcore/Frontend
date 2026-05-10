@@ -1,19 +1,15 @@
 package com.everybuddy.app.ui.chat
 
-// =============================================================================
-// 구조:
-//   ChatRoomScreen          — Hilt 진입점
-//   ChatRoomContent         — 상태 기반 전체 레이아웃
-//   ChatAppBar              — 상단바 (뒤로/이름/검색/메뉴)
-//   MessageList             — LazyColumn 메시지 목록
-//   TextMessageBubble       — 텍스트 말풍선 + 번역 버튼/번역문
-//   VoiceMessageBubble      — 음성 말풍선 (파형 + 재생 + STT)
-//   InputBar                — 입력바 (+/텍스트/마이크/전송)
-//   MediaPanel              — + 클릭 시 미디어 패널 (사진/카메라/통화/파일/대화저장)
-//   RecordingOverlay        — 음성 녹음 바텀시트
-//   ScriptSaveSheet         — 스크립트 저장 바텀시트 (1/2, 2/2)
-//   SaveOptionDialog        — 통합/따로 저장 다이얼로그
-// =============================================================================
+// ChatRoomScreen          — Hilt 진입점
+// ChatRoomContent         — 상태 기반 전체 레이아웃
+// ChatAppBar              — 상단바 (뒤로/이름/검색/메뉴)
+// MessageList             — LazyColumn 메시지 목록
+// TextMessageBubble       — 텍스트 말풍선 + 번역 버튼/번역문
+// VoiceMessageBubble      — 음성 말풍선 (파형 + 재생 + STT)
+// InputBar                — 입력바 (+/텍스트/마이크/전송)
+// RecordingOverlay        — 음성 녹음 바텀시트
+// ScriptSaveSheet         — 스크립트 저장 바텀시트 (1/2, 2/2)
+// SaveOptionDialog        — 통합/따로 저장 다이얼로그
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
@@ -141,7 +137,6 @@ fun ChatRoomContent(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // ── 상단 앱바 ────────────────────────────────────────────
             ChatAppBar(
                 roomName = state.room.name,
                 onBack   = onBack,
@@ -151,7 +146,6 @@ fun ChatRoomContent(
 
             HorizontalDivider(color = DividerGray, thickness = 0.5.dp)
 
-            // ── 메시지 목록 ──────────────────────────────────────────
             MessageList(
                 messages              = state.messages,
                 isAutoTranslate       = state.isAutoTranslate,
@@ -169,7 +163,6 @@ fun ChatRoomContent(
                 },
             )
 
-            // ── 미디어 패널 ──────────────────────────────────────────
             AnimatedVisibility(
                 visible = state.isMediaPanelOpen && !state.isRecording,
                 enter   = slideInVertically { it } + fadeIn(),
@@ -184,7 +177,6 @@ fun ChatRoomContent(
 //                )
             }
 
-            // ── 입력바 ───────────────────────────────────────────────
             if (!state.isRecording) {
                 InputBar(
                     text             = state.inputText,
@@ -197,7 +189,6 @@ fun ChatRoomContent(
             }
         }
 
-        // ── 녹음 오버레이 (바텀시트) ─────────────────────────────────
         AnimatedVisibility(
             visible  = state.isRecording,
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -213,7 +204,6 @@ fun ChatRoomContent(
             )
         }
 
-        // ── 컨텍스트 메뉴 ────────────────────────────────────────────
         state.contextMenuMessage?.let { msg ->
             MessageContextMenu(
                 onDismiss    = onDismissContextMenu,
@@ -234,7 +224,6 @@ fun ChatRoomContent(
             )
         }
 
-        // ── 저장 완료 토스트 ─────────────────────────────────────────
         AnimatedVisibility(
             visible  = state.savedToastVisible,
             modifier = Modifier
@@ -248,7 +237,6 @@ fun ChatRoomContent(
         }
     }   // Box 끝
 
-    // ── 스크립트 저장 바텀시트 ────────────────────────────────────────
     scriptSaveMessage?.let { msg ->
         ScriptSaveSheet(
             message   = msg,
@@ -268,12 +256,10 @@ fun ChatRoomContent(
         )
     }
 
-    // ── 저장옵션 다이얼로그 ──────────────────────────────────────────
     if (saveOptionOpen) {
         SaveOptionDialog(onDismiss = { saveOptionOpen = false })
     }
 
-    // ── 사이드 메뉴 ──────────────────────────────────────────────────
     if (isMenuOpen) {
         ChatSideMenu(
             isAutoTranslate       = state.isAutoTranslate,
@@ -371,7 +357,6 @@ fun ChatSideMenu(
                 ),
             )
 
-            // ── 자동번역 ON/OFF ──────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -545,12 +530,7 @@ fun DateDivider(label: String) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TextMessageBubble
-// 디자인: 상대=왼쪽(아바타+이름+흰말풍선) / 나=오른쪽(연파랑말풍선)
-//         번역 버튼: 文A 아이콘 — 말풍선 오른쪽 바깥
-//         번역문: 말풍선 아래 들여쓰기 없이 회색 텍스트
-// ─────────────────────────────────────────────────────────────────────────────
+// TextMessageBubble — 상대=왼쪽(아바타+이름+흰말풍선) / 나=오른쪽(연파랑말풍선)
 @Composable
 fun TextMessageBubble(
     message             : ChatMessage,
@@ -715,11 +695,7 @@ fun TranslateIconButton(onClick: () -> Unit) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// VoiceMessageBubble
-// 디자인: 재생버튼(파란원) + 파형(Canvas) + 타이머 / STT 텍스트 하단
-//         내 음성: 파란 버블 (#0167FF), 상대: 흰 버블
-// ─────────────────────────────────────────────────────────────────────────────
+// VoiceMessageBubble — 재생버튼(파란원) + 파형(Canvas) + 타이머 / STT 텍스트 하단
 @Composable
 fun VoiceMessageBubble(
     message             : ChatMessage,
@@ -930,10 +906,7 @@ fun WaveformView(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// InputBar
-// 디자인: + 원형버튼 / 둥근 텍스트필드 / 마이크 아이콘 / 전송 버튼
-// ─────────────────────────────────────────────────────────────────────────────
+// InputBar — + 원형버튼 / 둥근 텍스트필드 / 마이크 아이콘 / 전송 버튼
 @Composable
 fun InputBar(
     text             : String,
@@ -1035,10 +1008,6 @@ fun InputBar(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MediaPanel
-// 디자인: 사진 / 카메라 / 통화 / 파일 / 대화저장  (5개 아이콘 그리드)
-// ─────────────────────────────────────────────────────────────────────────────
 //@Composable
 //fun MediaPanel(
 //    onPhoto      : () -> Unit,
@@ -1095,14 +1064,7 @@ fun InputBar(
 //    }
 //}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RecordingOverlay
-// 디자인 (채팅방_음성녹음.png):
-//   흰 바텀시트, 마이크(파란 원) + 파동 애니메이션
-//   타이머 (HH:MM:SS), 하단 삭제/일시정지/정지 버튼 3개
-//   (채팅방_-_음성메시지_송신*.png 기준과 약간 다름 — 이미지 확인)
-//     송신 플로우: idle=마이크만, 녹음중=정지버튼, 완료=재생+재녹음+전송
-// ─────────────────────────────────────────────────────────────────────────────
+// RecordingOverlay — 흰 바텀시트, 마이크(파란 원) + 파동 애니메이션, 타이머, 삭제/일시정지/정지 버튼
 @Composable
 fun RecordingOverlay(
     seconds    : Int,
@@ -1262,9 +1224,7 @@ private fun RecordActionButton(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // RealtimeWaveform — 녹음 중 실시간 파형
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun RealtimeWaveform(
     amplitudes : List<Float>,
@@ -1287,12 +1247,6 @@ fun RealtimeWaveform(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ScriptSaveSheet — 스크립트 저장 바텀시트
-// 디자인 (채팅방__자동번역_off_-1.png, -2.png):
-//   1/2: 원문 표시 + 뜻(번역문) + 메모 + 폴더 선택 / 다음 버튼
-//   2/2: 동일 내용 / 저장 버튼 + 이전으로
-// ─────────────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScriptSaveSheet(
@@ -1579,9 +1533,7 @@ fun ScriptSaveSheet(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // SaveOptionDialog — 통합/따로 저장 선택
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun SaveOptionDialog(onDismiss: () -> Unit) {
     var selected by remember { mutableStateOf(0) }   // 0=통합, 1=따로
@@ -1665,9 +1617,6 @@ fun SaveOptionDialog(onDismiss: () -> Unit) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 유틸
-// ─────────────────────────────────────────────────────────────────────────────
 private fun formatTimer(seconds: Int): String {
     val h = seconds / 3600
     val m = (seconds % 3600) / 60
@@ -1681,9 +1630,6 @@ private fun formatDuration(seconds: Int): String {
     return "%02d:%02d".format(m, s)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Preview — 우원재 채팅방 (디버깅용)
-// ─────────────────────────────────────────────────────────────────────────────
 @Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "우원재 채팅방")
 @Composable
 private fun PreviewWoowonjai() {

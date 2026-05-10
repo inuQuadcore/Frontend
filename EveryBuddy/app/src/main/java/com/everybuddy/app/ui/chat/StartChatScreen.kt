@@ -359,7 +359,7 @@ fun SelectedFriendChip(user: DummyUser, onRemove: () -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    painter            = painterResource(R.drawable.ic_cancel),
+                    painter            = painterResource(R.drawable.ic_fab_plus),
                     contentDescription = "선택 취소",
                     modifier           = Modifier.size(10.dp),
                     tint               = Color.White,

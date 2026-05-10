@@ -363,14 +363,10 @@ fun SignUpScreenContent(
                 enabled  = uiState.isAgreed && !uiState.isLoading,
             ) {
                 if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier    = Modifier.size(20.dp),
-                        color       = Color.White,
-                        strokeWidth = 2.dp,
-                    )
+                    LoadingIndicator(modifier = Modifier.size(20.dp), tint = Color.White)
                 } else {
                     Text(
-                        text  = "회원가입 완료하기",
+                        text  = "회원 정보 작성",
                         style = TextStyle(
                             fontSize   = 16.sp,
                             fontFamily = PretendardFamily,

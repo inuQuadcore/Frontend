@@ -1,7 +1,6 @@
 package com.everybuddy.app
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -16,19 +15,13 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d("DEBUG", "onCreate started")
         enableEdgeToEdge()
-        try {
-            setContent {
-                Log.d("DEBUG", "setContent started")
-                EveryBuddyTheme {
-                    Surface(modifier = Modifier.fillMaxSize()) {
-                        AppNavGraph()
-                    }
+        setContent {
+            EveryBuddyTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    AppNavGraph()
                 }
             }
-        } catch (e: Exception) {
-            Log.e("DEBUG", "Crash in setContent", e)
         }
     }
 }

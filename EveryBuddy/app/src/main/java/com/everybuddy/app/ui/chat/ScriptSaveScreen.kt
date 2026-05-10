@@ -1,10 +1,8 @@
 package com.everybuddy.app.ui.chat
 
-// =============================================================================
-// ScriptSaveScreen.kt  (최종 디자인 반영 v2)
-// =============================================================================
-
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.tooling.preview.Preview
+import com.everybuddy.app.ui.theme.EveryBuddyTheme
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,9 +37,6 @@ import com.everybuddy.app.data.chat.MessageType
 import com.everybuddy.app.ui.theme.PretendardFamily
 import java.time.format.DateTimeFormatter
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 색상
-// ─────────────────────────────────────────────────────────────────────────────
 private val SsAccent     = Color(0xFF0167FF)
 private val SsTextPri    = Color(0xFF000000)
 private val SsTextSec    = Color(0xFF797979)
@@ -51,9 +46,6 @@ private val SsBubbleGray = Color(0xFFE5E6E8)
 private val SsBubbleBlue = Color(0xFFDEF0FF)
 private val SsSelectBg   = Color(0x0A0167FF)
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 모델
-// ─────────────────────────────────────────────────────────────────────────────
 data class ScriptFolder(
     val id         : String,
     val name       : String,
@@ -70,15 +62,49 @@ data class ScriptSaveItem(
     val messageId      : String,
     val originalText   : String,
     val translatedText : String  = "",
-    val memo           : String  = "",
+    val memo1          : String  = "",   // 단어 뜻 (최대 30자, 7/30)
+    val memo2          : String  = "",   // 상세 메모 (최대 150자, 23/150)
     val selectedFolder : String? = null,
 )
 
 enum class CaptureOption { COMBINED, SEPARATE }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MessageContextMenu
-// ─────────────────────────────────────────────────────────────────────────────
+data class ScriptItem(
+    val id             : String,
+    val originalText   : String,
+    val translatedText : String,
+    val memo1          : String  = "",
+    val memo2          : String  = "",
+    val folderId       : String? = null,
+)
+
+val dummyScriptItems = listOf(
+    ScriptItem(
+        id             = "s01",
+        originalText   = "I open up the messages, then had to hit the zoom. Turns out the girl was really a dude.",
+        translatedText = "메시지를 열어보니 자세히 봐야 했어. 알고 보니 그녀가 사실 남자였던 거야.",
+        memo1          = "확대/축소하기",
+        memo2          = "have to와 함께 쓰면 \"자세히 보다\" 라고도 쓰임",
+        folderId       = "f01",
+    ),
+    ScriptItem(
+        id             = "s02",
+        originalText   = "HE think he slicked back 'til I slipped back.",
+        translatedText = "그놈은 교묘하게 숨겼다고 생각했지만 난 알아냈지.",
+        memo1          = "말만(겉만) 번드르르한, 살짝 돌아가다",
+        memo2          = "그는 \"번드르르하게 넘겼다\"고 생각했겠지, 내가 \"살짝 돌아가기 전까지\" (=뒤통수를 치기 전까지)",
+        folderId       = "f01",
+    ),
+    ScriptItem(
+        id             = "s03",
+        originalText   = "She didn't know about me and I didn't know 'bout Sue",
+        translatedText = "그녀도 날 몰랐고, 나도 수에 대해 몰랐고",
+        memo1          = "",
+        memo2          = "",
+        folderId       = "f01",
+    ),
+)
+
 @Composable
 fun MessageContextMenu(
     onDismiss    : () -> Unit,
@@ -123,12 +149,6 @@ fun MessageContextMenu(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ScriptSaveSheet — 스크립트 저장 바텀시트
-//
-// 1/2: [다음] 파란 버튼 full-width + [취소하기] 빨간 텍스트
-// 2/2: [저장] 파란 버튼 full-width + [이전으로] 검정 텍스트
-// ─────────────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScriptSaveSheet(
@@ -142,7 +162,8 @@ fun ScriptSaveSheet(
     onAddFolder : () -> Unit = {},
 ) {
     var editedText     by remember { mutableStateOf(message.text) }
-    var memo           by remember { mutableStateOf("") }
+    var memo1          by remember { mutableStateOf("") }   // 단어 뜻 (최대 30자)
+    var memo2          by remember { mutableStateOf("") }   // 상세 메모 (최대 150자)
     var selectedFolder by remember { mutableStateOf<String?>(null) }
 
     ModalBottomSheet(
@@ -227,38 +248,31 @@ fun ScriptSaveSheet(
                 }
             }
 
-            // 메모 섹션
+            // 메모 1 — 단어 뜻 (최대 30자)
             // TODO padding: 메모 섹션 상단 패딩 (현재 20dp)
             Spacer(Modifier.height(20.dp))
             SsLabel("메모")
             Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFFF8F8F8))
-                    .border(0.5.dp, SsBorder, RoundedCornerShape(10.dp))
-                    // TODO padding: 메모 카드 내부 패딩 (현재 12dp)
-                    .padding(12.dp),
-            ) {
-                Column {
-                    BasicTextField(
-                        value         = memo,
-                        onValueChange = { if (it.length <= 150) memo = it },
-                        modifier      = Modifier
-                            .fillMaxWidth()
-                            // TODO padding: 메모 입력 최소 높이 (현재 60dp)
-                            .defaultMinSize(minHeight = 60.dp),
-                        textStyle     = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = SsTextPri),
-                        decorationBox = { inner ->
-                            if (memo.isEmpty()) Text("언어를 배울 때 처음 쓰기 좋은 인삿말", style = TextStyle(fontSize = 14.sp, color = SsTextSec))
-                            inner()
-                        },
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text("${memo.length}/150", style = TextStyle(fontSize = 11.sp, color = SsTextSec), modifier = Modifier.align(Alignment.End))
-                }
-            }
+            SsMemoField(
+                value     = memo1,
+                maxLength = 30,
+                minHeight = 44.dp,
+                hint      = "",
+                onChange  = { if (it.length <= 30) memo1 = it },
+            )
+
+            // 메모 2 — 상세 메모 (최대 150자)
+            // TODO padding: 메모2 섹션 상단 패딩 (현재 12dp)
+            Spacer(Modifier.height(12.dp))
+            SsLabel("메모")
+            Spacer(Modifier.height(8.dp))
+            SsMemoField(
+                value     = memo2,
+                maxLength = 150,
+                minHeight = 80.dp,
+                hint      = "언어를 배울 때 처음 쓰기 좋은 인삿말",
+                onChange  = { if (it.length <= 150) memo2 = it },
+            )
 
             // 폴더 선택
             // TODO padding: 폴더 선택 섹션 상단 패딩 (현재 20dp)
@@ -306,7 +320,7 @@ fun ScriptSaveSheet(
             Spacer(Modifier.height(28.dp))
             Button(
                 onClick  = if (step == 1) onNext else {
-                    { onSave(ScriptSaveItem(message.id, editedText, message.translatedText, memo, selectedFolder)) }
+                    { onSave(ScriptSaveItem(message.id, editedText, message.translatedText, memo1, memo2, selectedFolder)) }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape    = RoundedCornerShape(12.dp),
@@ -339,9 +353,6 @@ fun ScriptSaveSheet(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SsLabel — 섹션 제목
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun SsLabel(text: String) {
     Text(
@@ -350,9 +361,48 @@ private fun SsLabel(text: String) {
     )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// OriginalTextCard
-// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun SsMemoField(
+    value     : String,
+    maxLength : Int,
+    minHeight : androidx.compose.ui.unit.Dp,
+    hint      : String,
+    onChange  : (String) -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFFF8F8F8))
+            .border(0.5.dp, SsBorder, RoundedCornerShape(10.dp))
+            // TODO padding: 메모 카드 내부 패딩 (현재 12dp)
+            .padding(12.dp),
+    ) {
+        Column {
+            BasicTextField(
+                value         = value,
+                onValueChange = onChange,
+                modifier      = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = minHeight),
+                textStyle     = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = SsTextPri),
+                decorationBox = { inner ->
+                    if (value.isEmpty() && hint.isNotEmpty()) {
+                        Text(hint, style = TextStyle(fontSize = 14.sp, color = SsTextSec))
+                    }
+                    inner()
+                },
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "${value.length}/$maxLength",
+                style    = TextStyle(fontSize = 11.sp, color = SsTextSec),
+                modifier = Modifier.align(Alignment.End),
+            )
+        }
+    }
+}
+
 @Composable
 fun OriginalTextCard(text: String, onChange: (String) -> Unit) {
     var isEditing by remember { mutableStateOf(false) }
@@ -390,8 +440,16 @@ fun OriginalTextCard(text: String, onChange: (String) -> Unit) {
                     border         = BorderStroke(0.5.dp, SsBorder),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 ) {
+                    if (!isEditing) {
+                        Image(
+                            painter            = painterResource(R.drawable.ic_pencil),
+                            contentDescription = null,
+                            modifier           = Modifier.size(12.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
                     Text(
-                        if (isEditing) "✓ 완료하기" else "✏ 수정하기",
+                        if (isEditing) "완료하기" else "수정하기",
                         style = TextStyle(fontSize = 12.sp, color = SsTextSec),
                     )
                 }
@@ -400,9 +458,6 @@ fun OriginalTextCard(text: String, onChange: (String) -> Unit) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ScriptFolderThumbnail
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun ScriptFolderThumbnail(folder: ScriptFolder, isSelected: Boolean, onClick: () -> Unit) {
     Box(
@@ -434,9 +489,6 @@ fun ScriptFolderThumbnail(folder: ScriptFolder, isSelected: Boolean, onClick: ()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ConversationSelectScreen
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun ConversationSelectScreen(
     messages : List<ChatMessage>,
@@ -453,6 +505,10 @@ fun ConversationSelectScreen(
     val selectedMessages = remember(selectedRange, messages) {
         selectedRange?.let { r -> messages.filterIndexed { i, _ -> i in r } } ?: emptyList()
     }
+
+    // 안내문구 2단계: 선택 전 / 선택 후
+    val guideText = if (selectedMessages.isEmpty()) "저장하고 싶은 대화를 선택해주세요."
+    else "저장 버튼을 클릭해주세요."
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -475,7 +531,20 @@ fun ConversationSelectScreen(
                             "대화 선택",
                             style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SsTextPri),
                         )
-                        Box(modifier = Modifier.size(48.dp))  // 균형용
+                        // 선택 해제 버튼 — 선택 중일 때만 활성
+                        TextButton(
+                            onClick  = { selectedRange = null },
+                            enabled  = selectedMessages.isNotEmpty(),
+                        ) {
+                            Text(
+                                "선택 해제",
+                                style = TextStyle(
+                                    fontSize   = 14.sp,
+                                    fontFamily = PretendardFamily,
+                                    color      = if (selectedMessages.isNotEmpty()) SsTextPri else SsTextSec,
+                                ),
+                            )
+                        }
                     }
                     HorizontalDivider(color = SsBorder, thickness = 0.5.dp)
                 }
@@ -526,9 +595,9 @@ fun ConversationSelectScreen(
                 // 배경 전체 회색
                 Box(modifier = Modifier.fillMaxSize().background(Color(0xFFAAAAAA)))
 
-                // 안내문구
+                // 안내문구 — 2단계
                 Text(
-                    "저장하고 싶은 대화를 선택해주세요.",
+                    guideText,
                     style     = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SsTextSec),
                     modifier  = Modifier
                         .fillMaxWidth()
@@ -557,9 +626,6 @@ fun ConversationSelectScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SelectableMessageList
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun SelectableMessageList(
     messages      : List<ChatMessage>,
@@ -612,9 +678,6 @@ private fun SelectableMessageList(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SelectableMessageItem
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun SelectableMessageItem(message: ChatMessage, isMe: Boolean) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
@@ -672,13 +735,6 @@ private fun SelectableMessageItem(message: ChatMessage, isMe: Boolean) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CaptureOptionDialog — 저장옵션
-//
-// 디자인:
-//   헤더: "저장옵션" + 부제목 + X 닫기
-//   선택 항목: 테두리 박스 (선택=파란 테두리+연파랑bg+파란텍스트+파란체크원 / 미선택=회색)
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun CaptureOptionDialog(
     selected  : CaptureOption,
@@ -766,9 +822,6 @@ fun CaptureOptionDialog(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SavedToast
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun SavedToast(message: String = "저장되었습니다.") {
     Box(
@@ -782,9 +835,6 @@ fun SavedToast(message: String = "저장되었습니다.") {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NewFolderScreen
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun NewFolderScreen(
     roomName : String,
@@ -804,23 +854,45 @@ fun NewFolderScreen(
                         .background(Color.White)
                         // TODO padding: 앱바 horizontal 패딩 (현재 4dp)
                         .padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     IconButton(onClick = onBack) {
                         Icon(painterResource(R.drawable.ic_back), "뒤로", modifier = Modifier.size(24.dp), tint = SsTextPri)
                     }
-                    Text(roomName, style = TextStyle(fontSize = 20.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SsTextPri), modifier = Modifier.weight(1f))
-                    IconButton(onClick = {}) { Icon(painterResource(R.drawable.ic_search),   "검색", modifier = Modifier.size(24.dp), tint = SsTextPri) }
-                    IconButton(onClick = {}) { Icon(painterResource(R.drawable.ic_sidemenu), "메뉴",  modifier = Modifier.size(24.dp), tint = SsTextPri) }
+                    Text(
+                        "폴더 추가하기",
+                        style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SsTextPri),
+                    )
+                    // 균형용 빈 영역
+                    Box(modifier = Modifier.size(48.dp))
                 }
                 HorizontalDivider(color = SsBorder, thickness = 0.5.dp)
-                // 탭 인디케이터 + 새 폴더 제목
-                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(modifier = Modifier.width(60.dp).height(2.5.dp).background(SsTextPri))
-                    Text("새 폴더", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = SsTextPri),
-                        // TODO padding: "새 폴더" 텍스트 vertical 패딩 (현재 10dp)
-                        modifier = Modifier.padding(vertical = 10.dp))
-                    HorizontalDivider(color = SsBorder, thickness = 0.5.dp)
+            }
+        },
+        bottomBar = {
+            // [완료] full-width 파란 버튼
+            Column {
+                HorizontalDivider(color = SsBorder, thickness = 0.5.dp)
+                Button(
+                    onClick  = { if (folderName.isNotEmpty()) onSave(folderName, imageUri) },
+                    enabled  = folderName.isNotEmpty(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        // TODO padding: 완료 버튼 horizontal 패딩 (현재 16dp), vertical (현재 12dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .navigationBarsPadding()
+                        .height(52.dp),
+                    shape  = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor         = SsAccent,
+                        disabledContainerColor = Color(0xFFCCCCCC),
+                    ),
+                ) {
+                    Text(
+                        "완료",
+                        style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White),
+                    )
                 }
             }
         },
@@ -832,73 +904,224 @@ fun NewFolderScreen(
                 .fillMaxSize()
                 // TODO padding: 본문 horizontal 패딩 (현재 16dp)
                 .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // 폴더명
-            // TODO padding: 폴더명 섹션 상단 패딩 (현재 24dp)
-            Spacer(Modifier.height(24.dp))
-            Text("폴더명", style = TextStyle(fontSize = 14.sp, color = SsTextPri), modifier = Modifier.padding(bottom = 8.dp))
+            // TODO padding: 이미지 섹션 상단 패딩 (현재 32dp)
+            Spacer(Modifier.height(32.dp))
+            Box(
+                modifier = Modifier
+                    // TODO size: 커버 이미지 크기 (현재 160x130dp)
+                    .size(width = 160.dp, height = 130.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFFF0F0F0))
+                    .clickable {
+                        // TODO: 갤러리 런처 연동
+                        // val launcher = rememberLauncherForActivityResult(
+                        //   ActivityResultContracts.GetContent()
+                        // ) { uri -> imageUri = uri?.toString() }
+                        // launcher.launch("image/*")
+                    },
+            ) {
+                if (imageUri != null) {
+                    // TODO: coil AsyncImage(model = imageUri, contentScale = ContentScale.Crop)
+                } else {
+                    Column(
+                        modifier            = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        // + 아이콘
+                        Text(
+                            "+",
+                            style = TextStyle(fontSize = 32.sp, color = Color(0xFFAAAAAA)),
+                        )
+                        // TODO padding: "커버사진추가" 텍스트 상단 패딩 (현재 4dp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "커버사진추가",
+                            style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = SsTextSec),
+                        )
+                    }
+                }
+                // 카메라 아이콘 — 우하단 고정
+                Box(
+                    modifier         = Modifier
+                        .align(Alignment.BottomEnd)
+                        // TODO padding: 카메라 아이콘 위치 (현재 8dp)
+                        .padding(8.dp)
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF888888)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // TODO icon: ic_camera.xml
+                    Icon(
+                        painter            = painterResource(R.drawable.ic_media_camera),
+                        contentDescription = "카메라",
+                        modifier           = Modifier.size(18.dp),
+                        tint               = Color.White,
+                    )
+                }
+            }
+
+            // TODO padding: 폴더 이름 섹션 상단 패딩 (현재 28dp)
+            Spacer(Modifier.height(28.dp))
+
+            // 라벨 "폴더 이름 *"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "폴더 이름 ",
+                    style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = SsTextPri),
+                )
+                Text(
+                    "*",
+                    style = TextStyle(fontSize = 15.sp, color = SsTextRed),
+                )
+            }
+
+            // TODO padding: 입력 필드 상단 패딩 (현재 8dp)
+            Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .border(1.dp, SsBorder, RoundedCornerShape(8.dp))
-                    // TODO padding: 폴더명 입력 필드 내부 패딩 (현재 horizontal 12dp, vertical 14dp)
-                    .padding(horizontal = 12.dp, vertical = 14.dp),
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, SsBorder, RoundedCornerShape(10.dp))
+                    // TODO padding: 입력 필드 내부 패딩 (현재 horizontal 14dp, vertical 14dp)
+                    .padding(horizontal = 14.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.CenterVertically,
             ) {
                 BasicTextField(
                     value         = folderName,
-                    onValueChange = { if (it.length <= 10) folderName = it },
+                    onValueChange = { if (it.length <= 8) folderName = it },
                     modifier      = Modifier.weight(1f),
                     textStyle     = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SsTextPri),
+                    decorationBox = { inner ->
+                        if (folderName.isEmpty()) {
+                            Text(
+                                "폴더 이름을 입력해주세요",
+                                style = TextStyle(fontSize = 15.sp, color = SsTextSec),
+                            )
+                        }
+                        inner()
+                    },
                 )
-                Text("${folderName.length}/10", style = TextStyle(fontSize = 12.sp, color = SsTextSec))
-            }
-
-            // 폴더 대표 이미지
-            // TODO padding: 이미지 섹션 상단 패딩 (현재 24dp)
-            Spacer(Modifier.height(24.dp))
-            Text("폴더 대표 이미지", style = TextStyle(fontSize = 14.sp, color = SsTextPri), modifier = Modifier.padding(bottom = 10.dp))
-            Box(
-                modifier = Modifier
-                    // TODO size: 폴더 대표 이미지 크기 (현재 150x120dp)
-                    .size(width = 150.dp, height = 120.dp)
-                    .align(Alignment.CenterHorizontally)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFF0F0F0))
-                    .clickable { /* TODO: 갤러리 런처 */ },
-                contentAlignment = Alignment.Center,
-            ) {
-                if (imageUri != null) {
-                    // TODO: coil AsyncImage
-                } else {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("+", style = TextStyle(fontSize = 28.sp, color = Color(0xFFAAAAAA)))
-                        Text("새 폴더", style = TextStyle(fontSize = 12.sp, color = SsTextSec))
-                    }
-                }
-            }
-
-            Spacer(Modifier.weight(1f))
-
-            // 하단 취소 / 저장
-            HorizontalDivider(color = SsBorder, thickness = 0.5.dp)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // TODO padding: 하단 버튼 패딩 (현재 horizontal 20dp, vertical 14dp)
-                    .padding(horizontal = 20.dp, vertical = 14.dp)
-                    .navigationBarsPadding(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                TextButton(onClick = onBack) {
-                    Text("취소", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SsTextRed))
-                }
-                TextButton(onClick = { if (folderName.isNotEmpty()) onSave(folderName, imageUri) }, enabled = folderName.isNotEmpty()) {
-                    Text("저장", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = if (folderName.isNotEmpty()) SsTextPri else SsTextSec))
-                }
+                // 글자수 카운터
+                Text(
+                    "${folderName.length}/8",
+                    style = TextStyle(fontSize = 12.sp, color = SsTextSec),
+                )
             }
         }
+    }
+}
+
+private val previewMessage = ChatMessage(
+    id             = "m01",
+    roomId         = "r01",
+    senderId       = "u01",
+    senderName     = "우원재",
+    type           = MessageType.TEXT,
+    text           = "I open up the messages, then had to hit the zoom. Turns out the girl was really a dude.",
+    translatedText = "메시지를 열어보니 자세히 봐야 했어. 알고 보니 그녀가 사실 남자였던 거야.",
+)
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 300, name = "메시지 컨텍스트 메뉴")
+@Composable
+private fun Preview_MessageContextMenu() {
+    EveryBuddyTheme {
+        MessageContextMenu(
+            onDismiss    = {},
+            onCopy       = {},
+            onSelectCopy = {},
+            onReply      = {},
+            onSaveScript = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 200, name = "원문 카드 — 기본")
+@Composable
+private fun Preview_OriginalTextCard() {
+    EveryBuddyTheme {
+        Box(modifier = Modifier.padding(16.dp)) {
+            OriginalTextCard(
+                text     = previewMessage.text,
+                onChange = {},
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 100, name = "폴더 썸네일")
+@Composable
+private fun Preview_ScriptFolderThumbnail() {
+    EveryBuddyTheme {
+        Row(modifier = Modifier.padding(16.dp)) {
+            ScriptFolderThumbnail(folder = dummyScriptFolders[0], isSelected = false, onClick = {})
+            Spacer(Modifier.width(12.dp))
+            ScriptFolderThumbnail(folder = dummyScriptFolders[1], isSelected = true,  onClick = {})
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 80, name = "저장 토스트")
+@Composable
+private fun Preview_SavedToast() {
+    EveryBuddyTheme {
+        Box(modifier = Modifier.padding(16.dp)) {
+            SavedToast()
+        }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 300, name = "캡처 옵션 다이얼로그")
+@Composable
+private fun Preview_CaptureOptionDialog() {
+    EveryBuddyTheme {
+        CaptureOptionDialog(
+            selected  = CaptureOption.COMBINED,
+            onSelect  = {},
+            onDismiss = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "연속 대화 선택")
+@Composable
+private fun Preview_ConversationSelectScreen() {
+    EveryBuddyTheme {
+        val messages = dummyScriptItems.map {
+            ChatMessage(
+                id             = it.id,
+                roomId         = "r01",
+                senderId       = if (it.id == "s01") "u01" else "me",
+                senderName     = if (it.id == "s01") "우원재" else "나",
+                type           = MessageType.TEXT,
+                text           = it.originalText,
+                translatedText = it.translatedText,
+            )
+        }
+        ConversationSelectScreen(
+            messages = messages,
+            roomName = "우원재",
+            onBack   = {},
+            onSave   = { _, _ -> },
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "새 폴더 화면")
+@Composable
+private fun Preview_NewFolderScreen() {
+    EveryBuddyTheme {
+        NewFolderScreen(
+            roomName = "우원재",
+            onBack   = {},
+            onSave   = { _, _ -> },
+        )
     }
 }

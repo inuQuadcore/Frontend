@@ -1,0 +1,389 @@
+package com.everybuddy.app.ui.explore
+
+// =============================================================================
+// FilterSettingScreen.kt
+// 필터 설정 화면
+//
+// 섹션: 성별 | 나이(스무딩 슬라이더) | 국적 | 언어 | 활동빈도 | 사용자태그
+// 하단: [초기화] [적용하기]
+// =============================================================================
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.everybuddy.app.R
+import com.everybuddy.app.ui.theme.PretendardFamily
+
+private val C = AppColors
+
+// 나이 범위 상수
+private const val AGE_MIN = 15
+private const val AGE_MAX = 60
+
+// 탭 카테고리
+private val tagCategories = listOf("취미/관심사", "성격/MBTI", "음식", "엔터테인먼트")
+
+@Composable
+fun FilterSettingScreen(
+    current : FilterSettings,
+    onApply : (FilterSettings) -> Unit,
+    onBack  : () -> Unit,
+) {
+    BackHandler(onBack = onBack)
+
+    // 로컬 편집 상태
+    var gender          by remember { mutableStateOf(current.gender) }
+    var minAge          by remember { mutableFloatStateOf(current.minAge.toFloat()) }
+    var maxAge          by remember { mutableFloatStateOf(current.maxAge.toFloat()) }
+    var country         by remember { mutableStateOf(current.country) }
+    var language        by remember { mutableStateOf(current.language) }
+    var activityFilters by remember { mutableStateOf(current.activityFilters) }
+    var selectedTags    by remember { mutableStateOf(current.selectedTags) }
+    var tagCategoryIdx  by remember { mutableIntStateOf(0) }
+
+    Scaffold(
+        topBar = {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = C.TextPri)
+                    }
+                    Text(
+                        "필터",
+                        style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                        modifier = Modifier.weight(1f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                    Box(Modifier.size(48.dp))
+                }
+                HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+            }
+        },
+        bottomBar = {
+            Column {
+                HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        // TODO padding: 하단바 horizontal 16dp, vertical 12dp
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .navigationBarsPadding(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // 초기화 버튼
+                    OutlinedButton(
+                        onClick        = {
+                            gender = GenderFilter.ALL; minAge = AGE_MIN.toFloat()
+                            maxAge = AGE_MAX.toFloat(); country = null; language = null
+                            activityFilters = emptySet(); selectedTags = emptyList()
+                        },
+                        modifier       = Modifier.weight(1f).height(52.dp),
+                        shape          = RoundedCornerShape(12.dp),
+                        border         = BorderStroke(1.dp, C.Border),
+                        contentPadding = PaddingValues(0.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(painterResource(R.drawable.ic_loading), "초기화", Modifier.size(16.dp), tint = C.TextPri)
+                            Text("초기화", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
+                        }
+                    }
+                    // 적용하기
+                    Button(
+                        onClick = {
+                            onApply(FilterSettings(
+                                gender          = gender,
+                                minAge          = minAge.toInt(),
+                                maxAge          = maxAge.toInt(),
+                                country         = country,
+                                language        = language,
+                                activityFilters = activityFilters,
+                                selectedTags    = selectedTags,
+                                isOnline        = activityFilters.contains(ActivityFilter.ONLINE),
+                                recentlyActive  = activityFilters.contains(ActivityFilter.RECENT),
+                            ))
+                        },
+                        modifier = Modifier.weight(2f).height(52.dp),
+                        shape    = RoundedCornerShape(12.dp),
+                        colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
+                    ) {
+                        Text("적용하기", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color.White))
+                    }
+                }
+            }
+        },
+        containerColor = Color.White,
+    ) { innerPadding ->
+
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+        ) {
+
+            // ── 성별 ──────────────────────────────────────────────────────
+            FilterSection(title = "성별", desc = "소통하고 싶은 친구의 성별을 선택해주세요") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GenderFilter.entries.forEach { g ->
+                        FilterChip(
+                            selected = gender == g,
+                            onClick  = { gender = g },
+                            label    = { Text(g.label, style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily)) },
+                            shape    = RoundedCornerShape(20.dp),
+                            colors   = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = C.Accent,
+                                selectedLabelColor     = Color.White,
+                            ),
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider(color = C.Border.copy(alpha = 0.5f), thickness = 6.dp)
+
+            // ── 나이 ──────────────────────────────────────────────────────
+            FilterSection(
+                title = "나이",
+                desc  = "소통하고 싶은 친구의 나이를 선택해주세요",
+                badge = "${minAge.toInt()}~${maxAge.toInt()}세",
+            ) {
+                // 스무딩 범위 슬라이더 (눈금 없음, 1세 단위)
+                RangeSlider(
+                    value            = minAge..maxAge,
+                    onValueChange    = { range ->
+                        minAge = range.start.coerceIn(AGE_MIN.toFloat(), maxAge - 1)
+                        maxAge = range.endInclusive.coerceIn(minAge + 1, AGE_MAX.toFloat())
+                    },
+                    valueRange       = AGE_MIN.toFloat()..AGE_MAX.toFloat(),
+                    steps            = 0,  // 스무딩
+                    colors           = SliderDefaults.colors(
+                        thumbColor         = C.Accent,
+                        activeTrackColor   = C.Accent,
+                        inactiveTrackColor = C.Border,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            HorizontalDivider(color = C.Border.copy(alpha = 0.5f), thickness = 6.dp)
+
+            // ── 국적 ──────────────────────────────────────────────────────
+            FilterSection(title = "국적", desc = "소통하고 싶은 친구의 국적을 선택해주세요") {
+                // TODO: 국적 선택 하위 시트 → 현재는 드롭다운 표시
+                SelectionRow(
+                    label = country ?: "모든 국적",
+                    onTap = { /* TODO: 국적 선택 BottomSheet */ },
+                )
+            }
+
+            HorizontalDivider(color = C.Border.copy(alpha = 0.5f), thickness = 6.dp)
+
+            // ── 언어 ──────────────────────────────────────────────────────
+            FilterSection(title = "언어", desc = "내가 학습하고 싶은 언어를 사용하는 친구를 찾아봐요") {
+                SelectionRow(
+                    label = language ?: "모든 언어",
+                    onTap = { /* TODO: 언어 선택 BottomSheet */ },
+                )
+            }
+
+            HorizontalDivider(color = C.Border.copy(alpha = 0.5f), thickness = 6.dp)
+
+            // ── 활동빈도 ──────────────────────────────────────────────────
+            FilterSection(title = "활동빈도", desc = "활동이 활발한 친구를 선택할 수 있어요") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ActivityFilter.entries.forEach { af ->
+                        val isSelected = activityFilters.contains(af)
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                activityFilters = if (isSelected) activityFilters - af else activityFilters + af
+                            },
+                            shape  = RoundedCornerShape(12.dp),
+                            color  = if (isSelected) C.TagBg else Color.White,
+                            border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, if (isSelected) C.Accent else C.Border),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                // TODO: 아이콘 (현활/최근/대화빈도)
+                                Box(
+                                    modifier = Modifier.size(28.dp).clip(CircleShape)
+                                        .background(if (isSelected) C.Accent else C.Border),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (isSelected) {
+                                        Text("✓", style = TextStyle(fontSize = 14.sp, color = Color.White, fontWeight = FontWeight(700)))
+                                    }
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text(af.label, style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = if (isSelected) C.Accent else C.TextPri))
+                                    Text(af.desc,  style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextSec))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = C.Border.copy(alpha = 0.5f), thickness = 6.dp)
+
+            // ── 사용자 태그 ──────────────────────────────────────────────
+            FilterSection(
+                title = "사용자 태그",
+                desc  = "관심사나 성격이 맞는 친구를 골라볼 수 있어요.",
+            ) {
+                // 선택된 태그 표시
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    Text("선택한 태그", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.TextSec))
+                    Text("${selectedTags.size}/15", style = TextStyle(fontSize = 12.sp, color = C.TextSec))
+                }
+                Spacer(Modifier.height(8.dp))
+                if (selectedTags.isNotEmpty()) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(selectedTags) { tag ->
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .border(1.5.dp, C.Accent, RoundedCornerShape(20.dp))
+                                    .background(C.TagBg)
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                                    .clickable { selectedTags = selectedTags - tag },
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("${tag.emoji} ${tag.displayName}", style = TextStyle(fontSize = 12.sp, color = C.Accent, fontFamily = PretendardFamily))
+                                    Text("×", style = TextStyle(fontSize = 12.sp, color = C.Accent))
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                // 카테고리 탭
+                ScrollableTabRow(
+                    selectedTabIndex = tagCategoryIdx,
+                    containerColor   = Color.White,
+                    contentColor     = C.Accent,
+                    edgePadding      = 0.dp,
+                ) {
+                    tagCategories.forEachIndexed { idx, cat ->
+                        Tab(
+                            selected = tagCategoryIdx == idx,
+                            onClick  = { tagCategoryIdx = idx },
+                            text     = { Text(cat, style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily)) },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+
+                // 태그 그리드 (온보딩 동일 목록)
+                val filteredTags = ExploreDemo.allTags.filter { tag ->
+                    when (tagCategoryIdx) {
+                        0 -> tag.category == "HOBBY"
+                        1 -> tag.category == "PERSONALITY"
+                        2 -> tag.category == "FOOD"
+                        3 -> tag.category == "ENTERTAINMENT"
+                        else -> true
+                    }
+                }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(filteredTags.take(12)) { tag ->
+                        val isSel = selectedTags.any { it.tag == tag.tag }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(if (isSel) C.TagBg else C.TagBgGray)
+                                .border(if (isSel) 1.5.dp else 0.dp, if (isSel) C.Accent else Color.Transparent, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .clickable {
+                                    selectedTags = if (isSel) selectedTags - tag
+                                    else if (selectedTags.size < 15) selectedTags + tag else selectedTags
+                                },
+                        ) {
+                            Text("${tag.emoji} ${tag.displayName}", style = TextStyle(fontSize = 12.sp, color = if (isSel) C.Accent else C.TagTextGray, fontFamily = PretendardFamily))
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 필터 섹션 래퍼
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun FilterSection(title: String, desc: String, badge: String? = null, content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            // TODO padding: 섹션 horizontal 16dp, vertical 20dp
+            .padding(horizontal = 16.dp, vertical = 20.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri))
+            badge?.let { Text(it, style = TextStyle(fontSize = 13.sp, color = C.TextSec, fontFamily = PretendardFamily)) }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(desc, style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextSec))
+        Spacer(Modifier.height(14.dp))
+        content()
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 선택 행 (국적/언어 → 하위 페이지)
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun SelectionRow(label: String, onTap: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onTap),
+        shape    = RoundedCornerShape(12.dp),
+        color    = Color.White,
+        border   = BorderStroke(1.dp, C.Border),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.size(24.dp).clip(CircleShape).background(C.Border), contentAlignment = Alignment.Center) {
+                    Text("A", style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight(700), color = C.TextSec))
+                }
+                Text(label, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
+            }
+            Icon(painterResource(R.drawable.ic_chevron_right), "선택", Modifier.size(16.dp), tint = C.TextSec)
+        }
+    }
+}
+
+// 편의 함수
+private fun BorderStroke(width: androidx.compose.ui.unit.Dp, color: Color) =
+    androidx.compose.foundation.BorderStroke(width, color)

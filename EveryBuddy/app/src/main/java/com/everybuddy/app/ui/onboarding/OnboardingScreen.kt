@@ -57,12 +57,18 @@ fun OnboardingScreen(
     viewModel : OnboardingViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // 회원가입 API 성공 시 로그인 화면으로 이동
+    LaunchedEffect(uiState.registerSuccess) {
+        if (uiState.registerSuccess) onFinish()
+    }
+
     OnboardingHost(
         uiState       = uiState,
         onNext        = viewModel::onNext,
         onBack        = viewModel::onBack,
         onStateChange = viewModel::onStateChange,
-        onFinish      = onFinish,
+        onRegister    = viewModel::register,
     )
 }
 
@@ -91,7 +97,7 @@ fun OnboardingHost(
     onNext        : () -> Unit,
     onBack        : () -> Unit,
     onStateChange : (OnboardingUiState) -> Unit,
-    onFinish      : () -> Unit,
+    onRegister    : () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -114,7 +120,11 @@ fun OnboardingHost(
             5 -> StepInterests(uiState, onStateChange, onNext)
             6 -> StepBio(uiState, onStateChange, onNext)
             7 -> StepPermissions(onNext)
-            8 -> StepIntro(onFinish)
+            8 -> StepIntro(
+                isLoading    = uiState.isLoading,
+                errorMessage = uiState.errorMessage,
+                onRegister   = onRegister,
+            )
         }
     }
 }
@@ -364,7 +374,7 @@ fun StepBasicInfo(
     onStateChange : (OnboardingUiState) -> Unit,
     onNext        : () -> Unit,
 ) {
-    val canProceed = uiState.name.isNotBlank() && uiState.gender != null
+    val canProceed = uiState.name.isNotBlank() && uiState.gender != null && uiState.birthYear != null
 
     // DatePicker 다이얼로그 (showDatePicker = true일 때만 표시)
     if (uiState.showDatePicker) {
@@ -579,13 +589,24 @@ fun DatePickerModal(
     onConfirm : (Int, Int, Int) -> Unit,
     onDismiss : () -> Unit,
 ) {
-    val state = rememberDatePickerState()
+    // 2000-01-01 UTC 기준으로 시작 — 생일 선택에 적합한 초기 위치
+    val defaultMillis = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+        set(2000, 0, 1, 0, 0, 0)
+        set(java.util.Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis   = defaultMillis,
+        initialDisplayedMonthMillis = defaultMillis,
+    )
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = {
                 state.selectedDateMillis?.let { ms ->
-                    val cal = java.util.Calendar.getInstance().apply { timeInMillis = ms }
+                    // UTC 기준으로 파싱해야 타임존에 관계없이 선택한 날짜 그대로 추출됨
+                    val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+                        .apply { timeInMillis = ms }
                     onConfirm(
                         cal.get(java.util.Calendar.YEAR),
                         cal.get(java.util.Calendar.MONTH) + 1,
@@ -656,14 +677,13 @@ fun StepCountry(
     }
 }
 
-//step.3 사용 언어 + 레벨 바텀시트
+//step.3 사용 언어 (단일 선택)
 @Composable
 fun StepMyLanguage(
     uiState       : OnboardingUiState,
     onStateChange : (OnboardingUiState) -> Unit,
     onNext        : () -> Unit,
 ) {
-    // 검색어로 실시간 필터링 (피그마 예시: "한" 입력 → '한'국어/KO 표시)
     val filtered = remember(uiState.myLangQuery) {
         if (uiState.myLangQuery.isEmpty()) sampleLanguages
         else sampleLanguages.filter {
@@ -672,15 +692,69 @@ fun StepMyLanguage(
         }
     }
 
-    // 레벨 바텀시트 (온보딩3-2, 선택 된 언어가 있을 때만 표시)
-    if (uiState.showLevelSheet && uiState.selectedMyLangs.isNotEmpty()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 30.dp),
+    ) {
+        StepTitle(
+            title    = "어떤 언어를\n사용하고 계신가요?",
+            subtitle = "사용 가능한 언어 하나를 선택해 주세요.",
+        )
+        Spacer(Modifier.height(25.dp))
+
+        OnboardingSearchField(
+            query    = uiState.myLangQuery,
+            hint     = "언어를 검색해보세요",
+            onChange = { onStateChange(uiState.copy(myLangQuery = it)) },
+        )
+        Spacer(Modifier.height(20.dp))
+
+        LazyColumn(modifier = Modifier.weight(1f)) {
+            items(filtered, key = { it.code }) { lang ->
+                val selected = uiState.selectedMyLang?.code == lang.code
+                SelectableRow(
+                    flag     = lang.flag,
+                    label    = "${lang.nameKo} / ${lang.code}",
+                    selected = selected,
+                    onClick  = {
+                        onStateChange(uiState.copy(selectedMyLang = if (selected) null else lang))
+                    },
+                )
+            }
+        }
+
+        OnboardingNextButton(
+            enabled = uiState.selectedMyLang != null,
+            onClick = onNext,
+        )
+        Spacer(Modifier.height(45.dp))
+    }
+}
+
+// step.4 학습 언어 + 레벨 바텀시트
+@Composable
+fun StepLearnLanguage(
+    uiState       : OnboardingUiState,
+    onStateChange : (OnboardingUiState) -> Unit,
+    onNext        : () -> Unit,
+) {
+    val filtered = remember(uiState.learnQuery) {
+        if (uiState.learnQuery.isEmpty()) sampleLanguages
+        else sampleLanguages.filter {
+            it.nameKo.contains(uiState.learnQuery) ||
+                    it.code.contains(uiState.learnQuery, ignoreCase = true)
+        }
+    }
+
+    if (uiState.showLevelSheet && uiState.selectedLearnLangs.isNotEmpty()) {
         LevelBottomSheet(
-            languages     = uiState.selectedMyLangs,
+            languages     = uiState.selectedLearnLangs,
             onLevelChange = { lang, level ->
-                val updated = uiState.selectedMyLangs.map {
+                val updated = uiState.selectedLearnLangs.map {
                     if (it.code == lang.code) it.copy(level = level) else it
                 }
-                onStateChange(uiState.copy(selectedMyLangs = updated))
+                onStateChange(uiState.copy(selectedLearnLangs = updated))
             },
             onConfirm = {
                 onStateChange(uiState.copy(showLevelSheet = false))
@@ -696,76 +770,11 @@ fun StepMyLanguage(
             .padding(horizontal = 30.dp),
     ) {
         StepTitle(
-            title    = "어떤 언어를\n사용하고 계신가요?",
-            subtitle = "사용 가능한 언어와 수준을 선택해 주세요.",
-        )
-        Spacer(Modifier.height(25.dp))
-
-        // 검색 필드 (ic_search.xml)
-        OnboardingSearchField(
-            query    = uiState.myLangQuery,
-            hint     = "언어를 검색해보세요",
-            onChange = { onStateChange(uiState.copy(myLangQuery = it)) },
-        )
-        Spacer(Modifier.height(20.dp))
-
-        // 언어 리스트
-        // 선택됨: ic_check.xml / 미선택: ic_check_empty.xml
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            items(filtered, key = { it.code }) { lang ->
-                val selected = uiState.selectedMyLangs.any { it.code == lang.code }
-                SelectableRow(
-                    flag     = lang.flag,
-                    label    = "${lang.nameKo} / ${lang.code}",
-                    selected = selected,
-                    onClick  = {
-                        val updated = if (selected)
-                            uiState.selectedMyLangs.filter { it.code != lang.code }
-                        else
-                            uiState.selectedMyLangs + lang
-                        onStateChange(uiState.copy(selectedMyLangs = updated))
-                    },
-                )
-            }
-        }
-
-        // 다음 버튼 → 선택된 언어 있으면 레벨 바텀시트 표시
-        OnboardingNextButton(
-            enabled = uiState.selectedMyLangs.isNotEmpty(),
-            onClick = { onStateChange(uiState.copy(showLevelSheet = true)) },
-        )
-        Spacer(Modifier.height(45.dp))
-    }
-}
-
-// step.4 학습 언어
-// 다음 버튼 활성화 조건: selectedLearnLangs.isNotEmpty()
-@Composable
-fun StepLearnLanguage(
-    uiState       : OnboardingUiState,
-    onStateChange : (OnboardingUiState) -> Unit,
-    onNext        : () -> Unit,
-) {
-    val filtered = remember(uiState.learnQuery) {
-        if (uiState.learnQuery.isEmpty()) sampleLanguages
-        else sampleLanguages.filter {
-            it.nameKo.contains(uiState.learnQuery) ||
-                    it.code.contains(uiState.learnQuery, ignoreCase = true)
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 30.dp),
-    ) {
-        StepTitle(
             title    = "학습하고 싶은\n언어는 무엇인가요?",
             subtitle = "관심 있는 언어를 골라 학습을 시작해요.",
         )
         Spacer(Modifier.height(25.dp))
 
-        // 검색 필드 (ic_search.xml)
         OnboardingSearchField(
             query    = uiState.learnQuery,
             hint     = "언어를 검색해보세요",
@@ -773,8 +782,6 @@ fun StepLearnLanguage(
         )
         Spacer(Modifier.height(20.dp))
 
-        // 언어 리스트
-        // 선택됨: ic_check.xml / 미선택: ic_check_empty.xml
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(filtered, key = { it.code }) { lang ->
                 val selected = uiState.selectedLearnLangs.any { it.code == lang.code }
@@ -795,7 +802,7 @@ fun StepLearnLanguage(
 
         OnboardingNextButton(
             enabled = uiState.selectedLearnLangs.isNotEmpty(),
-            onClick = onNext,
+            onClick = { onStateChange(uiState.copy(showLevelSheet = true)) },
         )
         Spacer(Modifier.height(45.dp))
     }
@@ -918,33 +925,34 @@ fun StepInterests(
 
         Spacer(Modifier.height(25.dp))
 
-        // 태그 그리드 (3열)
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            val rows = tabTags.chunked(3)
-            items(rows) { row ->
-                Row(
-                    modifier              = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    row.forEach { tag ->
-                        TagChip(
-                            tag      = tag,
-                            selected = uiState.selectedTags.contains(tag),
-                            onClick  = {
-                                val cur = uiState.selectedTags
-                                if (cur.contains(tag)) {
-                                    onStateChange(uiState.copy(selectedTags = cur - tag))
-                                } else if (cur.size < TAG_MAX_COUNT) {
-                                    onStateChange(uiState.copy(selectedTags = cur + tag))
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
+        // 태그 — 3열 고정, 세로 스크롤 (기본), 가로 스크롤 (태그가 화면 폭 초과 시)
+        // 각 태그는 wrapContentWidth → 글자 길이에 맞게 폭 결정, 짤림 없음
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .horizontalScroll(rememberScrollState()),
+        ) {
+            Column(
+                modifier            = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                tabTags.chunked(3).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { tag ->
+                            TagChip(
+                                tag      = tag,
+                                selected = uiState.selectedTags.contains(tag),
+                                onClick  = {
+                                    val cur = uiState.selectedTags
+                                    if (cur.contains(tag)) {
+                                        onStateChange(uiState.copy(selectedTags = cur - tag))
+                                    } else if (cur.size < TAG_MAX_COUNT) {
+                                        onStateChange(uiState.copy(selectedTags = cur + tag))
+                                    }
+                                },
+                            )
+                        }
                     }
-                    // 마지막 행 빈 자리 채우기 (3열 유지)
-                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
@@ -957,17 +965,17 @@ fun StepInterests(
     }
 }
 
-// 태그 그리드 칩 (선택/미선택)
+// 태그 칩 — 텍스트 길이에 맞게 폭이 결정됨
 @Composable
 private fun TagChip(
     tag      : InterestTag,
     selected : Boolean,
     onClick  : () -> Unit,
-    modifier : Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
+        modifier = Modifier
             .height(40.dp)
+            .wrapContentWidth()
             .clip(RoundedCornerShape(19.dp))
             .background(if (selected) Color(0xFFDEF0FF) else Color(0xFFF5F5F5))
             .border(
@@ -976,20 +984,18 @@ private fun TagChip(
                 shape = RoundedCornerShape(19.dp),
             )
             .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 7.dp),
+            .padding(horizontal = 12.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text     = "${tag.emoji} ${tag.label}",
-            style    = TextStyle(
-                fontSize   = 16.sp,
+            text  = "${tag.emoji} ${tag.label}",
+            style = TextStyle(
+                fontSize   = 15.sp,
                 fontFamily = PretendardFamily,
                 fontWeight = if (selected) FontWeight(700) else FontWeight(600),
                 color      = if (selected) Color(0xFF0167FF) else Color(0xFF797979),
-                textAlign  = TextAlign.Center,
             ),
-            maxLines  = 1,
-            overflow  = TextOverflow.Ellipsis,
+            maxLines = 1,
         )
     }
 }
@@ -1013,16 +1019,14 @@ private fun SelectedTagChip(tag: InterestTag, onRemove: () -> Unit) {
         verticalAlignment     = Alignment.CenterVertically,
     ) {
         Text(
-            text = "${tag.emoji} ${tag.label}",
+            text  = "${tag.emoji} ${tag.label}",
             style = TextStyle(
                 fontSize   = 14.sp,
                 fontFamily = PretendardFamily,
                 fontWeight = FontWeight(700),
                 color      = Color(0xFF0167FF),
             ),
-            modifier = Modifier.weight(1f, fill = false),
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
         // X 버튼 (ic_tagselectcancel.xml)
         Icon(
@@ -1229,7 +1233,11 @@ fun StepPermissions(onNext: () -> Unit) {
  * "에브리버디 시작하기" 버튼 클릭 시 onFinish() 호출 → NavGraph에서 메인으로 이동.
  */
 @Composable
-fun StepIntro(onFinish: () -> Unit) {
+fun StepIntro(
+    isLoading    : Boolean,
+    errorMessage : String?,
+    onRegister   : () -> Unit,
+) {
     Column(
         modifier            = Modifier
             .fillMaxSize()
@@ -1241,12 +1249,12 @@ fun StepIntro(onFinish: () -> Unit) {
         Text(
             text = "에브리버디를\n소개해 드릴게요!",
             style = TextStyle(
-                fontSize = 34.sp,
+                fontSize   = 34.sp,
                 lineHeight = 40.sp,
                 fontFamily = PretendardFamily,
                 fontWeight = FontWeight(600),
-                color = Color(0xFF000000),
-                textAlign = TextAlign.Center,
+                color      = Color(0xFF000000),
+                textAlign  = TextAlign.Center,
             )
         )
 
@@ -1259,7 +1267,6 @@ fun StepIntro(onFinish: () -> Unit) {
                     .padding(vertical = 19.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 기능 아이콘 박스
                 Box(
                     modifier         = Modifier
                         .size(66.dp)
@@ -1301,28 +1308,55 @@ fun StepIntro(onFinish: () -> Unit) {
 
         Spacer(Modifier.weight(1f))
 
-        // 에브리버디 시작하기 버튼
+        errorMessage?.let { msg ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 220.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Text(
+                    text  = msg,
+                    style = TextStyle(
+                        fontSize   = 11.sp,
+                        fontFamily = PretendardFamily,
+                        color      = Color(0xFFFF2B01),
+                        textAlign  = TextAlign.Center,
+                    ),
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
+        // 회원가입 완료 버튼 — 클릭 시 모든 데이터를 서버로 전송
         Button(
-            onClick  = onFinish,
+            onClick  = onRegister,
+            enabled  = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(60.dp),
             shape    = RoundedCornerShape(15.dp),
             colors   = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF0167FF),
-                contentColor   = Color.White,
+                containerColor         = Color(0xFF0167FF),
+                contentColor           = Color.White,
+                disabledContainerColor = Color(0xFFD9D9D9),
+                disabledContentColor   = Color.White,
             ),
         ) {
-            Text(
-                "에브리버디 시작하기",
-                style = TextStyle(
-                    fontSize   = 20.sp,
-                    fontFamily = PretendardFamily,
-                    fontWeight = FontWeight(600),
-                    color = Color(0xFFFFFFFF),
-                    textAlign = TextAlign.Center,
-                ),
-            )
+            if (isLoading) {
+                LoadingIndicator(modifier = Modifier.size(24.dp), tint = Color.White)
+            } else {
+                Text(
+                    "회원가입 완료",
+                    style = TextStyle(
+                        fontSize   = 20.sp,
+                        fontFamily = PretendardFamily,
+                        fontWeight = FontWeight(600),
+                        color      = Color(0xFFFFFFFF),
+                        textAlign  = TextAlign.Center,
+                    ),
+                )
+            }
         }
         Spacer(Modifier.height(45.dp))
     }
@@ -1350,7 +1384,7 @@ fun LevelBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor   = Color.White,
-        shape            = RoundedCornerShape(topStart = 30.dp, topEnd = 0.dp),
+        shape            = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
     ) {
         Column(
             modifier = Modifier
@@ -1358,7 +1392,7 @@ fun LevelBottomSheet(
                 .padding(bottom = 40.dp), // 하단 여백 확보
         ) {
             Text(
-                "해당 언어로 소통이\n어느 정도 가능하신가요?",
+                "이 언어로 소통이\n얼만큼 가능하신가요?",
                 style = TextStyle(
                     fontSize   = 25.sp,
                     lineHeight = 31.sp,
@@ -1498,7 +1532,7 @@ private fun PreviewStep2() {
 private fun PreviewStep3() {
     EveryBuddyTheme {
         OnboardingHost(
-            OnboardingUiState(currentStep = 3, selectedMyLangs = listOf(sampleLanguages[0])),
+            OnboardingUiState(currentStep = 3, selectedMyLang = sampleLanguages[0]),
             {}, {}, {}, {},
         )
     }

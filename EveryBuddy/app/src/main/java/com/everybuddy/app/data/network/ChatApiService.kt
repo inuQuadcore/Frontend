@@ -17,57 +17,31 @@ import retrofit2.http.*
  */
 interface ChatApiService {
 
-    // ─────────────────────────────────────────────────────────────────────────
     // GET /api/v1/chatrooms — 내 채팅방 목록 조회
-    //
-    // 내가 참여하는 모든 채팅방 목록 반환.
-    // @return List<ChatRoomResponse>
-    // ─────────────────────────────────────────────────────────────────────────
     @GET("/api/v1/chatrooms")
     suspend fun getChatRooms(): Response<List<ChatRoomResponse>>
 
-    // ─────────────────────────────────────────────────────────────────────────
     // POST /api/v1/chatrooms — 채팅방 생성
-    //
-    // @param request roomName + participantIds
-    // @return ChatRoomResponse (생성된 채팅방 정보)
-    // ─────────────────────────────────────────────────────────────────────────
     @POST("/api/v1/chatrooms")
     suspend fun createChatRoom(
         @Body request: CreateChatRoomRequest,
     ): Response<ChatRoomResponse>
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // POST /api/v1/메시지 — 메시지 전송 (멀티파트)
-    //
-    // @param request JSON 파트 — chatRoomId + content
-    // @param file    첨부 파일 파트 (null = 텍스트 메시지)
-    // @return 204 No Content
-    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/v1/messages — 메시지 전송 (멀티파트)
     @Multipart
-    @POST("/api/v1/메시지")
+    @POST("/api/v1/messages")
     suspend fun sendMessage(
         @Part("request") request : RequestBody,
         @Part           file     : MultipartBody.Part? = null,
     ): Response<Unit>
 
-    // ─────────────────────────────────────────────────────────────────────────
     // PUT /api/v1/messages/{messageId}/read — 메시지 읽음 처리
-    //
-    // messageId 이하 모든 메시지 읽음 처리.
-    // @return 204 No Content
-    // ─────────────────────────────────────────────────────────────────────────
     @PUT("/api/v1/messages/{messageId}/read")
     suspend fun markMessageRead(
         @Path("messageId") messageId: Long,
     ): Response<Unit>
 
-    // ─────────────────────────────────────────────────────────────────────────
     // DELETE /api/v1/messages/{messageId} — 메시지 삭제
-    //
-    // 자신이 보낸 메시지만 삭제 가능.
-    // @return 204 No Content
-    // ─────────────────────────────────────────────────────────────────────────
     @DELETE("/api/v1/messages/{messageId}")
     suspend fun deleteMessage(
         @Path("messageId") messageId: Long,

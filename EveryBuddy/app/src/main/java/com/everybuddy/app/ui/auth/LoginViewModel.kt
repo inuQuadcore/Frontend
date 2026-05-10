@@ -1,5 +1,6 @@
 package com.everybuddy.app.ui.auth
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.network.AuthRepository
@@ -30,19 +31,11 @@ data class LoginUiState(
     val loginSuccess     : Boolean = false,
 )
 
-/**
- * LoginViewModel
- *
- * 로그인 화면의 비즈니스 로직을 담당하는 ViewModel.
- * Hilt로 주입되며, AuthRepository를 통해 로그인 API를 호출함.
- *
- * 주요 흐름:
- *  1. 유저가 loginId/password 입력 → onLoginIdChange/onPasswordChange 호출
- *  2. 로그인 버튼 클릭 → onLoginClick()
- *  3. 빈 칸 검사 후 authRepository.login() 호출
- *  4. 결과에 따라 loginSuccess = true(성공) 또는 errorMessage 설정(실패)
- *  5. LoginScreen의 LaunchedEffect가 loginSuccess를 감지하여 onLoginSuccess() 호출
- */
+sealed class LoginNavEvent {
+    object ToMain        : LoginNavEvent()   // 기존 유저 → MAIN
+    object ToOnboarding  : LoginNavEvent()   // 신규 유저 → ONBOARDING
+}
+
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val authRepository: AuthRepository,
@@ -51,12 +44,42 @@ class LoginViewModel @Inject constructor(
     companion object {
         // true = 시뮬레이션 모드 (API 호출 없이 즉시 성공 처리)
         // false = 실제 서버 연동
-        const val DEBUG_SIMULATION = true
+        const val DEBUG_SIMULATION = false
     }
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
+    private val _navEvent  = MutableStateFlow<LoginNavEvent?>(null)
+    val navEvent: StateFlow<LoginNavEvent?> = _navEvent.asStateFlow()
+
+    fun onGoogleLogin(activityContext: Context, webClientId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+            when (val result = authRepository.googleLogin(activityContext, webClientId)) {
+                is AuthResult.Success -> {
+                    _uiState.update { it.copy(isLoading = false) }
+                    _navEvent.value = if (result.data == true) LoginNavEvent.ToOnboarding
+                                      else                     LoginNavEvent.ToMain
+                }
+                is AuthResult.Error -> {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
+                }
+                is AuthResult.Exception -> {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = result.e.localizedMessage ?: "네트워크 오류가 발생했습니다.") }
+                }
+            }
+        }
+    }
+
+    fun onNavEventConsumed() {
+        _navEvent.value = null
+    }
+
+    fun onErrorDismissed() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
     fun onLoginIdChange(value: String) {
         _uiState.update { it.copy(loginId = value, errorMessage = null) }
     }
@@ -70,16 +93,6 @@ class LoginViewModel @Inject constructor(
         _uiState.update { it.copy(isPasswordVisible = !it.isPasswordVisible) }
     }
 
-    /**
-     * 로그인 버튼 클릭 시 호출.
-     *
-     * 1. 빈 칸 검사 → errorMessage 설정 후 return
-     * 2. isLoading = true로 전환
-     * 3. authRepository.login() 코루틴 호출
-     * 4-a. AuthResult.Success → loginSuccess = true (NavGraph 이동 트리거)
-     * 4-b. AuthResult.Error  → HTTP 코드별 한국어 에러 메시지 표시
-     * 4-c. AuthResult.Exception → 네트워크 에러 메시지 표시
-     */
     fun onLoginClick() {
         val state = _uiState.value
 
@@ -107,6 +120,7 @@ class LoginViewModel @Inject constructor(
                     val msg = when (result.code) {
                         401  -> "아이디 또는 비밀번호가 올바르지 않습니다."
                         404  -> "등록되지 않은 이메일입니다. 회원가입을 진행해주세요."
+                        409  -> "이미 로그인된 상태입니다. 잠시 후 다시 시도해주세요."
                         else -> result.message
                     }
                     _uiState.update { it.copy(isLoading = false, errorMessage = msg) }

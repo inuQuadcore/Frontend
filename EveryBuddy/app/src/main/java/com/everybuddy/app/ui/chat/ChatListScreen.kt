@@ -29,18 +29,12 @@ import com.everybuddy.app.data.chat.ChatRoom
 import com.everybuddy.app.data.chat.dummyChatRooms
 import com.everybuddy.app.ui.theme.*
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 색상
-// ─────────────────────────────────────────────────────────────────────────────
 private val ClAccent    = Color(0xFF0167FF)
 private val ClTextPri   = Color(0xFF1B1B1B)
 private val ClTextSec   = Color(0xFF8F9399)
 private val ClBorder    = Color(0xFFE5E5E5)
 private val ClBadge     = Color(0xFF0167FF)   // unreadCount 배지 색
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ChatListScreen — Hilt 진입점
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun ChatListScreen(
     onRoomClick : (ChatRoom) -> Unit = {},
@@ -64,9 +58,6 @@ fun ChatListScreen(
     )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ChatListContent
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun ChatListContent(
     state          : ChatListUiState,
@@ -87,7 +78,6 @@ fun ChatListContent(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // ── 상단 앱바 ────────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -138,7 +128,6 @@ fun ChatListContent(
                 }
             }
 
-            // ── 필터 탭 ──────────────────────────────────────────────
             LazyRow(
                 modifier              = Modifier
                     .fillMaxWidth()
@@ -195,7 +184,6 @@ fun ChatListContent(
                 }
             }
 
-            // ── 채팅방 목록 / 로딩 / 에러 / 빈 상태 ─────────────────
             Box(
                 modifier         = Modifier.weight(1f),
                 contentAlignment = Alignment.Center,
@@ -203,7 +191,7 @@ fun ChatListContent(
                 when {
                     // 로딩
                     state.isLoading -> {
-                        CircularProgressIndicator(color = ClAccent)
+                        LoadingIndicator()
                     }
 
                     // 에러
@@ -280,7 +268,6 @@ fun ChatListContent(
             }
         }
 
-        // ── FAB "+" 버튼 ─────────────────────────────────────────────
         FloatingActionButton(
             onClick        = onFabClick,
             modifier       = Modifier
@@ -303,7 +290,6 @@ fun ChatListContent(
             )
         }
 
-        // ── 컨텍스트 메뉴 ────────────────────────────────────────────
         state.contextMenuRoom?.let { room ->
             ChatRoomContextMenu(
                 room        = room,
@@ -314,12 +300,6 @@ fun ChatListContent(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ChatRoomItem — 채팅방 목록 아이템
-//
-// 레이아웃:
-//   [아바타 38dp] | [이름 + 마지막 메시지] | [시간 + unreadCount 배지]
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun ChatRoomItem(
     room        : ChatRoom,
@@ -433,9 +413,6 @@ fun ChatRoomItem(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ChatRoomContextMenu — 채팅방 롱클릭 컨텍스트 메뉴
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun ChatRoomContextMenu(
     room         : ChatRoom,
@@ -481,9 +458,6 @@ private fun ChatRoomContextMenu(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Preview
-// ─────────────────────────────────────────────────────────────────────────────
 @Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "채팅 탭 — 목록")
 @Composable
 private fun PreviewChatListWithRooms() {

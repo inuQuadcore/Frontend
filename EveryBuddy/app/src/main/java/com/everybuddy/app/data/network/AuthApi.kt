@@ -4,6 +4,25 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import com.google.gson.annotations.SerializedName
+
+//OAuth
+data class GoogleAuthRequest(
+    @SerializedName("idToken") val idToken: String,
+)
+data class GoogleAuthResponse(
+    @SerializedName("isNewUser")  val isNewUser  : Boolean,
+    @SerializedName("tempToken")  val tempToken  : String?,
+    @SerializedName("loginData")  val loginData  : LoginData?,
+)
+data class LoginData(
+    @SerializedName("userId")                val userId                : Long,
+    @SerializedName("accessToken")           val accessToken           : String,
+    @SerializedName("refreshToken")          val refreshToken          : String,
+    @SerializedName("tokenType")             val tokenType             : String,
+    @SerializedName("accessTokenExpiresAt")  val accessTokenExpiresAt  : String,
+    @SerializedName("refreshTokenExpiresAt") val refreshTokenExpiresAt : String,
+)
 
 // Request DTOs
 data class RegisterRequest(
@@ -50,6 +69,10 @@ data class ErrorResponse(
 
 // Retrofit API 인터페이스
 interface AuthApi {
+    @POST("/api/v1/auth/oauth/google")
+    suspend fun googleAuth(
+        @Body request: GoogleAuthRequest,
+    ): Response<GoogleAuthResponse>
 
     // POST /api/v1/auth/register — 회원가입
     @POST("api/v1/auth/register")

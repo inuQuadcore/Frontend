@@ -1,14 +1,5 @@
 package com.everybuddy.app.ui.chat
 
-// =============================================================================
-// ChatRoomViewModel.kt  (업데이트)
-//
-// 변경사항:
-//   - onToggleAutoTranslate() 추가
-//   - onPauseRecording() TODO stub 추가
-//   - 코드 정리 + 주석 보강
-// =============================================================================
-
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.chat.*
@@ -60,7 +51,6 @@ class ChatRoomViewModel @Inject constructor(
         }
     }
 
-    // ── 방 로드 ───────────────────────────────────────────────
     fun loadRoom(roomId: String) {
         val room     = dummyChatRooms.find { it.id == roomId } ?: return
         val messages = dummyMessages[roomId] ?: emptyList()
@@ -69,12 +59,10 @@ class ChatRoomViewModel @Inject constructor(
         // viewModelScope.launch { chatRepository.getMessages(roomId, page=0) }
     }
 
-    // ── 텍스트 입력 ───────────────────────────────────────────
     fun onInputChange(text: String) {
         _uiState.update { it.copy(inputText = text) }
     }
 
-    // ── 텍스트 전송 ───────────────────────────────────────────
     fun onSendText() {
         val text = _uiState.value.inputText.trim()
         if (text.isEmpty()) return
@@ -94,7 +82,6 @@ class ChatRoomViewModel @Inject constructor(
         // TODO: ChatRepository.sendTextMessage(roomId, text)
     }
 
-    // ── 음성 녹음 시작 ─────────────────────────────────────────
     fun onStartRecording() {
         // TODO: RECORD_AUDIO 권한 체크 — ChatRoomScreen에서 accompanist-permissions로 처리 후 호출
         val started = voiceRecorder.startRecording()
@@ -103,14 +90,12 @@ class ChatRoomViewModel @Inject constructor(
         }
     }
 
-    // ── 음성 녹음 일시정지 ─────────────────────────────────────
     fun onPauseRecording() {
         // TODO: VoiceRecorder.pause() 구현 후 연결
         //       현재 MediaRecorder는 API 24+부터 pause() 지원
         //       if (Build.VERSION.SDK_INT >= 24) recorder.pause()
     }
 
-    // ── 음성 녹음 정지 + 전송 ─────────────────────────────────
     fun onStopRecording() {
         val filePath    = voiceRecorder.stopRecording() ?: run {
             _uiState.update { it.copy(isRecording = false) }
@@ -140,13 +125,11 @@ class ChatRoomViewModel @Inject constructor(
         // }
     }
 
-    // ── 음성 녹음 취소 ─────────────────────────────────────────
     fun onCancelRecording() {
         voiceRecorder.cancelRecording()
         _uiState.update { it.copy(isRecording = false) }
     }
 
-    // ── 음성 재생 / 정지 ──────────────────────────────────────
     fun onPlayVoice(messageId: String) {
         if (_uiState.value.playingMessageId == messageId) {
             voicePlayer.stop()
@@ -158,7 +141,6 @@ class ChatRoomViewModel @Inject constructor(
         voicePlayer.play(messageId, url)
     }
 
-    // ── 번역 토글 (개별 메시지) ───────────────────────────────
     fun onToggleTranslation(messageId: String) {
         val state   = _uiState.value
         val current = state.showTranslation[messageId] ?: state.isAutoTranslate
@@ -184,13 +166,11 @@ class ChatRoomViewModel @Inject constructor(
         }
     }
 
-    // ── 자동번역 전체 토글 ────────────────────────────────────
     fun onToggleAutoTranslate() {
         _uiState.update { it.copy(isAutoTranslate = !it.isAutoTranslate) }
         // TODO: DataStore에 isAutoTranslate 설정 저장 (앱 재시작 후 유지)
     }
 
-    // ── 미디어 패널 토글 ──────────────────────────────────────
     fun onToggleMediaPanel() {
         _uiState.update { it.copy(isMediaPanelOpen = !it.isMediaPanelOpen) }
     }

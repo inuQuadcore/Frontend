@@ -1,84 +1,101 @@
 package com.everybuddy.app.data.network
 
 import android.content.Context
-import androidx.datastore.preferences.core.edit
-import com.everybuddy.app.di.PrefKeys          // data.network → di로 이동
-import com.everybuddy.app.di.dataStore          // data.network → di로 이동
+import com.everybuddy.app.data.auth.GoogleAuthManager
+import com.everybuddy.app.data.auth.GoogleSignInResult
 import com.google.gson.Gson
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class AuthRepository @Inject constructor(
-    private val api    : AuthApi,
-    @ApplicationContext private val context: Context,
+    private val api               : AuthApi,
+    private val googleAuthManager : GoogleAuthManager,
+    private val tokenManager      : TokenManager,
 ) {
     private val gson = Gson()
 
-    // 저장된 토큰 Flow
-    val accessToken: Flow<String?> = context.dataStore.data
-        .map { it[PrefKeys.ACCESS_TOKEN] }
+    val accessToken: Flow<String?> = tokenManager.accessToken
 
-    // 로그인
     suspend fun login(loginId: String, password: String): AuthResult<LoginResponse> {
         return try {
             val res = api.login(LoginRequest(loginId, password))
             if (res.isSuccessful) {
                 val body = res.body()!!
-                // JWT + userId DataStore 저장
-                context.dataStore.edit { prefs ->
-                    prefs[PrefKeys.ACCESS_TOKEN] = body.accessToken
-                    prefs[PrefKeys.USER_ID]      = body.userId.toString()
-                }
+                tokenManager.saveToken(body.accessToken, body.userId)
                 AuthResult.Success(body)
             } else {
-                val err = parseError(res.errorBody()?.string())
-                AuthResult.Error(res.code(), err)
+                AuthResult.Error(res.code(), parseError(res.errorBody()?.string()))
             }
-        } catch (e: kotlin.Exception) {
+        } catch (e: Exception) {
             AuthResult.Exception(e)
         }
     }
 
-    // 회원가입
     suspend fun register(req: RegisterRequest): AuthResult<Unit> {
         return try {
             val res = api.register(req)
             if (res.isSuccessful) {
                 AuthResult.Success(Unit)
             } else {
-                val err = parseError(res.errorBody()?.string())
-                AuthResult.Error(res.code(), err)
+                AuthResult.Error(res.code(), parseError(res.errorBody()?.string()))
             }
-        } catch (e: kotlin.Exception) {
+        } catch (e: Exception) {
             AuthResult.Exception(e)
         }
     }
 
-    // Firebase 토큰 발급
     suspend fun firebaseToken(): AuthResult<String> {
         return try {
             val res = api.firebaseToken()
             if (res.isSuccessful) {
                 AuthResult.Success(res.body()!!.firebaseToken)
             } else {
-                val err = parseError(res.errorBody()?.string())
-                AuthResult.Error(res.code(), err)
+                AuthResult.Error(res.code(), parseError(res.errorBody()?.string()))
             }
-        } catch (e: kotlin.Exception) {
+        } catch (e: Exception) {
             AuthResult.Exception(e)
         }
     }
 
-    // 로그아웃 (로컬 토큰 삭제)
-    suspend fun logout() {
-        context.dataStore.edit { it.clear() }
+    suspend fun googleLogin(
+        activityContext : Context,
+        webClientId     : String,
+    ): AuthResult<Boolean> {
+        val signInResult = googleAuthManager.signIn(activityContext, webClientId)
+        if (signInResult is GoogleSignInResult.Error) {
+            return AuthResult.Error(-1, signInResult.message)
+        }
+        val idToken = (signInResult as GoogleSignInResult.Success).idToken
+
+        return try {
+            val res = api.googleAuth(GoogleAuthRequest(idToken))
+            if (!res.isSuccessful) {
+                return AuthResult.Error(res.code(), parseError(res.errorBody()?.string()))
+            }
+            val body = res.body() ?: return AuthResult.Error(-1, "서버 응답이 없습니다.")
+
+            if (!body.isNewUser) {
+                val loginData = body.loginData
+                    ?: return AuthResult.Error(-1, "토큰 정보가 없습니다.")
+                tokenManager.saveToken(loginData.accessToken, loginData.userId)
+                AuthResult.Success(false)
+            } else {
+                val tempToken = body.tempToken
+                    ?: return AuthResult.Error(-1, "임시 토큰이 없습니다.")
+                tokenManager.saveTempToken(tempToken)
+                AuthResult.Success(true)
+            }
+        } catch (e: Exception) {
+            AuthResult.Exception(e)
+        }
     }
 
-    // 에러 파싱 헬퍼
+    suspend fun logout() {
+        tokenManager.clearToken()
+    }
+
     private fun parseError(body: String?): String {
         return try {
             gson.fromJson(body, ErrorResponse::class.java).message
