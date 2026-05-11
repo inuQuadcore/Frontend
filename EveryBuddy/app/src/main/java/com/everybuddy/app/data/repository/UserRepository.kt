@@ -22,25 +22,6 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private fun <T> Response<T>.toApiResult(gson: Gson, onSuccess: (T?) -> ApiResult<T>): ApiResult<T> =
-    if (isSuccessful) onSuccess(body())
-    else try {
-        val err = gson.fromJson(errorBody()?.string(), ApiErrorResponse::class.java)
-        ApiResult.Error(err.code, err.name, err.message)
-    } catch (e: Exception) {
-        ApiResult.Error(code(), "PARSE_ERROR", "응답 파싱 오류")
-    }
-
-private suspend fun <T> safeApiCall(
-    gson      : Gson,
-    block     : suspend () -> Response<T>,
-    onSuccess : (T?) -> ApiResult<T> = { ApiResult.Success(it!!) },
-): ApiResult<T> = try {
-    block().toApiResult(gson, onSuccess)
-} catch (e: Exception) {
-    ApiResult.NetworkError(e)
-}
-
 @Singleton
 class UserRepository @Inject constructor(
     private val api  : ApiService,
