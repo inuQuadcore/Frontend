@@ -2,7 +2,7 @@ package com.everybuddy.app.data.repository
 
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.EditMessageRequest
-import com.everybuddy.app.data.dto.MessageDto
+import com.everybuddy.app.data.dto.Message
 import com.everybuddy.app.data.dto.SendMessageRequest
 import com.everybuddy.app.data.dto.SyncMessagesResponse
 import com.everybuddy.app.data.network.ApiService
@@ -75,7 +75,7 @@ class MessageRepository @Inject constructor(
     suspend fun editMessage(
         messageId : Long,
         content   : String,
-    ): ApiResult<MessageDto> =
+    ): ApiResult<Message> =
         safeApiCall(gson, { api.editMessage(messageId, EditMessageRequest(content)) })
 
     /**

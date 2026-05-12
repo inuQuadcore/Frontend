@@ -3,7 +3,7 @@ package com.everybuddy.app.ui.friend
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.dto.ApiResult
-import com.everybuddy.app.data.dto.FriendStatusMessageDto
+import com.everybuddy.app.data.dto.FriendStatusMessage
 import com.everybuddy.app.data.dto.MyStatusMessageResponse
 import com.everybuddy.app.data.dto.userMessage
 import com.everybuddy.app.data.repository.StatusMessageRepository
@@ -17,11 +17,11 @@ import javax.inject.Inject
 
 data class StatusUiState(
     val myStatus            : MyStatusMessageResponse?     = null,
-    val friendStatuses      : List<FriendStatusMessageDto> = emptyList(),
+    val friendStatuses      : List<FriendStatusMessage> = emptyList(),
     val isWriteScreenOpen   : Boolean                      = false,
     val isEditMode          : Boolean                      = false,
     val draftText           : String                       = "",
-    val expandedStatus      : FriendStatusMessageDto?      = null,
+    val expandedStatus      : FriendStatusMessage?      = null,
     val isMyStatusMenuOpen  : Boolean                      = false,
     val isDeleteConfirmOpen : Boolean                      = false,
     val isReplying          : Boolean                      = false,
@@ -125,7 +125,7 @@ class StatusMessageViewModel @Inject constructor(
         }
     }
 
-    fun openFriendStatus(sm: FriendStatusMessageDto) {
+    fun openFriendStatus(sm: FriendStatusMessage) {
         _state.update { it.copy(expandedStatus = sm, isReplying = false, replyText = "", replySent = false) }
     }
 

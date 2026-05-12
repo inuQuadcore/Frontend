@@ -2,7 +2,7 @@ package com.everybuddy.app.data.dto
 
 import com.google.gson.annotations.SerializedName
 
-data class MessageDto(
+data class Message(
     @SerializedName("messageId")   val messageId   : Long,
     @SerializedName("userId")      val userId      : Long,
     @SerializedName("userName")    val userName    : String,
@@ -16,8 +16,8 @@ data class MessageDto(
 )
 
 data class SyncMessagesResponse(
-    @SerializedName("newMessages")     val newMessages     : List<MessageDto> = emptyList(),
-    @SerializedName("updatedMessages") val updatedMessages : List<MessageDto> = emptyList(),
+    @SerializedName("newMessages")     val newMessages     : List<Message> = emptyList(),
+    @SerializedName("updatedMessages") val updatedMessages : List<Message> = emptyList(),
     @SerializedName("deletedIds")      val deletedIds      : List<Long>       = emptyList(),
 )
 

@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.everybuddy.app.R
-import com.everybuddy.app.data.dto.FriendStatusMessageDto
+import com.everybuddy.app.data.dto.FriendStatusMessage
 import com.everybuddy.app.ui.theme.PretendardFamily
 import kotlinx.coroutines.delay
 
@@ -298,7 +298,7 @@ fun DeleteConfirmDialog(viewModel: StatusMessageViewModel) {
 
 @Composable
 fun FriendStatusDetailPopup(
-    sm        : FriendStatusMessageDto,
+    sm        : FriendStatusMessage,
     viewModel : StatusMessageViewModel,
 ) {
     val state by viewModel.state.collectAsState()
@@ -443,8 +443,8 @@ fun FriendStatusDetailPopup(
 
 @Composable
 fun FriendStatusPreviewCard(
-    sm      : FriendStatusMessageDto,
-    onClick : (FriendStatusMessageDto) -> Unit,
+    sm      : FriendStatusMessage,
+    onClick : (FriendStatusMessage) -> Unit,
 ) {
     Surface(
         modifier = Modifier
@@ -490,8 +490,8 @@ fun FriendStatusPreviewCard(
 
 @Composable
 fun FriendStatusFullItem(
-    sm      : FriendStatusMessageDto,
-    onClick : (FriendStatusMessageDto) -> Unit,
+    sm      : FriendStatusMessage,
+    onClick : (FriendStatusMessage) -> Unit,
 ) {
     Column(
         modifier = Modifier

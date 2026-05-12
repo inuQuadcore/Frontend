@@ -1,6 +1,6 @@
 package com.everybuddy.app.data.network
 
-import com.everybuddy.app.data.dto.ChatRoomDto
+import com.everybuddy.app.data.dto.ChatRoom
 import com.everybuddy.app.data.dto.CreateChatRoomRequest
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -21,13 +21,13 @@ interface ChatApiService {
 
     // GET /api/v1/chatrooms — 내 채팅방 목록 조회
     @GET("/api/v1/chatrooms")
-    suspend fun getChatRooms(): Response<List<ChatRoomDto>>
+    suspend fun getChatRooms(): Response<List<ChatRoom>>
 
     // POST /api/v1/chatrooms — 채팅방 생성
     @POST("/api/v1/chatrooms")
     suspend fun createChatRoom(
         @Body request: CreateChatRoomRequest,
-    ): Response<ChatRoomDto>
+    ): Response<ChatRoom>
 
     // POST /api/v1/messages — 메시지 전송 (멀티파트)
     @Multipart

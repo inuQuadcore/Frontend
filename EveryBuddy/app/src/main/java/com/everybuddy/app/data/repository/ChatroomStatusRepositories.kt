@@ -24,7 +24,7 @@ class ChatRoomRepository @Inject constructor(
      * 내 채팅방 목록 조회 — GET /api/v1/chatrooms
      * 에러: 401(인증)
      */
-    suspend fun getChatRooms(): ApiResult<List<ChatRoomDto>> =
+    suspend fun getChatRooms(): ApiResult<List<ChatRoom>> =
         safeApiCall(gson, { api.getChatRooms() })
 
     /**
@@ -34,7 +34,7 @@ class ChatRoomRepository @Inject constructor(
     suspend fun createChatRoom(
         roomName       : String,
         participantIds : List<Long>,
-    ): ApiResult<ChatRoomDto> = safeApiCall(gson, {
+    ): ApiResult<ChatRoom> = safeApiCall(gson, {
         api.createChatRoom(CreateChatRoomRequest(roomName, participantIds))
     })
 }

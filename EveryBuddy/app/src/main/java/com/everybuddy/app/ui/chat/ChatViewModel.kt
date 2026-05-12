@@ -36,7 +36,7 @@ class ChatViewModel @Inject constructor(
             when (val result = chatRepository.getChatRooms()) {
                 is ApiResult.Success -> {
                     val rooms = result.data
-                        ?.map { it.toChatRoom() }
+                        ?.map { it.toChatRoomUi() }
                         ?: emptyList()
                     _listState.update { it.copy(isLoading = false, rooms = rooms) }
                 }
@@ -72,7 +72,7 @@ class ChatViewModel @Inject constructor(
     fun createChatRoom(
         roomName       : String,
         participantIds : List<Long>,
-        onSuccess      : (ChatRoom) -> Unit,
+        onSuccess      : (ChatRoomUi) -> Unit,
         onError        : (String) -> Unit,
     ) {
         viewModelScope.launch {
@@ -80,7 +80,7 @@ class ChatViewModel @Inject constructor(
 
             when (val result = chatRepository.createChatRoom(roomName, participantIds)) {
                 is ApiResult.Success -> {
-                    val created = result.data?.toChatRoom()
+                    val created = result.data?.toChatRoomUi()
                     if (created != null) {
                         // 목록 맨 앞에 추가
                         _listState.update { state ->
@@ -128,7 +128,7 @@ class ChatViewModel @Inject constructor(
         // TODO: 검색창 AnimatedVisibility 토글 + 포커스 처리
     }
 
-    fun onContextMenu(room: ChatRoom) {
+    fun onContextMenu(room: ChatRoomUi) {
         _listState.update { it.copy(contextMenuRoom = room) }
     }
 
@@ -136,7 +136,7 @@ class ChatViewModel @Inject constructor(
         _listState.update { it.copy(contextMenuRoom = null) }
     }
 
-    fun onMenuAction(action: String, room: ChatRoom) {
+    fun onMenuAction(action: String, room: ChatRoomUi) {
         when (action) {
             "알림 끄기"   -> {
                 // TODO: PATCH /api/v1/chatrooms/{roomId}/mute
@@ -151,7 +151,7 @@ class ChatViewModel @Inject constructor(
         onDismissContextMenu()
     }
 
-    val filteredRooms: StateFlow<List<ChatRoom>> = listState.map { state ->
+    val filteredRooms: StateFlow<List<ChatRoomUi>> = listState.map { state ->
         state.rooms
             .filter { room ->
                 // 검색어 필터
@@ -167,6 +167,6 @@ class ChatViewModel @Inject constructor(
                 matchQuery && matchFilter
             }
             // 고정 방 최상단 정렬 → 최근 메시지 순 (timestamp 미구현이므로 현재 유지)
-            .sortedWith(compareByDescending<ChatRoom> { it.isPinned })
+            .sortedWith(compareByDescending<ChatRoomUi> { it.isPinned })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }

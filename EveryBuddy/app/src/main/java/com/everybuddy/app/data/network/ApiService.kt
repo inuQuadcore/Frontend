@@ -166,7 +166,7 @@ interface ApiService {
     suspend fun editMessage(
         @Path("messageId") messageId : Long,
         @Body request                : EditMessageRequest,
-    ): Response<MessageDto>
+    ): Response<Message>
 
     /**
      * GET /api/v1/messages/chatrooms/{chatRoomId} — 채팅방 메시지 동기화
@@ -206,7 +206,7 @@ interface ApiService {
     @GET("api/v1/users/{userId}/tags")
     suspend fun getUserTags(
         @Path("userId") userId: Long,
-    ): Response<List<TagDto>>
+    ): Response<List<UserTag>>
 
     /**
      * GET /api/v1/users/{userId}/languages — 유저 관심 언어 목록 조회
@@ -279,7 +279,7 @@ interface ApiService {
      * 401: 인증 필요
      */
     @GET("api/v1/chatrooms")
-    suspend fun getChatRooms(): Response<List<ChatRoomDto>>
+    suspend fun getChatRooms(): Response<List<ChatRoom>>
 
     /**
      * POST /api/v1/chatrooms — 채팅방 생성
@@ -292,7 +292,7 @@ interface ApiService {
     @POST("api/v1/chatrooms")
     suspend fun createChatRoom(
         @Body request: CreateChatRoomRequest,
-    ): Response<ChatRoomDto>
+    ): Response<ChatRoom>
 
     // =========================================================================
     // Status Message API

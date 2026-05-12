@@ -25,7 +25,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.everybuddy.app.R
 import com.everybuddy.app.data.chat.ChatFilter
 import com.everybuddy.app.data.chat.ChatListUiState
-import com.everybuddy.app.data.chat.ChatRoom
+import com.everybuddy.app.data.chat.ChatRoomUi
 import com.everybuddy.app.data.chat.dummyChatRooms
 import com.everybuddy.app.ui.theme.*
 
@@ -37,7 +37,7 @@ private val ClBadge     = Color(0xFF0167FF)   // unreadCount 배지 색
 
 @Composable
 fun ChatListScreen(
-    onRoomClick : (ChatRoom) -> Unit = {},
+    onRoomClick : (ChatRoomUi) -> Unit = {},
     onStartChat : () -> Unit         = {},
     viewModel   : ChatViewModel      = hiltViewModel(),
 ) {
@@ -61,15 +61,15 @@ fun ChatListScreen(
 @Composable
 fun ChatListContent(
     state          : ChatListUiState,
-    onRoomClick    : (ChatRoom) -> Unit,
+    onRoomClick    : (ChatRoomUi) -> Unit,
     onFilterSelect : (ChatFilter) -> Unit,
     onSearchToggle : () -> Unit,
     onSearchChange : (String) -> Unit,
     onFabClick     : () -> Unit,
     onRetry        : () -> Unit,
-    onContextMenu  : (ChatRoom) -> Unit,
+    onContextMenu  : (ChatRoomUi) -> Unit,
     onDismissMenu  : () -> Unit,
-    onMenuAction   : (String, ChatRoom) -> Unit,
+    onMenuAction   : (String, ChatRoomUi) -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -302,7 +302,7 @@ fun ChatListContent(
 
 @Composable
 fun ChatRoomItem(
-    room        : ChatRoom,
+    room        : ChatRoomUi,
     onClick     : () -> Unit,
     onLongClick : () -> Unit,
 ) {
@@ -415,7 +415,7 @@ fun ChatRoomItem(
 
 @Composable
 private fun ChatRoomContextMenu(
-    room         : ChatRoom,
+    room         : ChatRoomUi,
     onDismiss    : () -> Unit,
     onMenuAction : (String) -> Unit,
 ) {

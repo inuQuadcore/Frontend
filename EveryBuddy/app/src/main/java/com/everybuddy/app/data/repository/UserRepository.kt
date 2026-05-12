@@ -44,7 +44,7 @@ class UserRepository @Inject constructor(
      * 200: [ { tag, category } ]
      * 에러: 401(인증) | 404(유저없음) | 410(탈퇴)
      */
-    suspend fun getUserTags(userId: Long): ApiResult<List<TagDto>> =
+    suspend fun getUserTags(userId: Long): ApiResult<List<UserTag>> =
         safeApiCall(gson, { api.getUserTags(userId) })
 
     /**

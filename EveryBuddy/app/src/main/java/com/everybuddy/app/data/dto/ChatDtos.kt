@@ -7,7 +7,7 @@ import com.google.gson.annotations.SerializedName
  * 단 POST / (생성) 응답의 unreadCount는 null. 값이 채워지는 건 GET / (목록 조회)에서만.
  * → unreadCount는 nullable로 둠.
  */
-data class ChatRoomDto(
+data class ChatRoom(
     @SerializedName("chatRoomId")     val chatRoomId     : Long,
     @SerializedName("roomName")       val roomName       : String,
     @SerializedName("createdAt")      val createdAt      : String,

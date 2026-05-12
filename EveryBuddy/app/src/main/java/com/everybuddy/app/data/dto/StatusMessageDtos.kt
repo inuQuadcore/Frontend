@@ -13,12 +13,12 @@ data class MyStatusMessageResponse(
 )
 
 data class FriendStatusMessagesResponse(
-    @SerializedName("statusMessages") val statusMessages : List<FriendStatusMessageDto>,
+    @SerializedName("statusMessages") val statusMessages : List<FriendStatusMessage>,
     @SerializedName("nextCursor")     val nextCursor     : Long?   = null,
     @SerializedName("hasNext")        val hasNext        : Boolean,
 )
 
-data class FriendStatusMessageDto(
+data class FriendStatusMessage(
     @SerializedName("statusMessageId") val statusMessageId : Long,
     @SerializedName("userId")          val userId          : Long,
     @SerializedName("userName")        val userName        : String,
