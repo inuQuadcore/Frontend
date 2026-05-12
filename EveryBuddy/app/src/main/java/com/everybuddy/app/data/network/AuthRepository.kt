@@ -23,7 +23,13 @@ class AuthRepository @Inject constructor(
             val res = api.login(LoginRequest(loginId, password))
             if (res.isSuccessful) {
                 val body = res.body()!!
-                tokenManager.saveToken(body.accessToken, body.userId)
+                tokenManager.saveToken(
+                    accessToken           = body.accessToken,
+                    refreshToken          = body.refreshToken,
+                    accessTokenExpiresAt  = body.accessTokenExpiresAt,
+                    refreshTokenExpiresAt = body.refreshTokenExpiresAt,
+                    userId                = body.userId,
+                )
                 AuthResult.Success(body)
             } else {
                 AuthResult.Error(res.code(), parseError(res.errorBody()?.string()))
@@ -79,7 +85,13 @@ class AuthRepository @Inject constructor(
             if (!body.isNewUser) {
                 val loginData = body.loginData
                     ?: return AuthResult.Error(-1, "토큰 정보가 없습니다.")
-                tokenManager.saveToken(loginData.accessToken, loginData.userId)
+                tokenManager.saveToken(
+                    accessToken           = loginData.accessToken,
+                    refreshToken          = loginData.refreshToken,
+                    accessTokenExpiresAt  = loginData.accessTokenExpiresAt,
+                    refreshTokenExpiresAt = loginData.refreshTokenExpiresAt,
+                    userId                = loginData.userId,
+                )
                 AuthResult.Success(false)
             } else {
                 val tempToken = body.tempToken

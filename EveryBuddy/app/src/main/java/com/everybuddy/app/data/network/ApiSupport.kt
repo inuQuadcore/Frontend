@@ -14,13 +14,25 @@ import javax.inject.Singleton
 class TokenManager @Inject constructor(
     private val dataStore: DataStore<Preferences>,
 ) {
-    val accessToken: Flow<String?> = dataStore.data.map { it[TokenKeys.ACCESS_TOKEN] }
-    val userId:      Flow<Long?>   = dataStore.data.map { it[TokenKeys.USER_ID]?.toLongOrNull() }
+    val accessToken:           Flow<String?> = dataStore.data.map { it[TokenKeys.ACCESS_TOKEN] }
+    val refreshToken:          Flow<String?> = dataStore.data.map { it[TokenKeys.REFRESH_TOKEN] }
+    val accessTokenExpiresAt:  Flow<String?> = dataStore.data.map { it[TokenKeys.ACCESS_TOKEN_EXPIRES_AT] }
+    val refreshTokenExpiresAt: Flow<String?> = dataStore.data.map { it[TokenKeys.REFRESH_TOKEN_EXPIRES_AT] }
+    val userId:                Flow<Long?>   = dataStore.data.map { it[TokenKeys.USER_ID]?.toLongOrNull() }
 
-    suspend fun saveToken(accessToken: String, userId: Long) {
+    suspend fun saveToken(
+        accessToken           : String,
+        refreshToken          : String,
+        accessTokenExpiresAt  : String,
+        refreshTokenExpiresAt : String,
+        userId                : Long,
+    ) {
         dataStore.edit { prefs ->
-            prefs[TokenKeys.ACCESS_TOKEN] = accessToken
-            prefs[TokenKeys.USER_ID]      = userId.toString()
+            prefs[TokenKeys.ACCESS_TOKEN]              = accessToken
+            prefs[TokenKeys.REFRESH_TOKEN]             = refreshToken
+            prefs[TokenKeys.ACCESS_TOKEN_EXPIRES_AT]   = accessTokenExpiresAt
+            prefs[TokenKeys.REFRESH_TOKEN_EXPIRES_AT]  = refreshTokenExpiresAt
+            prefs[TokenKeys.USER_ID]                   = userId.toString()
         }
     }
 
@@ -33,6 +45,9 @@ class TokenManager @Inject constructor(
     suspend fun clearToken() {
         dataStore.edit { prefs ->
             prefs.remove(TokenKeys.ACCESS_TOKEN)
+            prefs.remove(TokenKeys.REFRESH_TOKEN)
+            prefs.remove(TokenKeys.ACCESS_TOKEN_EXPIRES_AT)
+            prefs.remove(TokenKeys.REFRESH_TOKEN_EXPIRES_AT)
             prefs.remove(TokenKeys.USER_ID)
         }
     }

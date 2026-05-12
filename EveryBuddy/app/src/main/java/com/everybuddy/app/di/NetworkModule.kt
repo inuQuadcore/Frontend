@@ -31,8 +31,11 @@ import javax.inject.Singleton
 private val Context.tokenDataStore: DataStore<Preferences> by preferencesDataStore(name = "everybuddy_token")
 
 object TokenKeys {
-    val ACCESS_TOKEN = stringPreferencesKey("access_token")
-    val USER_ID      = stringPreferencesKey("user_id")
+    val ACCESS_TOKEN              = stringPreferencesKey("access_token")
+    val REFRESH_TOKEN             = stringPreferencesKey("refresh_token")
+    val ACCESS_TOKEN_EXPIRES_AT   = stringPreferencesKey("access_token_expires_at")
+    val REFRESH_TOKEN_EXPIRES_AT  = stringPreferencesKey("refresh_token_expires_at")
+    val USER_ID                   = stringPreferencesKey("user_id")
 }
 
 @Module

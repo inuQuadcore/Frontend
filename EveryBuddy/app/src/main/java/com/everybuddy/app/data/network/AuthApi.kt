@@ -50,10 +50,12 @@ data class LoginRequest(
 
 // Response DTOs
 data class LoginResponse(
-    val userId      : Long,
-    val accessToken : String,
-    val tokenType   : String,   // "Bearer"
-    val expireIn    : Long,     // 86400
+    val userId                : Long,
+    val accessToken           : String,
+    val refreshToken          : String,
+    val tokenType             : String,   // "Bearer"
+    val accessTokenExpiresAt  : String,   // ISO 8601
+    val refreshTokenExpiresAt : String,   // ISO 8601
 )
 
 data class FirebaseTokenResponse(
