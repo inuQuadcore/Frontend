@@ -464,7 +464,7 @@ private fun PasswordRule(text: String, checked: Boolean, isError: Boolean) {
  * 체크박스 색상: 체크 시 #0167FF(파랑), 미체크 시 #CCCCCC(회색).
  */
 @Composable
-private fun AgreementBox(
+internal fun AgreementBox(
     isAgreed      : Boolean,
     onToggle      : () -> Unit,
 ) {

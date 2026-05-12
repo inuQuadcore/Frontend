@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.everybuddy.app.ui.main.MainScreen
+import com.everybuddy.app.ui.auth.ConsentScreen
 import com.everybuddy.app.ui.auth.LoginScreen
 import com.everybuddy.app.ui.auth.SignUpScreen
 import com.everybuddy.app.ui.onboarding.OnboardingScreen
@@ -13,6 +14,7 @@ import com.everybuddy.app.ui.onboarding.OnboardingScreen
 // 최상위 라우트
 object Route {
     const val SIGN_UP    = "sign_up"
+    const val CONSENT    = "consent"   // 구글 신규가입 약관 동의 (일반 가입은 SignUpScreen 내부에 약관 포함)
     const val ONBOARDING = "onboarding"
     const val LOGIN      = "login"
     const val MAIN       = "main"
@@ -41,6 +43,20 @@ fun AppNavGraph(
             )
         }
 
+        // 구글 신규가입 약관 동의
+        composable(Route.CONSENT) {
+            ConsentScreen(
+                onConsent = {
+                    navController.navigate(Route.ONBOARDING) {
+                        popUpTo(Route.CONSENT) { inclusive = true }
+                    }
+                },
+                onCancel  = {
+                    navController.popBackStack()   // LoginScreen으로 복귀
+                },
+            )
+        }
+
         // 온보딩
         composable(Route.ONBOARDING) {
             OnboardingScreen(
@@ -62,9 +78,9 @@ fun AppNavGraph(
                 },
                 onSignUpClick   = { navController.navigate(Route.SIGN_UP) },
                 onGoogleNewUser = {
-                    navController.navigate(Route.ONBOARDING) {
-                        popUpTo(Route.LOGIN) { inclusive = true }
-                    }
+                    // 구글 신규유저 → 약관 동의 → 온보딩
+                    // LoginScreen은 backstack에 유지 (Consent에서 뒤로가기 시 복귀 대상)
+                    navController.navigate(Route.CONSENT)
                 },
             )
         }
