@@ -20,7 +20,7 @@ fun com.everybuddy.app.data.dto.ChatRoomDto.toChatRoom(): ChatRoom = ChatRoom(
     id             = chatRoomId.toString(),
     name           = roomName,
     createdAt      = createdAt,
-    unreadCount    = unreadCount,
+    unreadCount    = unreadCount ?: 0,
     participantIds = participantIds,
 )
 
