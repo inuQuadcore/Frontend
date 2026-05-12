@@ -5,6 +5,7 @@ import com.everybuddy.app.data.auth.GoogleAuthManager
 import com.everybuddy.app.data.auth.GoogleSignInResult
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -125,8 +126,22 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    suspend fun logout() {
-        tokenManager.clearToken()
+    suspend fun logout(): AuthResult<Unit> {
+        val refreshToken = tokenManager.refreshToken.firstOrNull()
+        return try {
+            val result = if (refreshToken != null) {
+                val res = api.logout(LogoutRequest(refreshToken))
+                if (res.isSuccessful) AuthResult.Success(Unit)
+                else AuthResult.Error(res.code(), parseError(res.errorBody()?.string()))
+            } else {
+                AuthResult.Success(Unit)
+            }
+            tokenManager.clearToken()
+            result
+        } catch (e: Exception) {
+            tokenManager.clearToken()   // 옵션 A: 네트워크 실패해도 로컬 토큰은 삭제 (UX 우선)
+            AuthResult.Exception(e)
+        }
     }
 
     private fun parseError(body: String?): String {
