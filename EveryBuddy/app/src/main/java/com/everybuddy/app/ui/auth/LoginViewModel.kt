@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.repository.AuthRepository
-import com.everybuddy.app.data.network.AuthResult
+import com.everybuddy.app.data.dto.ApiResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -58,15 +58,15 @@ class LoginViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             when (val result = authRepository.googleLogin(activityContext, webClientId)) {
-                is AuthResult.Success -> {
+                is ApiResult.Success -> {
                     _uiState.update { it.copy(isLoading = false) }
                     _navEvent.value = if (result.data == true) LoginNavEvent.ToOnboarding
                                       else                     LoginNavEvent.ToMain
                 }
-                is AuthResult.Error -> {
+                is ApiResult.Error -> {
                     _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
                 }
-                is AuthResult.Exception -> {
+                is ApiResult.NetworkError -> {
                     _uiState.update { it.copy(isLoading = false, errorMessage = result.e.localizedMessage ?: "네트워크 오류가 발생했습니다.") }
                 }
             }
@@ -113,10 +113,10 @@ class LoginViewModel @Inject constructor(
 
             // 실제 API 호출 (DEBUG_SIMULATION = false 시 동작)
             when (val result = authRepository.login(state.loginId, state.password)) {
-                is AuthResult.Success -> {
+                is ApiResult.Success -> {
                     _uiState.update { it.copy(isLoading = false, loginSuccess = true) }
                 }
-                is AuthResult.Error -> {
+                is ApiResult.Error -> {
                     val msg = when (result.code) {
                         401  -> "아이디 또는 비밀번호가 올바르지 않습니다."
                         404  -> "등록되지 않은 이메일입니다. 회원가입을 진행해주세요."
@@ -125,7 +125,7 @@ class LoginViewModel @Inject constructor(
                     }
                     _uiState.update { it.copy(isLoading = false, errorMessage = msg) }
                 }
-                is AuthResult.Exception -> {
+                is ApiResult.NetworkError -> {
                     _uiState.update {
                         it.copy(
                             isLoading    = false,

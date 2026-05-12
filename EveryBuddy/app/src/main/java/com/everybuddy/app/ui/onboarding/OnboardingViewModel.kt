@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.auth.AuthDataHolder
 import com.everybuddy.app.data.repository.AuthRepository
-import com.everybuddy.app.data.network.AuthResult
+import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.network.GoogleRegisterRequest
 import com.everybuddy.app.data.network.LanguageLevel
 import com.everybuddy.app.data.network.RegisterRequest
@@ -58,7 +58,7 @@ class OnboardingViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             // 구글 신규가입 흐름이면 googleRegister, 아니면 일반 register 호출
-            val result: AuthResult<*> = if (authDataHolder.isGoogleSignup) {
+            val result: ApiResult<*> = if (authDataHolder.isGoogleSignup) {
                 val req = GoogleRegisterRequest(
                     tempToken         = authDataHolder.tempToken ?: "",
                     country           = state.selectedCountry?.code ?: "",
@@ -88,18 +88,18 @@ class OnboardingViewModel @Inject constructor(
             }
 
             when (result) {
-                is AuthResult.Success<*> -> {
+                is ApiResult.Success<*> -> {
                     authDataHolder.clear()
                     _uiState.update { it.copy(isLoading = false, registerSuccess = true) }
                 }
-                is AuthResult.Error -> {
+                is ApiResult.Error -> {
                     val msg = when (result.code) {
                         409  -> "이미 가입된 이메일입니다."
                         else -> result.message
                     }
                     _uiState.update { it.copy(isLoading = false, errorMessage = msg) }
                 }
-                is AuthResult.Exception -> {
+                is ApiResult.NetworkError -> {
                     _uiState.update { it.copy(isLoading = false, errorMessage = "네트워크 연결을 확인해주세요.") }
                 }
             }

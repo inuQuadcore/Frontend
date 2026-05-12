@@ -1,7 +1,6 @@
 package com.everybuddy.app.data.repository
 
-import com.everybuddy.app.data.network.ApiErrorResponse
-import com.everybuddy.app.data.network.AuthResult
+import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.network.ChatApiService
 import com.everybuddy.app.data.network.ChatRoomResponse
 import com.everybuddy.app.data.network.CreateChatRoomRequest
@@ -19,7 +18,7 @@ import javax.inject.Singleton
  * ChatRepository
  *
  * 채팅 관련 API 호출을 담당하는 Repository.
- * AuthRepository와 동일한 AuthResult 래퍼를 사용하여
+ * AuthRepository와 동일한 ApiResult 래퍼를 사용하여
  * ViewModel에서 일관된 방식으로 결과를 처리.
  *
  * Hilt @Singleton으로 주입.
@@ -35,14 +34,13 @@ class ChatRepository @Inject constructor(
     /**
      * 내가 참여하는 채팅방 목록을 서버에서 조회.
      *
-     * 성공 | AuthResult.Success(List<ChatRoomResponse>)
+     * 성공 | ApiResult.Success(List<ChatRoomResponse>)
      * 실패
      *  401 — JWT_ENTRY_POINT : 로그인 필요
-     * 예외 AuthResult.Exception (네트워크 오류 등)
+     * 예외 ApiResult.NetworkError (네트워크 오류 등)
      */
-    suspend fun getChatRooms(): AuthResult<List<ChatRoomResponse>> = safeCall {
-        chatApi.getChatRooms()
-    }
+    suspend fun getChatRooms(): ApiResult<List<ChatRoomResponse>> =
+        safeApiCall(gson, { chatApi.getChatRooms() })
 
     // 채팅방 생성
     // POST /api/v1/채팅방
@@ -52,19 +50,18 @@ class ChatRepository @Inject constructor(
      * @param roomName       채팅방 이름
      * @param participantIds 참여자 ID 목록 (나 자신 제외, 서버가 자동으로 추가)
      *
-     * 성공 | AuthResult.Success(ChatRoomResponse)
+     * 성공 | ApiResult.Success(ChatRoomResponse)
      * 실패
      *  400 — INVALID_INPUT_VALUE : roomName 또는 participantIds 누락
      *  401 — JWT_ENTRY_POINT
      *  404 — USER_NOT_FOUND
-     * 예외 AuthResult.Exception
+     * 예외 ApiResult.NetworkError
      */
     suspend fun createChatRoom(
         roomName       : String,
         participantIds : List<Long>,
-    ): AuthResult<ChatRoomResponse> = safeCall {
-        chatApi.createChatRoom(CreateChatRoomRequest(roomName, participantIds))
-    }
+    ): ApiResult<ChatRoomResponse> =
+        safeApiCall(gson, { chatApi.createChatRoom(CreateChatRoomRequest(roomName, participantIds)) })
 
     // 메시지 전송
     // POST /api/v1/메시지
@@ -74,21 +71,23 @@ class ChatRepository @Inject constructor(
      * @param chatRoomId 전송할 채팅방 ID
      * @param content    메시지 본문
      *
-     * 성공 | AuthResult.Success(Unit) — 204 No Content
+     * 성공 | ApiResult.Success(Unit) — 204 No Content
      * 실패
      *  400 — INVALID_INPUT_VALUE : chatRoomId 또는 content 누락
      *  401 — JWT_ENTRY_POINT
      *  403 — USER_NOT_IN_CHATROOM
      *  404 — USER_NOT_FOUND
-     * 예외 AuthResult.Exception
+     * 예외 ApiResult.NetworkError
      */
     suspend fun sendTextMessage(
         chatRoomId : Long,
         content    : String,
-    ): AuthResult<Unit> = safeCall {
+    ): ApiResult<Unit> {
         val requestJson = gson.toJson(SendMessageRequest(chatRoomId, content))
         val requestBody = requestJson.toRequestBody("application/json".toMediaTypeOrNull())
-        chatApi.sendMessage(request = requestBody, file = null)
+        return safeApiCall(gson, { chatApi.sendMessage(request = requestBody, file = null) }) {
+            ApiResult.Success(Unit)
+        }
     }
 
     /**
@@ -105,20 +104,20 @@ class ChatRepository @Inject constructor(
      * 문서:   pdf/txt/doc/docx/xls/xlsx/ppt/pptx
      * 압축:   zip/rar
      *
-     * 성공 | AuthResult.Success(Unit) — 204 No Content
+     * 성공 | ApiResult.Success(Unit) — 204 No Content
      * 실패
      *  400 — INVALID_INPUT_VALUE
      *  401 — JWT_ENTRY_POINT
      *  403 — USER_NOT_IN_CHATROOM
      *  404 — USER_NOT_FOUND
      *  413 — FILE_SIZE_EXCEEDED (10MB 초과)
-     * 예외 AuthResult.Exception
+     * 예외 ApiResult.NetworkError
      */
     suspend fun sendFileMessage(
         chatRoomId : Long,
         content    : String,
         file       : File,
-    ): AuthResult<Unit> = safeCall {
+    ): ApiResult<Unit> {
         val requestJson = gson.toJson(SendMessageRequest(chatRoomId, content))
         val requestBody = requestJson.toRequestBody("application/json".toMediaTypeOrNull())
         val mimeType    = resolveMimeType(file.extension)
@@ -127,7 +126,9 @@ class ChatRepository @Inject constructor(
             filename = file.name,
             body     = file.asRequestBody(mimeType.toMediaTypeOrNull()),
         )
-        chatApi.sendMessage(request = requestBody, file = filePart)
+        return safeApiCall(gson, { chatApi.sendMessage(request = requestBody, file = filePart) }) {
+            ApiResult.Success(Unit)
+        }
     }
 
     // 메시지 읽음 처리
@@ -137,16 +138,15 @@ class ChatRepository @Inject constructor(
      *
      * @param messageId 읽음 처리할 마지막 메시지 ID
      *
-     * 성공 | AuthResult.Success(Unit) — 204 No Content
+     * 성공 | ApiResult.Success(Unit) — 204 No Content
      * 실패
      *  401 — JWT_ENTRY_POINT
      *  403 — USER_NOT_IN_CHATROOM
      *  404 — MESSAGE_NOT_FOUND
-     * 예외 AuthResult.Exception
+     * 예외 ApiResult.NetworkError
      */
-    suspend fun markMessageRead(messageId: Long): AuthResult<Unit> = safeCall {
-        chatApi.markMessageRead(messageId)
-    }
+    suspend fun markMessageRead(messageId: Long): ApiResult<Unit> =
+        safeApiCall(gson, { chatApi.markMessageRead(messageId) }) { ApiResult.Success(Unit) }
 
     // 메시지 삭제
     // DELETE /api/v1/messages/{messageId}
@@ -155,17 +155,16 @@ class ChatRepository @Inject constructor(
      *
      * @param messageId 삭제할 메시지 ID
      *
-     * 성공 | AuthResult.Success(Unit) — 204 No Content
+     * 성공 | ApiResult.Success(Unit) — 204 No Content
      * 실패
      *  401 — JWT_ENTRY_POINT
      *  403 — NOT_MESSAGE_OF_USER : 타인의 메시지 삭제 시도
      *  404 — MESSAGE_NOT_FOUND
      *  409 — MESSAGE_ALREADY_DELETED : 이미 삭제된 메시지
-     * 예외 AuthResult.Exception
+     * 예외 ApiResult.NetworkError
      */
-    suspend fun deleteMessage(messageId: Long): AuthResult<Unit> = safeCall {
-        chatApi.deleteMessage(messageId)
-    }
+    suspend fun deleteMessage(messageId: Long): ApiResult<Unit> =
+        safeApiCall(gson, { chatApi.deleteMessage(messageId) }) { ApiResult.Success(Unit) }
 
     // TODO: 추후 서버 구현 후 추가 예정
     /*
@@ -178,30 +177,6 @@ class ChatRepository @Inject constructor(
 
 
     // 내부 유틸
-    /**
-     * API 호출을 AuthResult로 래핑하는 공통 헬퍼.
-     * AuthRepository의 safeCall과 동일한 패턴.
-     */
-    private suspend fun <T> safeCall(block: suspend () -> retrofit2.Response<T>): AuthResult<T> {
-        return try {
-            val response = block()
-            if (response.isSuccessful) {
-                AuthResult.Success<T>(response.body())
-            } else {
-                val errorBody = response.errorBody()?.string()
-                val apiError  = try {
-                    gson.fromJson(errorBody, ApiErrorResponse::class.java)
-                } catch (e: Exception) { null }
-                AuthResult.Error(
-                    code    = response.code(),
-                    message = apiError?.message ?: response.message(),
-                )
-            }
-        } catch (e: Exception) {
-            AuthResult.Exception(e)
-        }
-    }
-
     /** 파일 확장자 → MIME 타입 */
     private fun resolveMimeType(ext: String): String = when (ext.lowercase()) {
         "jpg", "jpeg" -> "image/jpeg"

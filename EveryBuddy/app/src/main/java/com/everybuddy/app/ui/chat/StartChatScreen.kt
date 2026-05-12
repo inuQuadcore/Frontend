@@ -27,7 +27,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.R
 import com.everybuddy.app.data.dummy.*
-import com.everybuddy.app.data.network.AuthResult
+import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.repository.ChatRepository
 import com.everybuddy.app.ui.explore.ExploreTagChip
 import com.everybuddy.app.ui.theme.*
@@ -94,7 +94,7 @@ class StartChatViewModel @Inject constructor(
 
         viewModelScope.launch {
             val result = chatRepository.createChatRoom(roomName, participantIds)
-            if (result is AuthResult.Success) {
+            if (result is ApiResult.Success) {
                 result.data?.let { room -> onSuccess(room.chatRoomId.toString()) }
             }
         }

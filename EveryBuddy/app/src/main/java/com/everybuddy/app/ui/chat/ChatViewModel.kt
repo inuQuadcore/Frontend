@@ -3,7 +3,7 @@ package com.everybuddy.app.ui.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.chat.*
-import com.everybuddy.app.data.network.AuthResult
+import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.repository.ChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -34,14 +34,14 @@ class ChatViewModel @Inject constructor(
             _listState.update { it.copy(isLoading = true, errorMessage = null) }
 
             when (val result = chatRepository.getChatRooms()) {
-                is AuthResult.Success -> {
+                is ApiResult.Success -> {
                     val rooms = result.data
                         ?.map { it.toChatRoom() }
                         ?: emptyList()
                     _listState.update { it.copy(isLoading = false, rooms = rooms) }
                 }
 
-                is AuthResult.Error -> {
+                is ApiResult.Error -> {
                     // 401: JWT 만료 → 로그인 화면으로 이동 필요
                     // TODO: 401 시 로그아웃 처리 — AppNavGraph에서 Route.LOGIN으로 navigate
                     _listState.update {
@@ -54,7 +54,7 @@ class ChatViewModel @Inject constructor(
                     }
                 }
 
-                is AuthResult.Exception -> {
+                is ApiResult.NetworkError -> {
                     // 네트워크 오류 — 더미 데이터 폴백
                     _listState.update {
                         it.copy(
@@ -79,7 +79,7 @@ class ChatViewModel @Inject constructor(
             _listState.update { it.copy(isLoading = true) }
 
             when (val result = chatRepository.createChatRoom(roomName, participantIds)) {
-                is AuthResult.Success -> {
+                is ApiResult.Success -> {
                     val created = result.data?.toChatRoom()
                     if (created != null) {
                         // 목록 맨 앞에 추가
@@ -96,7 +96,7 @@ class ChatViewModel @Inject constructor(
                     }
                 }
 
-                is AuthResult.Error -> {
+                is ApiResult.Error -> {
                     _listState.update { it.copy(isLoading = false) }
                     // 400: 필드별 에러 메시지 조합
                     val errorMsg = when (result.code) {
@@ -108,7 +108,7 @@ class ChatViewModel @Inject constructor(
                     onError(errorMsg)
                 }
 
-                is AuthResult.Exception -> {
+                is ApiResult.NetworkError -> {
                     _listState.update { it.copy(isLoading = false) }
                     onError(result.e.localizedMessage ?: "네트워크 오류가 발생했습니다.")
                 }
