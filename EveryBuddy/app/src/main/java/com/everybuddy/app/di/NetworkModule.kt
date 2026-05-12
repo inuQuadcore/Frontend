@@ -7,6 +7,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.network.ApiService
 import com.everybuddy.app.data.network.AuthApi
 import com.everybuddy.app.data.network.ChatApiService
@@ -76,7 +77,9 @@ object NetworkModule {
     @Named("logging")
     fun provideLoggingInterceptor(): Interceptor =
         HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            // Release 빌드에선 NONE — 비밀번호·토큰이 logcat에 평문 출력되는 보안 이슈 방지
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+                    else                   HttpLoggingInterceptor.Level.NONE
         }
 
     @Provides
