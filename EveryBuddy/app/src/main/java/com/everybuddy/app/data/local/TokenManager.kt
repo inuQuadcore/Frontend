@@ -35,12 +35,6 @@ class TokenManager @Inject constructor(
         }
     }
 
-    suspend fun saveTempToken(token: String) {
-        dataStore.edit { prefs ->
-            prefs[TokenKeys.ACCESS_TOKEN] = token
-        }
-    }
-
     suspend fun clearToken() {
         dataStore.edit { prefs ->
             prefs.remove(TokenKeys.ACCESS_TOKEN)
