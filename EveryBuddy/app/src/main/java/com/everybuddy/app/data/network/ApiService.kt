@@ -6,7 +6,6 @@ package com.everybuddy.app.data.network
 // Base URL: https://api.everybuddy.cloud/
 //
 // ─ 포함된 API 그룹 ──────────────────────────────────────────────────────────
-//   Auth API      : 회원가입, 로그인, 온보딩
 //   Friend API    : 친구 추가/삭제/목록 조회
 //   Block API     : 사용자 차단/차단 해제
 //   Discover API  : 랜덤 탐색, 필터 탐색
@@ -24,31 +23,6 @@ import retrofit2.Response
 import retrofit2.http.*
 
 interface ApiService {
-
-    // =========================================================================
-    // Auth API
-    // =========================================================================
-
-    /** POST /api/auth/register — 회원가입 */
-    @POST("api/auth/register")
-    suspend fun register(
-        @Body request: RegisterRequest,
-    ): Response<Unit>
-
-    /** POST /api/auth/login — 로그인 → JWT 발급 */
-    @POST("api/auth/login")
-    suspend fun login(
-        @Body request: LoginRequest,
-    ): Response<LoginResponse>
-
-    /**
-     * POST /api/auth/onboarding — 온보딩 정보 저장
-     * TODO: 스웨거 엔드포인트 확인 후 경로 수정
-     */
-    @POST("api/auth/onboarding")
-    suspend fun saveOnboarding(
-        @Body request: OnboardingRequest,
-    ): Response<Unit>
 
     // =========================================================================
     // Friend API  (이미지 5~8)
