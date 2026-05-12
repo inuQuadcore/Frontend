@@ -126,6 +126,27 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    suspend fun googleRegister(req: GoogleRegisterRequest): AuthResult<LoginResponse> {
+        return try {
+            val res = api.googleRegister(req)
+            if (res.isSuccessful) {
+                val body = res.body()!!
+                tokenManager.saveToken(
+                    accessToken           = body.accessToken,
+                    refreshToken          = body.refreshToken,
+                    accessTokenExpiresAt  = body.accessTokenExpiresAt,
+                    refreshTokenExpiresAt = body.refreshTokenExpiresAt,
+                    userId                = body.userId,
+                )
+                AuthResult.Success(body)
+            } else {
+                AuthResult.Error(res.code(), parseError(res.errorBody()?.string()))
+            }
+        } catch (e: Exception) {
+            AuthResult.Exception(e)
+        }
+    }
+
     suspend fun logout(): AuthResult<Unit> {
         val refreshToken = tokenManager.refreshToken.firstOrNull()
         return try {

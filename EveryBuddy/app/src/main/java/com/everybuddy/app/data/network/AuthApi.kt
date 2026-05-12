@@ -96,6 +96,12 @@ interface AuthApi {
         @Body request: GoogleAuthRequest,
     ): Response<GoogleAuthResponse>
 
+    // POST /api/v1/auth/oauth/google/register — 구글 신규 유저 가입 완료
+    @POST("api/v1/auth/oauth/google/register")
+    suspend fun googleRegister(
+        @Body body: GoogleRegisterRequest,
+    ): Response<LoginResponse>  // 200: 성공 / 401: TEMP_TOKEN_EXPIRED·INVALID_OAUTH_TOKEN / 409: DUPLICATED_USER
+
     // POST /api/v1/auth/register — 회원가입
     @POST("api/v1/auth/register")
     suspend fun register(
