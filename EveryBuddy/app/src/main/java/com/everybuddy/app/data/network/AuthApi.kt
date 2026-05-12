@@ -26,16 +26,17 @@ data class LoginData(
 
 // Request DTOs
 data class RegisterRequest(
-    val loginId   : String,
-    val password  : String,
-    val name      : String,
-    val country   : String,          // "KOREA", "USA" 등
-    val birthday  : String,          // "2000-01-01"
-    val gender    : String,          // "MALE" | "FEMALE"
-    val bio       : String,
-    val tags      : List<String>,    // ["SPORTS", "INTJ"]
-    val languages : List<LanguageLevel>,
-    val checked   : Boolean,         // 약관 동의
+    val loginId           : String,
+    val password          : String,
+    val name              : String,
+    val checked           : Boolean,                // 약관 동의
+    val country           : String,                 // "KOREA", "USA" 등
+    val birthday          : String,                 // "2000-01-01"
+    val gender            : String,                 // "MALE" | "FEMALE"
+    val bio               : String,
+    val tags              : List<String>,           // ["SPORTS", "INTJ"]
+    val primaryLanguage   : String,                 // "KOREAN" — 자동 level=5, 자동 번역 기본 대상
+    val interestLanguages : List<LanguageLevel>,    // [{ "language": "ENGLISH", "level": 3 }]
 )
 
 data class LanguageLevel(

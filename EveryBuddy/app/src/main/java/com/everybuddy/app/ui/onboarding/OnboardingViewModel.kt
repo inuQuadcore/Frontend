@@ -54,16 +54,17 @@ class OnboardingViewModel @Inject constructor(
         else ""
 
         val req = RegisterRequest(
-            loginId   = authDataHolder.loginId,
-            password  = authDataHolder.password,
-            name      = state.name,
-            country   = state.selectedCountry?.code ?: "",
-            birthday  = birthday,
-            gender    = state.gender?.apiValue ?: "",
-            bio       = state.bio,
-            tags      = state.selectedTags.map { it.apiValue },
-            languages = state.selectedLearnLangs.map { LanguageLevel(it.apiValue, it.level.coerceAtLeast(1)) },
-            checked   = authDataHolder.checked,
+            loginId           = authDataHolder.loginId,
+            password          = authDataHolder.password,
+            name              = state.name,
+            checked           = authDataHolder.checked,
+            country           = state.selectedCountry?.code ?: "",
+            birthday          = birthday,
+            gender            = state.gender?.apiValue ?: "",
+            bio               = state.bio,
+            tags              = state.selectedTags.map { it.apiValue },
+            primaryLanguage   = state.selectedMyLang?.apiValue ?: "",
+            interestLanguages = state.selectedLearnLangs.map { LanguageLevel(it.apiValue, it.level.coerceAtLeast(1)) },
         )
 
         viewModelScope.launch {
