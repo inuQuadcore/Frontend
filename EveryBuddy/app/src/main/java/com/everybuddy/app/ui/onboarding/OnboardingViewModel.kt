@@ -61,6 +61,7 @@ class OnboardingViewModel @Inject constructor(
             val result: ApiResult<*> = if (authDataHolder.isGoogleSignup) {
                 val req = GoogleRegisterRequest(
                     tempToken         = authDataHolder.tempToken ?: "",
+                    checked           = authDataHolder.checked,   // 약관 동의 화면 추가 시 true로 set됨
                     country           = state.selectedCountry?.code ?: "",
                     birthday          = birthday,
                     gender            = state.gender?.apiValue ?: "",
