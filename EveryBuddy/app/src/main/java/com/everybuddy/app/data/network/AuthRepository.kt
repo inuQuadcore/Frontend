@@ -39,6 +39,27 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    suspend fun refresh(refreshToken: String): AuthResult<LoginResponse> {
+        return try {
+            val res = api.refresh(RefreshTokenRequest(refreshToken))
+            if (res.isSuccessful) {
+                val body = res.body()!!
+                tokenManager.saveToken(
+                    accessToken           = body.accessToken,
+                    refreshToken          = body.refreshToken,
+                    accessTokenExpiresAt  = body.accessTokenExpiresAt,
+                    refreshTokenExpiresAt = body.refreshTokenExpiresAt,
+                    userId                = body.userId,
+                )
+                AuthResult.Success(body)
+            } else {
+                AuthResult.Error(res.code(), parseError(res.errorBody()?.string()))
+            }
+        } catch (e: Exception) {
+            AuthResult.Exception(e)
+        }
+    }
+
     suspend fun register(req: RegisterRequest): AuthResult<Unit> {
         return try {
             val res = api.register(req)

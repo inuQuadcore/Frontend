@@ -108,6 +108,12 @@ interface AuthApi {
         @Body body: LoginRequest,
     ): Response<LoginResponse>  // 200: 성공 / 401: 실패 / 404: 유저없음
 
+    // POST /api/v1/auth/refresh — 토큰 재발급 (rotation)
+    @POST("api/v1/auth/refresh")
+    suspend fun refresh(
+        @Body body: RefreshTokenRequest,
+    ): Response<LoginResponse>  // 200: 성공 / 401: REFRESH_TOKEN_NOT_FOUND·EXPIRED
+
     // GET /api/v1/auth/firebaseToken — Firebase 실시간 채팅 토큰 발급 (JWT 필요)
     @GET("api/v1/auth/firebaseToken")
     suspend fun firebaseToken(): Response<FirebaseTokenResponse>
