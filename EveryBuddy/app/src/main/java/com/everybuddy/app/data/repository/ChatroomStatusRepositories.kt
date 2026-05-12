@@ -7,7 +7,6 @@ package com.everybuddy.app.data.repository
 
 import com.everybuddy.app.data.dto.*
 import com.everybuddy.app.data.network.ApiService
-import com.everybuddy.app.data.network.CreateChatRoomRequest
 import com.google.gson.Gson
 import retrofit2.Response
 import javax.inject.Inject

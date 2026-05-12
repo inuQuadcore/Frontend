@@ -2,18 +2,12 @@ package com.everybuddy.app.data.dto
 
 import com.google.gson.annotations.SerializedName
 
-// Unique-to-ApiDtos helpers used by ApiRepositories
-data class LanguageDto(
-    @SerializedName("language") val language : String,
-    @SerializedName("level")    val level    : Int,
-)
-
 data class OnboardingLanguage(
     @SerializedName("language") val language : String,
     @SerializedName("level")    val level    : Int,
 )
 
-// POST /api/v1/messages (multipart JSON part) — different name from AppDtos SendMessageRequestDto
+// POST /api/v1/messages (multipart JSON part)
 data class SendMessageRequest(
     @SerializedName("chatRoomId") val chatRoomId : Long,
     @SerializedName("content")    val content    : String,

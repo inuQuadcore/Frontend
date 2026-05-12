@@ -1,10 +1,10 @@
 package com.everybuddy.app.data.repository
 
 import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.dto.ChatRoomDto
+import com.everybuddy.app.data.dto.CreateChatRoomRequest
+import com.everybuddy.app.data.dto.SendMessageRequest
 import com.everybuddy.app.data.network.ChatApiService
-import com.everybuddy.app.data.network.ChatRoomResponse
-import com.everybuddy.app.data.network.CreateChatRoomRequest
-import com.everybuddy.app.data.network.SendMessageRequest
 import com.google.gson.Gson
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -34,12 +34,12 @@ class ChatRepository @Inject constructor(
     /**
      * 내가 참여하는 채팅방 목록을 서버에서 조회.
      *
-     * 성공 | ApiResult.Success(List<ChatRoomResponse>)
+     * 성공 | ApiResult.Success(List<ChatRoomDto>)
      * 실패
      *  401 — JWT_ENTRY_POINT : 로그인 필요
      * 예외 ApiResult.NetworkError (네트워크 오류 등)
      */
-    suspend fun getChatRooms(): ApiResult<List<ChatRoomResponse>> =
+    suspend fun getChatRooms(): ApiResult<List<ChatRoomDto>> =
         safeApiCall(gson, { chatApi.getChatRooms() })
 
     // 채팅방 생성
@@ -50,7 +50,7 @@ class ChatRepository @Inject constructor(
      * @param roomName       채팅방 이름
      * @param participantIds 참여자 ID 목록 (나 자신 제외, 서버가 자동으로 추가)
      *
-     * 성공 | ApiResult.Success(ChatRoomResponse)
+     * 성공 | ApiResult.Success(ChatRoomDto)
      * 실패
      *  400 — INVALID_INPUT_VALUE : roomName 또는 participantIds 누락
      *  401 — JWT_ENTRY_POINT
@@ -60,7 +60,7 @@ class ChatRepository @Inject constructor(
     suspend fun createChatRoom(
         roomName       : String,
         participantIds : List<Long>,
-    ): ApiResult<ChatRoomResponse> =
+    ): ApiResult<ChatRoomDto> =
         safeApiCall(gson, { chatApi.createChatRoom(CreateChatRoomRequest(roomName, participantIds)) })
 
     // 메시지 전송

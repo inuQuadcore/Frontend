@@ -2,45 +2,10 @@ package com.everybuddy.app.data.dto
 
 import com.google.gson.annotations.SerializedName
 
-// Auth
-data class RegisterRequest(
-    @SerializedName("loginId")   val loginId   : String,
-    @SerializedName("password")  val password  : String,
-    @SerializedName("name")      val name      : String,
-    @SerializedName("country")   val country   : String,
-    @SerializedName("birthday")  val birthday  : String,
-    @SerializedName("gender")    val gender    : String,
-    @SerializedName("bio")       val bio       : String,
-    @SerializedName("tags")      val tags      : List<String>,
-    @SerializedName("languages") val languages : List<LanguageLevelDto>,
-    @SerializedName("checked")   val checked   : Boolean,
-)
-
-data class LanguageLevelDto(
-    @SerializedName("language") val language : String,
-    @SerializedName("level")    val level    : Int,
-)
-
-data class LoginRequest(
-    @SerializedName("loginId")  val loginId  : String,
-    @SerializedName("password") val password : String,
-)
-
-data class LoginResponse(
-    @SerializedName("userId")      val userId      : Long,
-    @SerializedName("accessToken") val accessToken : String,
-    @SerializedName("tokenType")   val tokenType   : String,
-    @SerializedName("expireIn")    val expireIn    : Long,
-)
-
-data class OnboardingRequest(
-    @SerializedName("name")      val name      : String,
-    @SerializedName("country")   val country   : String,
-    @SerializedName("birthday")  val birthday  : String,
-    @SerializedName("gender")    val gender    : String,
-    @SerializedName("bio")       val bio       : String,
-    @SerializedName("tags")      val tags      : List<String>,
-    @SerializedName("languages") val languages : List<LanguageLevelDto>,
+// 공통 — 여러 도메인(Auth/Friend/Discover/User)에서 공유
+data class LanguageLevel(
+    @SerializedName("language") val language : String,           // "ENGLISH", "KOREAN" 등
+    @SerializedName("level")    val level    : Int,              // 1~5
 )
 
 // Friend
@@ -51,7 +16,7 @@ data class FriendDto(
     @SerializedName("profileImageUrl") val profileImageUrl : String?              = null,
     @SerializedName("country")         val country         : String               = "",
     @SerializedName("bio")             val bio             : String               = "",
-    @SerializedName("languages")       val languages       : List<LanguageLevelDto> = emptyList(),
+    @SerializedName("languages")       val languages       : List<LanguageLevel> = emptyList(),
     @SerializedName("tags")            val tags            : List<TagDto>         = emptyList(),
 )
 
@@ -68,7 +33,7 @@ data class DiscoverUserDto(
     @SerializedName("profileImageUrl") val profileImageUrl : String?              = null,
     @SerializedName("country")         val country         : String               = "",
     @SerializedName("bio")             val bio             : String               = "",
-    @SerializedName("languages")       val languages       : List<LanguageLevelDto> = emptyList(),
+    @SerializedName("languages")       val languages       : List<LanguageLevel> = emptyList(),
     @SerializedName("tags")            val tags            : List<TagDto>         = emptyList(),
     @SerializedName("lastSeenAt")      val lastSeenAt      : String?              = null,
 )
@@ -107,7 +72,7 @@ data class TagDto(
     @SerializedName("category") val category : String = "",
 )
 data class UserLanguagesResponse(
-    @SerializedName("languages") val languages : List<LanguageLevelDto>,
+    @SerializedName("languages") val languages : List<LanguageLevel>,
     @SerializedName("isOwner")   val isOwner   : Boolean,
 )
 data class UpdateLanguageLevelRequest(
@@ -143,10 +108,6 @@ data class ChatRoomDto(
 data class CreateChatRoomRequest(
     @SerializedName("roomName")       val roomName       : String,
     @SerializedName("participantIds") val participantIds : List<Long>,
-)
-data class SendMessageRequestDto(
-    @SerializedName("chatRoomId") val chatRoomId : Long,
-    @SerializedName("content")    val content    : String,
 )
 
 // Status Message

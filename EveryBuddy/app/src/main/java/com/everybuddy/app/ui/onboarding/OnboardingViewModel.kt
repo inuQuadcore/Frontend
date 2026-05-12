@@ -3,11 +3,11 @@ package com.everybuddy.app.ui.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.auth.AuthDataHolder
-import com.everybuddy.app.data.repository.AuthRepository
 import com.everybuddy.app.data.dto.ApiResult
-import com.everybuddy.app.data.network.GoogleRegisterRequest
-import com.everybuddy.app.data.network.LanguageLevel
-import com.everybuddy.app.data.network.RegisterRequest
+import com.everybuddy.app.data.dto.GoogleRegisterRequest
+import com.everybuddy.app.data.dto.LanguageLevel
+import com.everybuddy.app.data.dto.RegisterRequest
+import com.everybuddy.app.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -15,8 +15,8 @@ data class ChatRoom(
     val participantIds : List<Long>   = emptyList(),
 )
 
-// ChatRoomResponse → ChatRoom 변환
-fun com.everybuddy.app.data.network.ChatRoomResponse.toChatRoom(): ChatRoom = ChatRoom(
+// ChatRoomDto → ChatRoom 변환
+fun com.everybuddy.app.data.dto.ChatRoomDto.toChatRoom(): ChatRoom = ChatRoom(
     id             = chatRoomId.toString(),
     name           = roomName,
     createdAt      = createdAt,
