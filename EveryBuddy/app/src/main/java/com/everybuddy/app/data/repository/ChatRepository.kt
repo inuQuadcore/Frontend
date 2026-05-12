@@ -1,5 +1,11 @@
-package com.everybuddy.app.data.network
+package com.everybuddy.app.data.repository
 
+import com.everybuddy.app.data.network.ApiErrorResponse
+import com.everybuddy.app.data.network.AuthResult
+import com.everybuddy.app.data.network.ChatApiService
+import com.everybuddy.app.data.network.ChatRoomResponse
+import com.everybuddy.app.data.network.CreateChatRoomRequest
+import com.everybuddy.app.data.network.SendMessageRequest
 import com.google.gson.Gson
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody

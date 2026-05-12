@@ -28,7 +28,7 @@ import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.R
 import com.everybuddy.app.data.dummy.*
 import com.everybuddy.app.data.network.AuthResult
-import com.everybuddy.app.data.network.ChatRepository
+import com.everybuddy.app.data.repository.ChatRepository
 import com.everybuddy.app.ui.explore.ExploreTagChip
 import com.everybuddy.app.ui.theme.*
 import javax.inject.Inject

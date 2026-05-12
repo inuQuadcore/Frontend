@@ -3,7 +3,7 @@ package com.everybuddy.app.ui.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.auth.AuthDataHolder
-import com.everybuddy.app.data.network.AuthRepository
+import com.everybuddy.app.data.repository.AuthRepository
 import com.everybuddy.app.data.network.AuthResult
 import com.everybuddy.app.data.network.GoogleRegisterRequest
 import com.everybuddy.app.data.network.LanguageLevel

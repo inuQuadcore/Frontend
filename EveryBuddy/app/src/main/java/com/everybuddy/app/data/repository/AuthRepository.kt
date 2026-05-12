@@ -1,10 +1,20 @@
-package com.everybuddy.app.data.network
+package com.everybuddy.app.data.repository
 
 import android.content.Context
 import com.everybuddy.app.data.auth.AuthDataHolder
 import com.everybuddy.app.data.auth.GoogleAuthManager
 import com.everybuddy.app.data.auth.GoogleSignInResult
 import com.everybuddy.app.data.local.TokenManager
+import com.everybuddy.app.data.network.AuthApi
+import com.everybuddy.app.data.network.AuthResult
+import com.everybuddy.app.data.network.ErrorResponse
+import com.everybuddy.app.data.network.GoogleAuthRequest
+import com.everybuddy.app.data.network.GoogleRegisterRequest
+import com.everybuddy.app.data.network.LoginRequest
+import com.everybuddy.app.data.network.LoginResponse
+import com.everybuddy.app.data.network.LogoutRequest
+import com.everybuddy.app.data.network.RefreshTokenRequest
+import com.everybuddy.app.data.network.RegisterRequest
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
