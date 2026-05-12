@@ -49,6 +49,25 @@ data class LoginRequest(
     val password : String,
 )
 
+data class RefreshTokenRequest(
+    val refreshToken: String,
+)
+
+data class LogoutRequest(
+    val refreshToken: String,
+)
+
+data class GoogleRegisterRequest(
+    val tempToken         : String,
+    val country           : String,
+    val birthday          : String,
+    val gender            : String,
+    val bio               : String,
+    val tags              : List<String>,
+    val primaryLanguage   : String,
+    val interestLanguages : List<LanguageLevel>,
+)
+
 // Response DTOs
 data class LoginResponse(
     val userId                : Long,
