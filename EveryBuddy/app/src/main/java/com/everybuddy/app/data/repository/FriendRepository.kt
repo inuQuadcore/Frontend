@@ -2,14 +2,14 @@ package com.everybuddy.app.data.repository
 
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.FriendListResponse
-import com.everybuddy.app.data.network.ApiService
+import com.everybuddy.app.data.network.FriendApi
 import com.google.gson.Gson
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class FriendRepository @Inject constructor(
-    private val api  : ApiService,
+    private val api  : FriendApi,
     private val gson : Gson,
 ) {
     /**

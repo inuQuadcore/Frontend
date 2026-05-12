@@ -5,7 +5,7 @@ import com.everybuddy.app.data.dto.EditMessageRequest
 import com.everybuddy.app.data.dto.Message
 import com.everybuddy.app.data.dto.SendMessageRequest
 import com.everybuddy.app.data.dto.SyncMessagesResponse
-import com.everybuddy.app.data.network.ApiService
+import com.everybuddy.app.data.network.MessageApi
 import com.google.gson.Gson
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -17,7 +17,7 @@ import javax.inject.Singleton
 
 @Singleton
 class MessageRepository @Inject constructor(
-    private val api  : ApiService,
+    private val api  : MessageApi,
     private val gson : Gson,
 ) {
     /**

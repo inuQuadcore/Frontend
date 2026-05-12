@@ -11,7 +11,7 @@ package com.everybuddy.app.data.repository
 // =============================================================================
 
 import com.everybuddy.app.data.dto.*
-import com.everybuddy.app.data.network.ApiService
+import com.everybuddy.app.data.network.UserApi
 import com.google.gson.Gson
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -24,7 +24,7 @@ import javax.inject.Singleton
 
 @Singleton
 class UserRepository @Inject constructor(
-    private val api  : ApiService,
+    private val api  : UserApi,
     private val gson : Gson,
 ) {
 

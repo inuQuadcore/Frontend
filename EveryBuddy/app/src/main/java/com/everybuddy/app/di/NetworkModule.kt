@@ -8,10 +8,16 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.everybuddy.app.BuildConfig
-import com.everybuddy.app.data.network.ApiService
 import com.everybuddy.app.data.network.AuthApi
+import com.everybuddy.app.data.network.BlockApi
 import com.everybuddy.app.data.network.ChatApiService
+import com.everybuddy.app.data.network.ChatRoomApi
+import com.everybuddy.app.data.network.DiscoverApi
+import com.everybuddy.app.data.network.FriendApi
+import com.everybuddy.app.data.network.MessageApi
+import com.everybuddy.app.data.network.StatusMessageApi
 import com.everybuddy.app.data.network.TokenAuthenticator
+import com.everybuddy.app.data.network.UserApi
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import dagger.Module
@@ -87,7 +93,7 @@ object NetworkModule {
     fun provideAuthenticator(authenticator: TokenAuthenticator): Authenticator = authenticator
 
     // Main OkHttpClient — JWT 인터셉터 + Authenticator (401 자동 refresh)
-    // 일반 API(ApiService, ChatApiService)용
+    // 일반 API(도메인별 *Api 인터페이스들, ChatApiService)용
     @Provides
     @Singleton
     fun provideOkHttpClient(
@@ -148,18 +154,39 @@ object NetworkModule {
         .addConverterFactory(GsonConverterFactory.create(gson))
         .build()
 
-    @Provides
-    @Singleton
-    fun provideApiService(retrofit: Retrofit): ApiService =
-        retrofit.create(ApiService::class.java)
-
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideAuthApi(@Named("auth") retrofit: Retrofit): AuthApi =
         retrofit.create(AuthApi::class.java)
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
+    fun provideFriendApi(retrofit: Retrofit): FriendApi =
+        retrofit.create(FriendApi::class.java)
+
+    @Provides @Singleton
+    fun provideBlockApi(retrofit: Retrofit): BlockApi =
+        retrofit.create(BlockApi::class.java)
+
+    @Provides @Singleton
+    fun provideDiscoverApi(retrofit: Retrofit): DiscoverApi =
+        retrofit.create(DiscoverApi::class.java)
+
+    @Provides @Singleton
+    fun provideMessageApi(retrofit: Retrofit): MessageApi =
+        retrofit.create(MessageApi::class.java)
+
+    @Provides @Singleton
+    fun provideUserApi(retrofit: Retrofit): UserApi =
+        retrofit.create(UserApi::class.java)
+
+    @Provides @Singleton
+    fun provideChatRoomApi(retrofit: Retrofit): ChatRoomApi =
+        retrofit.create(ChatRoomApi::class.java)
+
+    @Provides @Singleton
+    fun provideStatusMessageApi(retrofit: Retrofit): StatusMessageApi =
+        retrofit.create(StatusMessageApi::class.java)
+
+    @Provides @Singleton
     fun provideChatApiService(retrofit: Retrofit): ChatApiService =
         retrofit.create(ChatApiService::class.java)
 }

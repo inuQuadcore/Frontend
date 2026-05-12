@@ -1,50 +1,17 @@
 package com.everybuddy.app.data.repository
 
-// =============================================================================
-// ChatroomStatusRepositories.kt
-// 채팅방 API + 상태메시지 API Repository
-// =============================================================================
-
-import com.everybuddy.app.data.dto.*
-import com.everybuddy.app.data.network.ApiService
+import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.dto.FriendStatusMessagesResponse
+import com.everybuddy.app.data.dto.MyStatusMessageResponse
+import com.everybuddy.app.data.dto.StatusMessageRequest
+import com.everybuddy.app.data.network.StatusMessageApi
 import com.google.gson.Gson
-import retrofit2.Response
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ChatRoomRepository
-// ─────────────────────────────────────────────────────────────────────────────
-@Singleton
-class ChatRoomRepository @Inject constructor(
-    private val api  : ApiService,
-    private val gson : Gson,
-) {
-    /**
-     * 내 채팅방 목록 조회 — GET /api/v1/chatrooms
-     * 에러: 401(인증)
-     */
-    suspend fun getChatRooms(): ApiResult<List<ChatRoom>> =
-        safeApiCall(gson, { api.getChatRooms() })
-
-    /**
-     * 채팅방 생성 — POST /api/v1/chatrooms
-     * 에러: 400(errors.roomName / errors.participantIds) | 401 | 404(유저없음)
-     */
-    suspend fun createChatRoom(
-        roomName       : String,
-        participantIds : List<Long>,
-    ): ApiResult<ChatRoom> = safeApiCall(gson, {
-        api.createChatRoom(CreateChatRoomRequest(roomName, participantIds))
-    })
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// StatusMessageRepository
-// ─────────────────────────────────────────────────────────────────────────────
 @Singleton
 class StatusMessageRepository @Inject constructor(
-    private val api  : ApiService,
+    private val api  : StatusMessageApi,
     private val gson : Gson,
 ) {
     /**

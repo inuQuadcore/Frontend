@@ -3,14 +3,14 @@ package com.everybuddy.app.data.repository
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.DiscoverFilterResponse
 import com.everybuddy.app.data.dto.DiscoverResponse
-import com.everybuddy.app.data.network.ApiService
+import com.everybuddy.app.data.network.DiscoverApi
 import com.google.gson.Gson
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class DiscoverRepository @Inject constructor(
-    private val api  : ApiService,
+    private val api  : DiscoverApi,
     private val gson : Gson,
 ) {
     /**
