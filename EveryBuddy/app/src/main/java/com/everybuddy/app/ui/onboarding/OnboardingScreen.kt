@@ -374,7 +374,8 @@ fun StepBasicInfo(
     onStateChange : (OnboardingUiState) -> Unit,
     onNext        : () -> Unit,
 ) {
-    val canProceed = uiState.name.isNotBlank() && uiState.gender != null && uiState.birthYear != null
+    val canProceed = uiState.name.isNotBlank() && uiState.gender != null &&
+            uiState.birthYear != null && uiState.birthMonth != null && uiState.birthDay != null
 
     // DatePicker 다이얼로그 (showDatePicker = true일 때만 표시)
     if (uiState.showDatePicker) {
