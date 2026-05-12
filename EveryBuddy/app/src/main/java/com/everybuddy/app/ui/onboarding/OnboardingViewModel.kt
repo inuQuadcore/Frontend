@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.network.AuthDataHolder
 import com.everybuddy.app.data.network.AuthRepository
 import com.everybuddy.app.data.network.AuthResult
+import com.everybuddy.app.data.network.GoogleRegisterRequest
 import com.everybuddy.app.data.network.LanguageLevel
 import com.everybuddy.app.data.network.RegisterRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -53,24 +54,41 @@ class OnboardingViewModel @Inject constructor(
             "%04d-%02d-%02d".format(state.birthYear, state.birthMonth, state.birthDay)
         else ""
 
-        val req = RegisterRequest(
-            loginId           = authDataHolder.loginId,
-            password          = authDataHolder.password,
-            name              = state.name,
-            checked           = authDataHolder.checked,
-            country           = state.selectedCountry?.code ?: "",
-            birthday          = birthday,
-            gender            = state.gender?.apiValue ?: "",
-            bio               = state.bio,
-            tags              = state.selectedTags.map { it.apiValue },
-            primaryLanguage   = state.selectedMyLang?.apiValue ?: "",
-            interestLanguages = state.selectedLearnLangs.map { LanguageLevel(it.apiValue, it.level.coerceAtLeast(1)) },
-        )
-
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            when (val result = authRepository.register(req)) {
-                is AuthResult.Success -> {
+
+            // 구글 신규가입 흐름이면 googleRegister, 아니면 일반 register 호출
+            val result: AuthResult<*> = if (authDataHolder.isGoogleSignup) {
+                val req = GoogleRegisterRequest(
+                    tempToken         = authDataHolder.tempToken ?: "",
+                    country           = state.selectedCountry?.code ?: "",
+                    birthday          = birthday,
+                    gender            = state.gender?.apiValue ?: "",
+                    bio               = state.bio,
+                    tags              = state.selectedTags.map { it.apiValue },
+                    primaryLanguage   = state.selectedMyLang?.apiValue ?: "",
+                    interestLanguages = state.selectedLearnLangs.map { LanguageLevel(it.apiValue, it.level.coerceAtLeast(1)) },
+                )
+                authRepository.googleRegister(req)
+            } else {
+                val req = RegisterRequest(
+                    loginId           = authDataHolder.loginId,
+                    password          = authDataHolder.password,
+                    name              = state.name,
+                    checked           = authDataHolder.checked,
+                    country           = state.selectedCountry?.code ?: "",
+                    birthday          = birthday,
+                    gender            = state.gender?.apiValue ?: "",
+                    bio               = state.bio,
+                    tags              = state.selectedTags.map { it.apiValue },
+                    primaryLanguage   = state.selectedMyLang?.apiValue ?: "",
+                    interestLanguages = state.selectedLearnLangs.map { LanguageLevel(it.apiValue, it.level.coerceAtLeast(1)) },
+                )
+                authRepository.register(req)
+            }
+
+            when (result) {
+                is AuthResult.Success<*> -> {
                     authDataHolder.clear()
                     _uiState.update { it.copy(isLoading = false, registerSuccess = true) }
                 }

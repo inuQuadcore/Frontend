@@ -14,6 +14,7 @@ class AuthRepository @Inject constructor(
     private val api               : AuthApi,
     private val googleAuthManager : GoogleAuthManager,
     private val tokenManager      : TokenManager,
+    private val authDataHolder    : AuthDataHolder,
 ) {
     private val gson = Gson()
 
@@ -118,7 +119,7 @@ class AuthRepository @Inject constructor(
             } else {
                 val tempToken = body.tempToken
                     ?: return AuthResult.Error(-1, "임시 토큰이 없습니다.")
-                tokenManager.saveTempToken(tempToken)
+                authDataHolder.setGoogleSignup(tempToken)   // Onboarding 완료 시 googleRegister 호출에 사용
                 AuthResult.Success(true)
             }
         } catch (e: Exception) {
