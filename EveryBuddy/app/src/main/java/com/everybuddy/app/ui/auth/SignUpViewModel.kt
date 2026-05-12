@@ -1,7 +1,7 @@
 package com.everybuddy.app.ui.auth
 
 import androidx.lifecycle.ViewModel
-import com.everybuddy.app.data.network.AuthDataHolder
+import com.everybuddy.app.data.auth.AuthDataHolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

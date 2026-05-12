@@ -1,4 +1,4 @@
-package com.everybuddy.app.data.network
+package com.everybuddy.app.data.auth
 
 import javax.inject.Inject
 import javax.inject.Singleton
