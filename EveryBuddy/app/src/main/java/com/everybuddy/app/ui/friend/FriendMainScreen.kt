@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.everybuddy.app.ui.friend
 
 import androidx.compose.foundation.background
@@ -15,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.DisposableEffect
 import kotlinx.coroutines.delay
 import com.everybuddy.app.ui.theme.PretendardFamily
 import com.everybuddy.app.R
@@ -22,22 +25,28 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import com.everybuddy.app.ui.explore.DiscoverUser
+import com.everybuddy.app.ui.explore.ExploreDemo
+import com.everybuddy.app.ui.explore.UserLanguage
+import com.everybuddy.app.ui.explore.UserTag
+import com.everybuddy.app.ui.explore.UserProfileScreen
 
 private val C = FriendColors
 
 @Composable
 fun FriendMainScreen(
-    viewModel         : FriendViewModel,
-    statusVm          : StatusMessageViewModel = hiltViewModel(),
-    onNavigateToChat  : () -> Unit = {},
-    onNavigateToFind  : () -> Unit = {},
-    onNavigateToScript: () -> Unit = {},
-    onNavigateToMy    : () -> Unit = {},
-    onFriendClick     : (FriendProfile) -> Unit = {},
-    onAddFriend       : () -> Unit = {},
+    viewModel      : FriendViewModel,
+    statusVm       : StatusMessageViewModel = hiltViewModel(),
+    onAddFriend    : () -> Unit = {},
+    onStartChat    : (DiscoverUser) -> Unit = {},
+    onNotification : () -> Unit = {},
 ) {
     val uiState     by viewModel.uiState.collectAsState()
     val statusState by statusVm.state.collectAsState()
+
+    DisposableEffect(Unit) {
+        onDispose { viewModel.clearSelectedFriend() }
+    }
 
     LaunchedEffect(uiState.toastMessage) {
         if (uiState.toastMessage != null) {
@@ -54,18 +63,23 @@ fun FriendMainScreen(
     }
 
     when {
+        uiState.selectedFriend != null -> UserProfileScreen(
+            user           = uiState.selectedFriend!!.toDiscoverUser(),
+            isFriend       = uiState.selectedFriend!!.isFriend,
+            onBack         = viewModel::clearSelectedFriend,
+            onChat         = { onStartChat(it) },
+            onAddFriend    = { viewModel.addFriendById(uiState.selectedFriend!!.id) },
+            onRemoveFriend = { viewModel.removeFriendById(uiState.selectedFriend!!.id) },
+        )
         uiState.isSearchActive         -> FriendSearchScreen(viewModel = viewModel)
-        uiState.isStatusPageOpen       -> StatusMessageAllScreen(viewModel = viewModel, statusVm = statusVm)
         statusState.isWriteScreenOpen  -> StatusWriteScreen(viewModel = statusVm)
+        uiState.isStatusPageOpen       -> StatusMessageAllScreen(viewModel = viewModel, statusVm = statusVm)
         else                           -> FriendMainContent(
-            viewModel          = viewModel,
-            statusVm           = statusVm,
-            onNavigateToChat   = onNavigateToChat,
-            onNavigateToFind   = onNavigateToFind,
-            onNavigateToScript = onNavigateToScript,
-            onNavigateToMy     = onNavigateToMy,
-            onFriendClick      = onFriendClick,
-            onAddFriend        = onAddFriend,
+            viewModel      = viewModel,
+            statusVm       = statusVm,
+            onFriendClick  = { viewModel.selectFriend(it) },
+            onAddFriend    = onAddFriend,
+            onNotification = onNotification,
         )
     }
 
@@ -82,16 +96,24 @@ fun FriendMainScreen(
     }
 }
 
+private fun FriendProfile.toDiscoverUser() = DiscoverUser(
+    userId          = id.hashCode().toLong(),
+    name            = name,
+    profileImageUrl = profileImageUrl,
+    country         = nationality,
+    bio             = bio,
+    languages       = nativeLanguages.map { UserLanguage(it, 5) } + learningLanguages.map { UserLanguage(it, 2) },
+    tags            = interests.mapNotNull { apiVal -> ExploreDemo.allTags.find { it.tag == apiVal } },
+    isOnline        = isOnline,
+)
+
 @Composable
 private fun FriendMainContent(
-    viewModel          : FriendViewModel,
-    statusVm           : StatusMessageViewModel,
-    onNavigateToChat   : () -> Unit,
-    onNavigateToFind   : () -> Unit,
-    onNavigateToScript : () -> Unit,
-    onNavigateToMy     : () -> Unit,
-    onFriendClick      : (FriendProfile) -> Unit,
-    onAddFriend        : () -> Unit,
+    viewModel      : FriendViewModel,
+    statusVm       : StatusMessageViewModel,
+    onFriendClick  : (FriendProfile) -> Unit,
+    onAddFriend    : () -> Unit,
+    onNotification : () -> Unit = {},
 ) {
     val uiState     by viewModel.uiState.collectAsState()
     val statusState by statusVm.state.collectAsState()
@@ -103,16 +125,8 @@ private fun FriendMainContent(
                 title          = "친구",
                 showAddFriend  = true,
                 onSearch       = { viewModel.setSearchActive(true) },
-                onNotification = { /* TODO: 알림 화면 */ },
+                onNotification = onNotification,
                 onAddFriend    = onAddFriend,
-            )
-        },
-        bottomBar = {
-            FriendBottomNavBar(
-                onChat   = onNavigateToChat,
-                onFind   = onNavigateToFind,
-                onScript = onNavigateToScript,
-                onMy     = onNavigateToMy,
             )
         },
         containerColor = Color.White,
@@ -197,7 +211,12 @@ private fun FriendMainContent(
                 }
 
                 items(friends) { friend ->
-                    FriendListItem(friend = friend, onClick = onFriendClick)
+                    FriendListItem(
+                        friend         = friend,
+                        isFollowing    = uiState.followedFriendIds.contains(friend.id),
+                        onFollowToggle = { viewModel.onFollowToggle(friend.id) },
+                        onClick        = onFriendClick,
+                    )
                 }
             }
 

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.everybuddy.app.ui.explore
 
 import androidx.compose.animation.*
@@ -17,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
@@ -39,14 +42,22 @@ private val C = AppColors
 // ExploreScreen
 @Composable
 fun ExploreScreen(
-    viewModel           : ExploreViewModel    = hiltViewModel(),
-    onNavigateToChat    : () -> Unit          = {},
-    onNavigateToFriend  : () -> Unit          = {},
-    onNavigateToScript  : () -> Unit          = {},
-    onNavigateToMy      : () -> Unit          = {},
-    onOpenProfile       : (DiscoverUser) -> Unit = {},
+    viewModel      : ExploreViewModel       = hiltViewModel(),
+    onOpenProfile  : (DiscoverUser) -> Unit = {},
+    onStartChat    : (DiscoverUser) -> Unit = {},
+    onNotification : () -> Unit             = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // 프로필 화면 분기
+    if (uiState.isProfileOpen && uiState.selectedUser != null) {
+        UserProfileScreen(
+            user   = uiState.selectedUser!!,
+            onBack = viewModel::closeProfile,
+            onChat = { onStartChat(it) },
+        )
+        return
+    }
 
     // 필터 화면 분기
     if (uiState.isFilterScreenOpen) {
@@ -62,15 +73,7 @@ fun ExploreScreen(
         topBar = {
             ExploreTopBar(
                 onSearch       = { /* TODO: 검색 */ },
-                onNotification = { /* TODO: 알림 */ },
-            )
-        },
-        bottomBar = {
-            ExploreBottomNavBar(
-                onChat   = onNavigateToChat,
-                onFriend = onNavigateToFriend,
-                onScript = onNavigateToScript,
-                onMy     = onNavigateToMy,
+                onNotification = onNotification,
             )
         },
         containerColor = Color.White,
@@ -159,7 +162,12 @@ private fun RecommendTab(
             )
         }
         items(uiState.tagMatchUsers.take(3)) { user ->
-            UserListItem(user = user, onClick = { onOpenProfile(user) })
+            UserListItem(
+                user           = user,
+                isFollowing    = uiState.followedUserIds.contains(user.userId),
+                onFollowToggle = { viewModel.onFollowToggle(user.userId) },
+                onClick        = { onOpenProfile(user) },
+            )
         }
 
         item {
@@ -178,7 +186,12 @@ private fun RecommendTab(
             )
         }
         items(uiState.learningLangUsers.take(3)) { user ->
-            UserListItem(user = user, onClick = { onOpenProfile(user) })
+            UserListItem(
+                user           = user,
+                isFollowing    = uiState.followedUserIds.contains(user.userId),
+                onFollowToggle = { viewModel.onFollowToggle(user.userId) },
+                onClick        = { onOpenProfile(user) },
+            )
         }
     }
 }
@@ -221,7 +234,12 @@ private fun FilterTab(
                 }
             }
             items(uiState.filterResults) { user ->
-                UserListItem(user = user, onClick = { onOpenProfile(user) })
+                UserListItem(
+                    user           = user,
+                    isFollowing    = uiState.followedUserIds.contains(user.userId),
+                    onFollowToggle = { viewModel.onFollowToggle(user.userId) },
+                    onClick        = { onOpenProfile(user) },
+                )
             }
             if (uiState.filterHasNext) {
                 item {
@@ -244,11 +262,23 @@ private fun RandomCardSection(
     onPrev       : () -> Unit,
     onCardClick  : (DiscoverUser) -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
+    if (cardSet.isEmpty()) return
 
-    // 수평 드래그로 카드 전환
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    val animOffsetX by animateFloatAsState(targetValue = offsetX, label = "card_offset")
+    val scope    = rememberCoroutineScope()
+    val offsetX  = remember { Animatable(0f) }
+    val offsetY  = remember { Animatable(0f) }
+    val swipeDir = remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(currentIndex) {
+        val dir = swipeDir.intValue
+        offsetY.snapTo(0f)
+        if (dir != 0) {
+            offsetX.snapTo(-dir * 450f)
+            offsetX.animateTo(0f, tween(280, easing = FastOutSlowInEasing))
+        } else {
+            offsetX.snapTo(0f)
+        }
+    }
 
     val cardUser = cardSet.getOrNull(currentIndex) ?: return
 
@@ -256,31 +286,68 @@ private fun RandomCardSection(
         modifier            = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // 카드 영역
+        Spacer(Modifier.height(24.dp))
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .pointerInput(currentIndex) {
-                    detectHorizontalDragGestures(
-                        onDragEnd = {
-                            if (abs(offsetX) > 80f) {
-                                if (offsetX < 0) onNext() else onPrev()
-                            }
-                            scope.launch { offsetX = 0f }
-                        },
-                        onHorizontalDrag = { _, delta ->
-                            offsetX = (offsetX + delta).coerceIn(-150f, 150f)
-                        },
-                    )
-                }
-                .graphicsLayer {
-                    // 대각선 전환 인터렉션: 수평 드래그 시 살짝 기울기
-                    translationX = animOffsetX * 0.3f
-                    rotationZ    = animOffsetX * 0.05f
-                },
+            modifier         = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.TopCenter,
         ) {
-            ProfileCard(user = cardUser, onClick = { onCardClick(cardUser) })
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .offset(y = (-20).dp)
+                    .aspectRatio(3f / 4f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFFB8C8FF)),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .offset(y = (-10).dp)
+                    .aspectRatio(3f / 4f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFFC8D5FF)),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .pointerInput(currentIndex) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                val dx = offsetX.value
+                                if (abs(dx) > 80f) {
+                                    val dir = if (dx < 0) -1 else 1
+                                    swipeDir.intValue = dir
+                                    scope.launch {
+                                        val jX = launch { offsetX.animateTo(-900f, tween(320)) }
+                                        val jY = launch { offsetY.animateTo(700f, tween(320)) }
+                                        jX.join(); jY.join()
+                                        if (dir < 0) onNext() else onPrev()
+                                    }
+                                } else {
+                                    scope.launch {
+                                        launch { offsetX.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) }
+                                        launch { offsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) }
+                                    }
+                                }
+                            },
+                            onHorizontalDrag = { _, delta ->
+                                scope.launch {
+                                    offsetX.snapTo((offsetX.value + delta).coerceIn(-220f, 220f))
+                                }
+                            },
+                        )
+                    }
+                    .graphicsLayer {
+                        translationX = offsetX.value
+                        translationY = offsetY.value
+                        alpha        = (1f - offsetY.value / 700f).coerceAtLeast(0f)
+                    },
+            ) {
+                ProfileCard(user = cardUser, onClick = { onCardClick(cardUser) })
+            }
         }
 
         // 카드 순서 점 인디케이터
@@ -306,17 +373,30 @@ private fun ProfileCard(user: DiscoverUser, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(280.dp)
+            .aspectRatio(3f / 4f)
             .clip(RoundedCornerShape(20.dp))
             .background(Color(0xFF888888))
             .clickable(onClick = onClick),
     ) {
-        AsyncImage(
-            model              = user.profileImageUrl,
-            contentDescription = user.name,
-            contentScale       = ContentScale.Crop,
-            modifier           = Modifier.fillMaxSize(),
-        )
+        when (user.userId) {
+            10L -> Image(
+                painter            = painterResource(R.drawable.im_woo2),
+                contentDescription = user.name,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
+            )
+            else -> Box(
+                modifier         = Modifier.fillMaxSize().background(Color(0xFFF0F0F0)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter            = painterResource(R.drawable.ic_nav_my),
+                    contentDescription = user.name,
+                    modifier           = Modifier.size(60.dp),
+                    tint               = Color(0xFFCCCCCC),
+                )
+            }
+        }
 
         // 하단 그라데이션 오버레이
         Box(
@@ -426,49 +506,60 @@ fun FilterBanner(subtitle: String = "조건에 맞추어 추천해요", onClick:
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .height(88.dp)
+            .clip(RoundedCornerShape(0.dp))
             .background(C.BannerBg),
     ) {
-        Row(
+        // 반원: 위쪽 절반, 왼쪽 조금 잘린채로
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .size(120.dp)
+                .offset(x = (-20).dp, y = (40).dp)
+                .background(Color(0xFFCCDDFF), CircleShape),
+        )
+
+        Row(
+            modifier              = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // TODO: 일러스트 이미지 (아바타들)
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFCCDDFF)),
+            Image(
+                painter            = painterResource(R.drawable.ic_filter),
+                contentDescription = null,
+                contentScale       = ContentScale.FillHeight,
+                modifier           = Modifier.requiredHeight(72.dp),
             )
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f).padding(vertical = 12.dp)) {
                 Text(
                     "나에게 맞는 친구만",
-                    style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                    style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
                 )
                 Text(
                     subtitle,
-                    style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextSec),
+                    style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextSec),
                 )
             }
             Button(
                 onClick        = onClick,
-                shape          = RoundedCornerShape(20.dp),
+                shape          = RoundedCornerShape(50.dp),
                 colors         = ButtonDefaults.buttonColors(containerColor = C.Accent),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
             ) {
-                Text("필터설정", style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
+                Text("필터 설정", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
             }
         }
     }
 }
 
-// 유저 리스트 아이템
 @Composable
-fun UserListItem(user: DiscoverUser, onClick: () -> Unit) {
+fun UserListItem(
+    user           : DiscoverUser,
+    isFollowing    : Boolean     = false,
+    onFollowToggle : () -> Unit  = {},
+    onClick        : () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -479,14 +570,27 @@ fun UserListItem(user: DiscoverUser, onClick: () -> Unit) {
         // 프로필 이미지 + 국기 뱃지
         Box(modifier = Modifier.size(60.dp)) {
             Box(
-                modifier = Modifier.size(60.dp).clip(CircleShape).background(Color(0xFFD0D0D0)),
+                modifier = Modifier.size(60.dp).clip(CircleShape).background(Color(0xFFF0F0F0)),
             ) {
-                AsyncImage(
-                    model              = user.profileImageUrl,
-                    contentDescription = user.name,
-                    contentScale       = ContentScale.Crop,
-                    modifier           = Modifier.fillMaxSize(),
-                )
+                when (user.userId) {
+                    10L -> Image(
+                        painter            = painterResource(R.drawable.im_woo2),
+                        contentDescription = user.name,
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize(),
+                    )
+                    else -> Box(
+                        modifier         = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter            = painterResource(R.drawable.ic_nav_my),
+                            contentDescription = user.name,
+                            modifier           = Modifier.size(36.dp),
+                            tint               = Color(0xFFCCCCCC),
+                        )
+                    }
+                }
             }
             Text(
                 user.countryFlag(),
@@ -496,7 +600,7 @@ fun UserListItem(user: DiscoverUser, onClick: () -> Unit) {
         }
         Spacer(Modifier.width(12.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
             // 태그 3개 (온보딩 순서)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 user.top3Tags().forEach { tag ->
@@ -537,6 +641,7 @@ fun UserListItem(user: DiscoverUser, onClick: () -> Unit) {
                 }
             }
         }
+
     }
     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
 }
@@ -582,23 +687,34 @@ fun ActiveBadge() {
 
 // TopBar + BottomNavBar
 @Composable
-private fun ExploreTopBar(onSearch: () -> Unit, onNotification: () -> Unit) {
+private fun ExploreTopBar(
+    onSearch       : () -> Unit,
+    onNotification : () -> Unit,
+    hasNotification: Boolean = false,
+) {
     Column {
-        Row(
+        Box(
             modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("탐색", style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri))
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                "탐색",
+                modifier = Modifier.align(Alignment.Center),
+                style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+            )
+            Row(
+                modifier              = Modifier.align(Alignment.CenterEnd),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 IconButton(onClick = onSearch, modifier = Modifier.size(40.dp)) {
-                    Icon(painterResource(R.drawable.ic_search), "검색", Modifier.size(22.dp), tint = C.TextPri)
+                    Icon(painterResource(R.drawable.ic_search), "검색", Modifier.size(24.dp), tint = C.TextPri)
                 }
                 Box {
                     IconButton(onClick = onNotification, modifier = Modifier.size(40.dp)) {
-                        Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(22.dp), tint = C.TextPri)
+                        Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(24.dp), tint = C.TextPri)
                     }
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(C.Accent).align(Alignment.TopEnd).offset(x = (-6).dp, y = 6.dp))
+                    if (hasNotification) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(C.Accent).align(Alignment.TopEnd).offset(x = (-6).dp, y = 6.dp))
+                    }
                 }
             }
         }
@@ -606,33 +722,5 @@ private fun ExploreTopBar(onSearch: () -> Unit, onNotification: () -> Unit) {
     }
 }
 
-@Composable
-private fun ExploreBottomNavBar(onChat: () -> Unit, onFriend: () -> Unit, onScript: () -> Unit, onMy: () -> Unit) {
-    Column {
-        HorizontalDivider(color = C.Border, thickness = 0.5.dp)
-        Row(
-            modifier = Modifier.fillMaxWidth().height(60.dp).background(Color.White).navigationBarsPadding(),
-            horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ExpNavItem("대화",    R.drawable.ic_nav_chat,   false, onChat)
-            ExpNavItem("친구",    R.drawable.ic_nav_friend, false, onFriend)
-            ExpNavItem("탐색",    R.drawable.ic_nav_find,   true,  {})
-            ExpNavItem("스크립트", R.drawable.ic_nav_script, false, onScript)
-            ExpNavItem("마이",    R.drawable.ic_nav_my,     false, onMy)
-        }
-    }
-}
 
-@Composable
-private fun ExpNavItem(label: String, iconRes: Int, isSelected: Boolean, onClick: () -> Unit) {
-    val tint = if (isSelected) C.Accent else Color(0xFFAAAAAA)
-    Column(
-        modifier = Modifier.clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(painterResource(iconRes), label, Modifier.size(24.dp), tint = tint)
-        Spacer(Modifier.height(2.dp))
-        Text(label, style = TextStyle(fontSize = 10.sp, fontFamily = PretendardFamily, color = tint, fontWeight = if (isSelected) FontWeight(600) else FontWeight(400)))
-    }
-}
 

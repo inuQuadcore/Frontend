@@ -1,6 +1,7 @@
 package com.everybuddy.app.ui.script
 
 import androidx.lifecycle.ViewModel
+import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.ui.chat.ScriptFolder
 import com.everybuddy.app.ui.chat.ScriptItem
 import com.everybuddy.app.ui.chat.dummyScriptFolders
@@ -14,8 +15,8 @@ import java.util.UUID
 import javax.inject.Inject
 
 data class ScriptUiState(
-    val folders       : List<ScriptFolder> = dummyScriptFolders,
-    val items         : List<ScriptItem>   = dummyScriptItems,
+    val folders       : List<ScriptFolder> = if (BuildConfig.DEBUG) dummyScriptFolders else emptyList(),
+    val items         : List<ScriptItem>   = if (BuildConfig.DEBUG) dummyScriptItems   else emptyList(),
     val selectedFolderIndex : Int          = 0,   // 0 = 전체, 1~ = 특정 폴더
     val sortOption    : ScriptSortOption   = ScriptSortOption.SAVED_AT_DESC,
     val searchQuery   : String             = "",

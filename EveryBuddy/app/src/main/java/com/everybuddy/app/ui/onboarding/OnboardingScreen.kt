@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.everybuddy.app.ui.onboarding
 
 import androidx.compose.foundation.*
@@ -29,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.everybuddy.app.R
 import com.everybuddy.app.ui.theme.*
+import com.everybuddy.app.ui.friend.KoreanChosung
 
 // 아이콘 파일 목록 (res/drawable/*.xml)
 // ic_back.xml             — 뒤로가기 화살표
@@ -632,7 +635,7 @@ fun StepCountry(
     val filtered = remember(uiState.countryQuery) {
         if (uiState.countryQuery.isEmpty()) sampleCountries
         else sampleCountries.filter {
-            it.nameKo.contains(uiState.countryQuery) ||
+            KoreanChosung.matches(uiState.countryQuery, it.nameKo) ||
                     it.code.contains(uiState.countryQuery, ignoreCase = true)
         }
     }
@@ -687,7 +690,7 @@ fun StepMyLanguage(
     val filtered = remember(uiState.myLangQuery) {
         if (uiState.myLangQuery.isEmpty()) sampleLanguages
         else sampleLanguages.filter {
-            it.nameKo.contains(uiState.myLangQuery) ||
+            KoreanChosung.matches(uiState.myLangQuery, it.nameKo) ||
                     it.code.contains(uiState.myLangQuery, ignoreCase = true)
         }
     }
@@ -742,7 +745,7 @@ fun StepLearnLanguage(
     val filtered = remember(uiState.learnQuery) {
         if (uiState.learnQuery.isEmpty()) sampleLanguages
         else sampleLanguages.filter {
-            it.nameKo.contains(uiState.learnQuery) ||
+            KoreanChosung.matches(uiState.learnQuery, it.nameKo) ||
                     it.code.contains(uiState.learnQuery, ignoreCase = true)
         }
     }

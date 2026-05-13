@@ -90,6 +90,27 @@ class VoiceRecorder @Inject constructor(
         }
     }
 
+    fun pauseRecording() {
+        try {
+            recorder?.pause()
+            timerJob?.cancel()
+        } catch (_: Exception) {}
+    }
+
+    fun resumeRecording() {
+        try {
+            recorder?.resume()
+            timerJob = scope.launch {
+                while (isActive) {
+                    delay(1_000)
+                    _seconds.value++
+                    val amp = (recorder?.maxAmplitude ?: 0).toFloat() / 32767f
+                    _amplitudes.value = (_amplitudes.value + amp).takeLast(30)
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
     fun cancelRecording() {
         timerJob?.cancel()
         timerJob = null

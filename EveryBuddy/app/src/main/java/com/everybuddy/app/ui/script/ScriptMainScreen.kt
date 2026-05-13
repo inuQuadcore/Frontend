@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -28,24 +27,19 @@ import com.everybuddy.app.ui.chat.ScriptFolder
 import com.everybuddy.app.ui.chat.ScriptItem
 import com.everybuddy.app.ui.theme.PretendardFamily
 
-private val SmAccent      = Color(0xFF0167FF)
-private val SmTextPri     = Color(0xFF000000)
-private val SmTextSec     = Color(0xFF797979)
-private val SmBorder      = Color(0xFFE5E5E5)
-private val SmNavInactive = Color(0xFFAAAAAA)
-private val SmNavBg       = Color(0xFFFFFFFF)
+private val SmAccent  = Color(0xFF0167FF)
+private val SmTextPri = Color(0xFF000000)
+private val SmTextSec = Color(0xFF797979)
+private val SmBorder  = Color(0xFFE5E5E5)
 
 @Composable
 fun ScriptMainScreen(
-    viewModel         : ScriptViewModel,
-    onNavigateToChat  : () -> Unit = {},
-    onNavigateToFriend: () -> Unit = {},
-    onNavigateToFind  : () -> Unit = {},
-    onNavigateToMy    : () -> Unit = {},
-    onAddFolder       : () -> Unit = {},
-    onFolderClick     : (ScriptFolder) -> Unit = {},
-    onItemClick       : (ScriptItem) -> Unit = {},
-    onItemAudio       : (ScriptItem) -> Unit = {},
+    viewModel      : ScriptViewModel,
+    onAddFolder    : () -> Unit = {},
+    onFolderClick  : (ScriptFolder) -> Unit = {},
+    onItemClick    : (ScriptItem) -> Unit = {},
+    onItemAudio    : (ScriptItem) -> Unit = {},
+    onNotification : () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val items = viewModel.filteredItems
@@ -57,15 +51,7 @@ fun ScriptMainScreen(
         topBar = {
             ScriptTopBar(
                 onSearchClick       = { /* TODO: 검색창 열기 */ },
-                onNotificationClick = { /* TODO: 알림 화면 이동 */ },
-            )
-        },
-        bottomBar = {
-            ScriptBottomNavBar(
-                onChat   = onNavigateToChat,
-                onFriend = onNavigateToFriend,
-                onFind   = onNavigateToFind,
-                onMy     = onNavigateToMy,
+                onNotificationClick = onNotification,
             )
         },
         containerColor = Color.White,
@@ -184,62 +170,58 @@ fun ScriptMainScreen(
 private fun ScriptTopBar(
     onSearchClick       : () -> Unit,
     onNotificationClick : () -> Unit,
+    hasNotification     : Boolean = false,
 ) {
     Column {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
                 .background(Color.White)
-                // TODO padding: TopBar horizontal 16dp
                 .padding(horizontal = 16.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            // 타이틀
             Text(
                 "스크립트",
-                style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri),
+                modifier = Modifier.align(Alignment.Center),
+                style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri),
             )
-
-            // 우측 아이콘 2개
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier              = Modifier.align(Alignment.CenterEnd),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 IconButton(
                     onClick  = onSearchClick,
                     modifier = Modifier.size(40.dp),
                 ) {
-                    // ic_search.xml
                     Icon(
                         painter            = painterResource(R.drawable.ic_search),
                         contentDescription = "검색",
-                        modifier           = Modifier.size(22.dp),
+                        modifier           = Modifier.size(24.dp),
                         tint               = SmTextPri,
                     )
                 }
-                // 알림 아이콘 — 파란 점 뱃지 포함
                 Box {
                     IconButton(
                         onClick  = onNotificationClick,
                         modifier = Modifier.size(40.dp),
                     ) {
-                        // ic_notification.xml
                         Icon(
                             painter            = painterResource(R.drawable.ic_alarm),
                             contentDescription = "알림",
-                            modifier           = Modifier.size(22.dp),
+                            modifier           = Modifier.size(24.dp),
                             tint               = SmTextPri,
                         )
                     }
-                    // 파란 뱃지 점
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(SmAccent)
-                            .align(Alignment.TopEnd)
-                            // TODO padding: 뱃지 위치 offset (현재 6dp from end, 6dp from top)
-                            .offset(x = (-6).dp, y = 6.dp),
-                    )
+                    if (hasNotification) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(SmAccent)
+                                .align(Alignment.TopEnd)
+                                .offset(x = (-6).dp, y = 6.dp),
+                        )
+                    }
                 }
             }
         }
@@ -423,101 +405,6 @@ fun ScriptItemCard(
         color     = SmBorder,
         thickness = 0.5.dp,
     )
-}
-
-@Composable
-private fun ScriptBottomNavBar(
-    onChat   : () -> Unit,
-    onFriend : () -> Unit,
-    onFind   : () -> Unit,
-    onMy     : () -> Unit,
-) {
-    Column {
-        HorizontalDivider(color = SmBorder, thickness = 0.5.dp)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(60.dp)
-                .background(SmNavBg)
-                .navigationBarsPadding(),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment     = Alignment.CenterVertically,
-        ) {
-            // 대화 탭 — ic_nav_chat.xml
-            NavItem(
-                iconRes     = R.drawable.ic_nav_chat,
-                label       = "대화",
-                isSelected  = false,
-                onClick     = onChat,
-            )
-            // 친구 탭 — ic_nav_friend.xml
-            NavItem(
-                iconRes     = R.drawable.ic_nav_friend,
-                label       = "친구",
-                isSelected  = false,
-                onClick     = onFriend,
-            )
-            // 찾기 탭 — ic_nav_find.xml
-            NavItem(
-                iconRes     = R.drawable.ic_nav_find,
-                label       = "찾기",
-                isSelected  = false,
-                onClick     = {},
-            )
-            // 스크립트 탭 (선택됨) — ic_nav_script.xml
-            NavItem(
-                iconRes     = R.drawable.ic_nav_script,
-                label       = "스크립트",
-                isSelected  = true,
-                onClick     = {},
-            )
-            // 마이 탭 — ic_nav_my.xml
-            NavItem(
-                iconRes     = R.drawable.ic_nav_my,
-                label       = "마이",
-                isSelected  = false,
-                onClick     = onMy,
-            )
-        }
-    }
-}
-
-@Composable
-private fun NavItem(
-    iconRes    : Int,
-    label      : String,
-    isSelected : Boolean,
-    onClick    : () -> Unit,
-) {
-    val tintColor = if (isSelected) SmAccent else SmNavInactive
-
-    Column(
-        modifier            = Modifier
-            .clickable(onClick = onClick)
-            // TODO padding: 네비 탭 아이템 horizontal 12dp, vertical 8dp
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            painter            = painterResource(iconRes),
-            contentDescription = label,
-            // TODO size: 네비 아이콘 크기 24dp
-            modifier           = Modifier.size(24.dp),
-            tint               = tintColor,
-        )
-        // TODO padding: 네비 라벨 상단 2dp
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text  = label,
-            style = TextStyle(
-                fontSize   = 10.sp,
-                fontFamily = PretendardFamily,
-                color      = tintColor,
-                fontWeight = if (isSelected) FontWeight(600) else FontWeight(400),
-            ),
-        )
-    }
 }
 
 // 임시 BorderStroke import (ScriptItemCard 에서 사용)

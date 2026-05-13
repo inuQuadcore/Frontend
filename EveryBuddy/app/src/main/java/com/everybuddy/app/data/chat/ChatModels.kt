@@ -24,14 +24,22 @@ fun com.everybuddy.app.data.network.ChatRoomResponse.toChatRoom(): ChatRoom = Ch
     participantIds = participantIds,
 )
 
-// ChatListUiState — [변경] errorMessage 추가
+data class ChatFolder(
+    val id          : String       = System.currentTimeMillis().toString(),
+    val name        : String       = "",
+    val chatRoomIds : List<String> = emptyList(),
+)
+
 data class ChatListUiState(
-    val rooms           : List<ChatRoom> = emptyList(),
-    val isLoading       : Boolean        = false,
-    val errorMessage    : String?        = null,
-    val searchQuery     : String         = "",
-    val activeFilter    : ChatFilter     = ChatFilter.ALL,
-    val contextMenuRoom : ChatRoom?      = null,
+    val rooms           : List<ChatRoom>   = emptyList(),
+    val isLoading       : Boolean          = false,
+    val errorMessage    : String?          = null,
+    val searchQuery     : String           = "",
+    val activeFilter    : ChatFilter       = ChatFilter.ALL,
+    val contextMenuRoom : ChatRoom?        = null,
+    val infoRoom        : ChatRoom?        = null,
+    val folders         : List<ChatFolder> = emptyList(),
+    val activeFolderId  : String?          = null,
 )
 
 enum class ChatFilter(val label: String) {
@@ -56,23 +64,6 @@ data class ChatMessage(
     val translatedText   : String        = "",
 )
 
-// ChatRoomUiState — [변경] translatingMessageIds, contextMenuMessage, savedToastVisible 추가
-data class ChatRoomUiState(
-    val room                  : ChatRoom             = ChatRoom(),
-    val messages              : List<ChatMessage>    = emptyList(),
-    val inputText             : String               = "",
-    val isRecording           : Boolean              = false,
-    val recordingSeconds      : Int                  = 0,
-    val recordingAmplitudes   : List<Float>          = emptyList(),
-    val playingMessageId      : String?              = null,
-    val isMediaPanelOpen      : Boolean              = false,
-    val isAutoTranslate       : Boolean              = false,
-    val showTranslation       : Map<String, Boolean> = emptyMap(),
-    val translatingMessageIds : Set<String>          = emptySet(),
-    val contextMenuMessage    : ChatMessage?         = null,
-    val savedToastVisible     : Boolean              = false,
-)
-
 private val BASE_DATE = LocalDateTime.of(2026, 1, 25, 0, 0)
 
 val dummyChatRooms: List<ChatRoom> = listOf(
@@ -94,16 +85,16 @@ val dummyMessages: Map<String, List<ChatMessage>> = mapOf(
             id = "ww_m01", roomId = "r_woowonjai",
             senderId = "u_woowonjai", senderName = "우원재",
             type = MessageType.TEXT,
-            text = "We're livin' in a different time zone. Have a good night",
-            translatedText = "우리는 다른 시간대에 살고 있습니다.\n좋은 밤 되세요.",
+            text = "You make me feel brand new",
+            translatedText = "네 덕분에 새 사람이 된 것 같아",
             timestamp = BASE_DATE.withHour(19).withMinute(41),
         ),
         ChatMessage(
             id = "ww_m02", roomId = "r_woowonjai",
             senderId = "u_woowonjai", senderName = "우원재",
             type = MessageType.VOICE,
-            text = "We are who we are\nWe a-a-are who we a-a-are\nohahh\nDon't you know who we are?",
-            translatedText = "우리는 우리야.\n우리느으은 우리느으으으은\n우리가 누구인지 몰라?",
+            text = "We're livin' in a different time zone. Have a good night",
+            translatedText = "우리는 다른 시간대에 살잖아.\n잘 자.",
             voiceUrl = "", voiceDurationSec = 24,
             timestamp = BASE_DATE.withHour(19).withMinute(42),
         ),

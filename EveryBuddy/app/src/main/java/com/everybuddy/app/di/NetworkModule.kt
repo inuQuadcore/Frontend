@@ -12,6 +12,7 @@ import com.everybuddy.app.data.network.AuthApi
 import com.everybuddy.app.data.network.ChatApiService
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.everybuddy.app.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -81,7 +82,7 @@ object NetworkModule {
         @Named("logging") loggingInterceptor : Interceptor,
     ): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(jwtInterceptor)
-        .addInterceptor(loggingInterceptor)  // TODO: Release 빌드에서 제거
+        .apply { if (BuildConfig.DEBUG) addInterceptor(loggingInterceptor) }
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)

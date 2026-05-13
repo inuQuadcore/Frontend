@@ -25,61 +25,62 @@ private val C = FriendColors  // 색상 단축키
 
 @Composable
 fun FriendTopBar(
-    title              : String,
-    showAddFriend      : Boolean = false,
-    onSearch           : () -> Unit,
-    onNotification     : () -> Unit,
-    onAddFriend        : () -> Unit = {},
+    title           : String,
+    showAddFriend   : Boolean = false,
+    hasNotification : Boolean = false,
+    onSearch        : () -> Unit,
+    onNotification  : () -> Unit,
+    onAddFriend     : () -> Unit = {},
 ) {
     Column {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
                 .background(Color.White)
-                // TODO padding: TopBar horizontal 16dp
                 .padding(horizontal = 16.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            // 좌측: 친구추가 아이콘 또는 빈 공간
             if (showAddFriend) {
-                IconButton(onClick = onAddFriend, modifier = Modifier.size(40.dp)) {
-                    // ic_friend_add.xml — 사람+플러스 아이콘
+                IconButton(
+                    onClick  = onAddFriend,
+                    modifier = Modifier.size(40.dp).align(Alignment.CenterStart),
+                ) {
                     Icon(
                         painter            = painterResource(R.drawable.ic_friend_add),
                         contentDescription = "친구 추가",
-                        modifier           = Modifier.size(22.dp),
+                        modifier           = Modifier.size(24.dp),
                         tint               = C.TextPri,
                     )
                 }
-            } else {
-                Box(Modifier.size(40.dp))
             }
 
             Text(
-                text  = title,
-                style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                text     = title,
+                modifier = Modifier.align(Alignment.Center),
+                style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                // ic_search.xml
+            Row(
+                modifier              = Modifier.align(Alignment.CenterEnd),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 IconButton(onClick = onSearch, modifier = Modifier.size(40.dp)) {
-                    Icon(painterResource(R.drawable.ic_search), "검색", Modifier.size(22.dp), tint = C.TextPri)
+                    Icon(painterResource(R.drawable.ic_search), "검색", Modifier.size(24.dp), tint = C.TextPri)
                 }
-                // ic_notification.xml + 파란 뱃지
                 Box {
                     IconButton(onClick = onNotification, modifier = Modifier.size(40.dp)) {
-                        Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(22.dp), tint = C.TextPri)
+                        Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(24.dp), tint = C.TextPri)
                     }
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(C.Accent)
-                            .align(Alignment.TopEnd)
-                            .offset(x = (-6).dp, y = 6.dp),
-                    )
+                    if (hasNotification) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(C.Accent)
+                                .align(Alignment.TopEnd)
+                                .offset(x = (-6).dp, y = 6.dp),
+                        )
+                    }
                 }
             }
         }
@@ -105,16 +106,18 @@ fun InterestTag(label: String) {
 
 @Composable
 fun FriendListItem(
-    friend  : FriendProfile,
-    onClick : (FriendProfile) -> Unit,
+    friend         : FriendProfile,
+    isFollowing    : Boolean            = false,
+    onFollowToggle : () -> Unit         = {},
+    onClick        : (FriendProfile) -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick(friend) }
-            // TODO padding: 친구 아이템 horizontal 16dp, vertical 12dp
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         Box(modifier = Modifier.size(64.dp)) {
             // 메인 프로필 원
@@ -144,7 +147,7 @@ fun FriendListItem(
         // TODO padding: 이미지-텍스트 간격 14dp
         Spacer(Modifier.width(14.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
             // 관심사 태그 (최대 3개)
             if (friend.interests.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -196,6 +199,7 @@ fun FriendListItem(
                 }
             }
         }
+
     }
     HorizontalDivider(
         modifier  = Modifier.padding(horizontal = 16.dp),
@@ -273,7 +277,7 @@ fun StatusMessagePreviewCard(
 
             // 내용 25자 / 내 것이면 "작성하기..." 또는 내용
             val preview = when {
-                isMe && sm.content.isEmpty() -> "작성하기...○"
+                isMe && sm.content.isEmpty() -> "💬 작성하기..."
                 isMe -> sm.preview80()
                 else -> sm.preview25()
             }

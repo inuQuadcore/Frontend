@@ -79,12 +79,8 @@ fun ScriptDemoScreen(
             onBack   = { currentRoute = DemoRoute.CHAT_ROOM },
         )
         DemoRoute.SCRIPT_MAIN -> ScriptMainScreen(
-            viewModel          = scriptViewModel,
-            onNavigateToChat   = { currentRoute = DemoRoute.CHAT_ROOM },
-            onNavigateToFriend = {},
-            onNavigateToFind   = {},
-            onNavigateToMy     = {},
-            onAddFolder        = { /* TODO: NewFolderScreen 이동 */ },
+            viewModel     = scriptViewModel,
+            onAddFolder   = { /* TODO: NewFolderScreen 이동 */ },
         )
     }
 }
@@ -99,9 +95,7 @@ private fun DemoChatRoomScreen(
     // 컨텍스트 메뉴 상태
     var contextMenuMessage by remember { mutableStateOf<DemoChatMessage?>(null) }
 
-    // ScriptSaveSheet 상태
     var saveSheetMessage by remember { mutableStateOf<DemoChatMessage?>(null) }
-    var saveSheetStep    by remember { mutableStateOf(1) }
 
     // 저장 완료 토스트
     val uiState by scriptViewModel.uiState.collectAsState()
@@ -178,8 +172,7 @@ private fun DemoChatRoomScreen(
                     onSelectCopy = { contextMenuMessage = null },
                     onReply      = { contextMenuMessage = null },
                     onSaveScript = {
-                        saveSheetMessage = msg
-                        saveSheetStep    = 1
+                        saveSheetMessage   = msg
                         contextMenuMessage = null
                     },
                 )
@@ -202,10 +195,7 @@ private fun DemoChatRoomScreen(
         val chatMessage = chatMessageFromDemo(msg)
         ScriptSaveSheet(
             message     = chatMessage,
-            step        = saveSheetStep,
             folders     = scriptViewModel.uiState.collectAsState().value.folders,
-            onNext      = { saveSheetStep = 2 },
-            onBack      = { saveSheetStep = 1 },
             onSave      = { item ->
                 scriptViewModel.saveScriptItem(
                     originalText   = item.originalText,
@@ -215,12 +205,8 @@ private fun DemoChatRoomScreen(
                     folderId       = item.selectedFolder,
                 )
                 saveSheetMessage = null
-                saveSheetStep    = 1
             },
-            onDismiss   = {
-                saveSheetMessage = null
-                saveSheetStep    = 1
-            },
+            onDismiss   = { saveSheetMessage = null },
             onAddFolder = { /* TODO: NewFolderScreen */ },
         )
     }
