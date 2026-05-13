@@ -1,17 +1,24 @@
 package com.everybuddy.app.ui.friend
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
+import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.dto.Friend
+import com.everybuddy.app.data.dto.userMessage
+import com.everybuddy.app.data.repository.FriendRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class FriendUiState(
     // 전체 데이터
-    val friends             : List<FriendProfile>   = if (BuildConfig.DEBUG) FriendDemoData.friends else emptyList(),
+    val friends             : List<FriendProfile>   = emptyList(),
+    val isLoading           : Boolean               = false,
     val statusMessages      : List<StatusMessage>   = if (BuildConfig.DEBUG) FriendDemoData.statusMessages.toList() else emptyList(),
     val myStatusMessage     : StatusMessage?        = null,   // 내 상태메시지 (null = 미작성)
 
@@ -46,10 +53,27 @@ data class FriendUiState(
 )
 
 @HiltViewModel
-class FriendViewModel @Inject constructor() : ViewModel() {
+class FriendViewModel @Inject constructor(
+    private val friendRepository: FriendRepository,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FriendUiState())
     val uiState: StateFlow<FriendUiState> = _uiState.asStateFlow()
+
+    init { loadFriends() }
+
+    fun loadFriends() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            when (val r = friendRepository.getFriends()) {
+                is ApiResult.Success -> _uiState.update {
+                    it.copy(friends = r.data.friends.map { f -> f.toFriendProfile() }, isLoading = false)
+                }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _uiState.update { it.copy(isLoading = false, toastMessage = r.userMessage()) }
+            }
+        }
+    }
 
     fun setSearchActive(active: Boolean) {
         _uiState.update { it.copy(isSearchActive = active, searchQuery = if (!active) "" else it.searchQuery) }
@@ -192,3 +216,18 @@ class FriendViewModel @Inject constructor() : ViewModel() {
             it.isVisible() && it.authorId != FriendDemoData.MY_USER_ID
         }
 }
+
+// Friend(DTO) → FriendProfile(UI) 매핑.
+// isOnline은 RTDB presence/{userId} 구독으로 별도 채움 — 별도 작업으로 분리.
+private fun Friend.toFriendProfile() = FriendProfile(
+    id                = userId,
+    name              = name,
+    profileImageUrl   = profileImageUrl,
+    nationality       = country,
+    nativeLanguages   = emptyList(),
+    learningLanguages = languages.map { it.language },
+    interests         = tags.map { it.tag },
+    bio               = bio,
+    isOnline          = false,
+    isFriend          = true,
+)
