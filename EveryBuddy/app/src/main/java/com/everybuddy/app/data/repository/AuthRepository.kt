@@ -1,7 +1,9 @@
 package com.everybuddy.app.data.repository
 
 import android.content.Context
+import android.util.Log
 import com.everybuddy.app.data.auth.AuthDataHolder
+import com.everybuddy.app.data.auth.FirebaseAuthManager
 import com.everybuddy.app.data.auth.GoogleAuthManager
 import com.everybuddy.app.data.auth.GoogleSignInResult
 import com.everybuddy.app.data.dto.ApiErrorResponse
@@ -24,10 +26,11 @@ import javax.inject.Singleton
 
 @Singleton
 class AuthRepository @Inject constructor(
-    private val api               : AuthApi,
-    private val googleAuthManager : GoogleAuthManager,
-    private val tokenManager      : TokenManager,
-    private val authDataHolder    : AuthDataHolder,
+    private val api                 : AuthApi,
+    private val googleAuthManager   : GoogleAuthManager,
+    private val firebaseAuthManager : FirebaseAuthManager,
+    private val tokenManager        : TokenManager,
+    private val authDataHolder      : AuthDataHolder,
 ) {
     private val gson = Gson()
 
@@ -45,6 +48,7 @@ class AuthRepository @Inject constructor(
                     refreshTokenExpiresAt = body.refreshTokenExpiresAt,
                     userId                = body.userId,
                 )
+                signInToFirebase()
                 ApiResult.Success(body)
             } else {
                 parseError(res)
@@ -128,6 +132,7 @@ class AuthRepository @Inject constructor(
                     refreshTokenExpiresAt = loginData.refreshTokenExpiresAt,
                     userId                = loginData.userId,
                 )
+                signInToFirebase()
                 ApiResult.Success(false)
             } else {
                 val tempToken = body.tempToken
@@ -152,6 +157,7 @@ class AuthRepository @Inject constructor(
                     refreshTokenExpiresAt = body.refreshTokenExpiresAt,
                     userId                = body.userId,
                 )
+                signInToFirebase()
                 ApiResult.Success(body)
             } else {
                 parseError(res)
@@ -176,6 +182,22 @@ class AuthRepository @Inject constructor(
         } catch (e: Exception) {
             tokenManager.clearToken()   // 옵션 A: 네트워크 실패해도 로컬 토큰은 삭제 (UX 우선)
             ApiResult.NetworkError(e)
+        }
+    }
+
+    // JWT 발급 직후 Firebase Custom Token으로 signIn — RTDB write 권한 확보용.
+    // 실패해도 앱 로그인 자체는 막지 않음 (Firebase는 채팅/presence 전용 도메인).
+    private suspend fun signInToFirebase() {
+        try {
+            val res = api.firebaseToken()
+            if (!res.isSuccessful) {
+                Log.w("AuthRepository", "firebaseToken API failed: ${res.code()}")
+                return
+            }
+            val token = res.body()?.firebaseToken ?: return
+            firebaseAuthManager.signInWithCustomToken(token)
+        } catch (e: Exception) {
+            Log.w("AuthRepository", "signInToFirebase failed", e)
         }
     }
 
