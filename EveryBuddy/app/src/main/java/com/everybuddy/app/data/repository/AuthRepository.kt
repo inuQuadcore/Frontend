@@ -13,7 +13,6 @@ import com.everybuddy.app.data.dto.GoogleRegisterRequest
 import com.everybuddy.app.data.dto.LoginRequest
 import com.everybuddy.app.data.dto.LoginResponse
 import com.everybuddy.app.data.dto.LogoutRequest
-import com.everybuddy.app.data.dto.RefreshTokenRequest
 import com.everybuddy.app.data.dto.RegisterRequest
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.network.AuthApi
@@ -49,27 +48,6 @@ class AuthRepository @Inject constructor(
                     userId                = body.userId,
                 )
                 signInToFirebase()
-                ApiResult.Success(body)
-            } else {
-                parseError(res)
-            }
-        } catch (e: Exception) {
-            ApiResult.NetworkError(e)
-        }
-    }
-
-    suspend fun refresh(refreshToken: String): ApiResult<LoginResponse> {
-        return try {
-            val res = api.refresh(RefreshTokenRequest(refreshToken))
-            if (res.isSuccessful) {
-                val body = res.body()!!
-                tokenManager.saveToken(
-                    accessToken           = body.accessToken,
-                    refreshToken          = body.refreshToken,
-                    accessTokenExpiresAt  = body.accessTokenExpiresAt,
-                    refreshTokenExpiresAt = body.refreshTokenExpiresAt,
-                    userId                = body.userId,
-                )
                 ApiResult.Success(body)
             } else {
                 parseError(res)
