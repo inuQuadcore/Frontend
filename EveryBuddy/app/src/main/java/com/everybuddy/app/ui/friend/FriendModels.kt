@@ -18,7 +18,7 @@ object FriendColors {
 }
 
 data class FriendProfile(
-    val id              : String,
+    val id              : Long,
     val name            : String,
     val profileImageUrl : String?   = null,   // TODO: Coil AsyncImage
     val nationality     : String    = "KR",   // 국적 플래그 이모지 코드
@@ -34,7 +34,7 @@ data class FriendProfile(
 
 data class StatusMessage(
     val id          : String = UUID.randomUUID().toString(),
-    val authorId    : String,
+    val authorId    : Long,
     val authorName  : String,
     val profileImageUrl: String? = null,  // TODO: Coil
     val content     : String,             // 최대 150자

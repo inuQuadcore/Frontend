@@ -39,7 +39,7 @@ data class FriendUiState(
     val selectedFriend      : FriendProfile?        = null,
 
     // 팔로우 상태
-    val followedFriendIds   : Set<String>           = emptySet(),
+    val followedFriendIds   : Set<Long>             = emptySet(),
 
     // 토스트
     val toastMessage        : String?               = null,
@@ -160,14 +160,14 @@ class FriendViewModel @Inject constructor() : ViewModel() {
     fun selectFriend(friend: FriendProfile) { _uiState.update { it.copy(selectedFriend = friend) } }
     fun clearSelectedFriend() { _uiState.update { it.copy(selectedFriend = null) } }
 
-    fun onFollowToggle(id: String) {
+    fun onFollowToggle(id: Long) {
         _uiState.update { s ->
             val ids = s.followedFriendIds
             s.copy(followedFriendIds = if (ids.contains(id)) ids - id else ids + id)
         }
     }
 
-    fun addFriendById(friendId: String) {
+    fun addFriendById(friendId: Long) {
         _uiState.update { s ->
             s.copy(
                 friends = s.friends.map { if (it.id == friendId) it.copy(isFriend = true) else it },
@@ -176,7 +176,7 @@ class FriendViewModel @Inject constructor() : ViewModel() {
         }
     }
 
-    fun removeFriendById(friendId: String) {
+    fun removeFriendById(friendId: Long) {
         _uiState.update { s ->
             s.copy(
                 friends = s.friends.map { if (it.id == friendId) it.copy(isFriend = false) else it },
