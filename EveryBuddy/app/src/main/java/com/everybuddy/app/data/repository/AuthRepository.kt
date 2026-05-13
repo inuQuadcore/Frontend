@@ -109,11 +109,11 @@ class AuthRepository @Inject constructor(
         activityContext : Context,
         webClientId     : String,
     ): ApiResult<Boolean> {
-        val signInResult = googleAuthManager.signIn(activityContext, webClientId)
-        if (signInResult is GoogleSignInResult.Error) {
-            return ApiResult.Error(-1, "GOOGLE_SIGN_IN_FAILED", signInResult.message)
+        val idToken = when (val signInResult = googleAuthManager.signIn(activityContext, webClientId)) {
+            is GoogleSignInResult.Success   -> signInResult.idToken
+            is GoogleSignInResult.Cancelled -> return ApiResult.Error(-1, "GOOGLE_SIGN_IN_CANCELLED", "")
+            is GoogleSignInResult.Error     -> return ApiResult.Error(-1, "GOOGLE_SIGN_IN_FAILED", signInResult.message)
         }
-        val idToken = (signInResult as GoogleSignInResult.Success).idToken
 
         return try {
             val res = api.googleAuth(GoogleAuthRequest(idToken))

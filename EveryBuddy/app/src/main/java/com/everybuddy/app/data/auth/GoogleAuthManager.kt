@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -17,6 +18,8 @@ import javax.inject.Singleton
  */
 sealed class GoogleSignInResult {
     data class Success(val idToken: String) : GoogleSignInResult()
+    /** 사용자가 계정 선택 다이얼로그에서 취소함 (에러 메시지 표시 X) */
+    object Cancelled                        : GoogleSignInResult()
     data class Error(val message: String)   : GoogleSignInResult()
 }
 
@@ -65,6 +68,8 @@ class GoogleAuthManager @Inject constructor(
             } else {
                 GoogleSignInResult.Error("지원하지 않는 인증 방식입니다.")
             }
+        } catch (e: GetCredentialCancellationException) {
+            GoogleSignInResult.Cancelled
         } catch (e: GetCredentialException) {
             GoogleSignInResult.Error(e.localizedMessage ?: "Google 로그인에 실패했습니다.")
         } catch (e: GoogleIdTokenParsingException) {

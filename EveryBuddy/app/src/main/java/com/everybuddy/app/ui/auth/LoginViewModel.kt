@@ -64,7 +64,9 @@ class LoginViewModel @Inject constructor(
                                       else                     LoginNavEvent.ToMain
                 }
                 is ApiResult.Error -> {
-                    _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
+                    // 사용자가 계정 선택 다이얼로그에서 취소한 경우는 에러로 표시하지 않음
+                    val msg = if (result.name == "GOOGLE_SIGN_IN_CANCELLED") null else result.message
+                    _uiState.update { it.copy(isLoading = false, errorMessage = msg) }
                 }
                 is ApiResult.NetworkError -> {
                     _uiState.update { it.copy(isLoading = false, errorMessage = result.e.localizedMessage ?: "네트워크 오류가 발생했습니다.") }
