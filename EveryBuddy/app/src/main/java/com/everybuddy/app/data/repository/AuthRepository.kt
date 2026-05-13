@@ -6,6 +6,7 @@ import com.everybuddy.app.data.auth.AuthDataHolder
 import com.everybuddy.app.data.auth.FirebaseAuthManager
 import com.everybuddy.app.data.auth.GoogleAuthManager
 import com.everybuddy.app.data.auth.GoogleSignInResult
+import com.everybuddy.app.data.firebase.PresenceManager
 import com.everybuddy.app.data.dto.ApiErrorResponse
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.GoogleAuthRequest
@@ -29,6 +30,7 @@ class AuthRepository @Inject constructor(
     private val api                 : AuthApi,
     private val googleAuthManager   : GoogleAuthManager,
     private val firebaseAuthManager : FirebaseAuthManager,
+    private val presenceManager     : PresenceManager,
     private val tokenManager        : TokenManager,
     private val authDataHolder      : AuthDataHolder,
 ) {
@@ -178,10 +180,12 @@ class AuthRepository @Inject constructor(
                 ApiResult.Success(Unit)
             }
             tokenManager.clearToken()
+            presenceManager.stop()
             firebaseAuthManager.signOut()
             result
         } catch (e: Exception) {
             tokenManager.clearToken()   // 옵션 A: 네트워크 실패해도 로컬 토큰은 삭제 (UX 우선)
+            presenceManager.stop()
             firebaseAuthManager.signOut()
             ApiResult.NetworkError(e)
         }
@@ -197,7 +201,11 @@ class AuthRepository @Inject constructor(
                 return
             }
             val token = res.body()?.firebaseToken ?: return
-            firebaseAuthManager.signInWithCustomToken(token)
+            val ok = firebaseAuthManager.signInWithCustomToken(token)
+            if (ok) {
+                val userId = tokenManager.userId.firstOrNull() ?: return
+                presenceManager.start(userId)
+            }
         } catch (e: Exception) {
             Log.w("AuthRepository", "signInToFirebase failed", e)
         }

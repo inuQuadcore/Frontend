@@ -71,6 +71,7 @@ dependencies {
     // Androidx Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.activity.compose)
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
