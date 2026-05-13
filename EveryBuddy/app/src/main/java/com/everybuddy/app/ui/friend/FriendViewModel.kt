@@ -1,18 +1,24 @@
 package com.everybuddy.app.ui.friend
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
+import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.dto.Friend
+import com.everybuddy.app.data.dto.userMessage
+import com.everybuddy.app.data.repository.FriendRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import java.util.UUID
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class FriendUiState(
     // 전체 데이터
-    val friends             : List<FriendProfile>   = if (BuildConfig.DEBUG) FriendDemoData.friends else emptyList(),
+    val friends             : List<FriendProfile>   = emptyList(),
+    val isLoading           : Boolean               = false,
     val statusMessages      : List<StatusMessage>   = if (BuildConfig.DEBUG) FriendDemoData.statusMessages.toList() else emptyList(),
     val myStatusMessage     : StatusMessage?        = null,   // 내 상태메시지 (null = 미작성)
 
@@ -36,24 +42,38 @@ data class FriendUiState(
     val replyText           : String                = "",
     val replySent           : Boolean               = false,  // "전송 완료!" 토스트
 
-    // 채팅방 목록 (답장 → 채팅방 생성/업데이트)
-    val chatRooms           : MutableList<FriendDemoData.DemoChatRoom> = if (BuildConfig.DEBUG) FriendDemoData.chatRooms else mutableListOf(),
-
     // 프로필 화면
     val selectedFriend      : FriendProfile?        = null,
 
     // 팔로우 상태
-    val followedFriendIds   : Set<String>           = emptySet(),
+    val followedFriendIds   : Set<Long>             = emptySet(),
 
     // 토스트
     val toastMessage        : String?               = null,
 )
 
 @HiltViewModel
-class FriendViewModel @Inject constructor() : ViewModel() {
+class FriendViewModel @Inject constructor(
+    private val friendRepository: FriendRepository,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FriendUiState())
     val uiState: StateFlow<FriendUiState> = _uiState.asStateFlow()
+
+    init { loadFriends() }
+
+    fun loadFriends() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            when (val r = friendRepository.getFriends()) {
+                is ApiResult.Success -> _uiState.update {
+                    it.copy(friends = r.data.friends.map { f -> f.toFriendProfile() }, isLoading = false)
+                }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _uiState.update { it.copy(isLoading = false, toastMessage = r.userMessage()) }
+            }
+        }
+    }
 
     fun setSearchActive(active: Boolean) {
         _uiState.update { it.copy(isSearchActive = active, searchQuery = if (!active) "" else it.searchQuery) }
@@ -116,56 +136,6 @@ class FriendViewModel @Inject constructor() : ViewModel() {
         _uiState.update { it.copy(replyText = text) }
     }
 
-    /**
-     * 답장 전송
-     * - 기존 채팅방이 있으면 메시지 추가
-     * - 없으면 새 채팅방 생성
-     * - 채팅방 내 상태메시지 인용 표시 (15자 제한)
-     */
-    fun sendReply() {
-        val state = _uiState.value
-        val target = state.expandedStatus ?: return
-        val text   = state.replyText.trim().ifBlank { return }
-
-        val statusPreview = target.preview15()
-
-        val existingRoom = state.chatRooms.find { it.friendId == target.authorId }
-        if (existingRoom != null) {
-            existingRoom.messages.add(
-                FriendDemoData.DemoChatMsg(
-                    text                  = text,
-                    isMine                = true,
-                    isStatusReply         = true,
-                    originalStatusPreview = statusPreview,
-                )
-            )
-        } else {
-            state.chatRooms.add(
-                FriendDemoData.DemoChatRoom(
-                    id         = UUID.randomUUID().toString(),
-                    friendId   = target.authorId,
-                    friendName = target.authorName,
-                    messages   = mutableListOf(
-                        FriendDemoData.DemoChatMsg(
-                            text                  = text,
-                            isMine                = true,
-                            isStatusReply         = true,
-                            originalStatusPreview = statusPreview,
-                        )
-                    ),
-                )
-            )
-        }
-
-        _uiState.update {
-            it.copy(replySent = true, replyText = "")
-        }
-    }
-
-    fun consumeReplySent() {
-        _uiState.update { it.copy(replySent = false) }
-    }
-
     fun openStatusPage()  { _uiState.update { it.copy(isStatusPageOpen = true)  } }
     fun closeStatusPage() { _uiState.update { it.copy(isStatusPageOpen = false) } }
 
@@ -214,28 +184,40 @@ class FriendViewModel @Inject constructor() : ViewModel() {
     fun selectFriend(friend: FriendProfile) { _uiState.update { it.copy(selectedFriend = friend) } }
     fun clearSelectedFriend() { _uiState.update { it.copy(selectedFriend = null) } }
 
-    fun onFollowToggle(id: String) {
+    fun onFollowToggle(id: Long) {
         _uiState.update { s ->
             val ids = s.followedFriendIds
             s.copy(followedFriendIds = if (ids.contains(id)) ids - id else ids + id)
         }
     }
 
-    fun addFriendById(friendId: String) {
-        _uiState.update { s ->
-            s.copy(
-                friends = s.friends.map { if (it.id == friendId) it.copy(isFriend = true) else it },
-                selectedFriend = s.selectedFriend?.let { if (it.id == friendId) it.copy(isFriend = true) else it },
-            )
+    fun addFriendById(friendId: Long) {
+        viewModelScope.launch {
+            when (val r = friendRepository.addFriend(friendId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { s ->
+                        s.copy(selectedFriend = s.selectedFriend?.let { if (it.id == friendId) it.copy(isFriend = true) else it })
+                    }
+                    loadFriends()
+                }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _uiState.update { it.copy(toastMessage = r.userMessage()) }
+            }
         }
     }
 
-    fun removeFriendById(friendId: String) {
-        _uiState.update { s ->
-            s.copy(
-                friends = s.friends.map { if (it.id == friendId) it.copy(isFriend = false) else it },
-                selectedFriend = s.selectedFriend?.let { if (it.id == friendId) it.copy(isFriend = false) else it },
-            )
+    fun removeFriendById(friendId: Long) {
+        viewModelScope.launch {
+            when (val r = friendRepository.removeFriend(friendId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { s ->
+                        s.copy(selectedFriend = s.selectedFriend?.let { if (it.id == friendId) it.copy(isFriend = false) else it })
+                    }
+                    loadFriends()
+                }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _uiState.update { it.copy(toastMessage = r.userMessage()) }
+            }
         }
     }
 
@@ -246,3 +228,18 @@ class FriendViewModel @Inject constructor() : ViewModel() {
             it.isVisible() && it.authorId != FriendDemoData.MY_USER_ID
         }
 }
+
+// Friend(DTO) → FriendProfile(UI) 매핑.
+// isOnline은 RTDB presence/{userId} 구독으로 별도 채움 — 별도 작업으로 분리.
+private fun Friend.toFriendProfile() = FriendProfile(
+    id                = userId,
+    name              = name,
+    profileImageUrl   = profileImageUrl,
+    nationality       = country,
+    nativeLanguages   = emptyList(),
+    learningLanguages = languages.map { it.language },
+    interests         = tags.map { it.tag },
+    bio               = bio,
+    isOnline          = false,
+    isFriend          = true,
+)

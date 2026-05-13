@@ -97,7 +97,7 @@ fun FriendMainScreen(
 }
 
 private fun FriendProfile.toDiscoverUser() = DiscoverUser(
-    userId          = id.hashCode().toLong(),
+    userId          = id,
     name            = name,
     profileImageUrl = profileImageUrl,
     country         = nationality,
