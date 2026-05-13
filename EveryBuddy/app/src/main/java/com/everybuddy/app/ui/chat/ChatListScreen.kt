@@ -28,7 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.everybuddy.app.R
 import com.everybuddy.app.data.chat.ChatFilter
 import com.everybuddy.app.data.chat.ChatListUiState
-import com.everybuddy.app.data.chat.ChatRoom
+import com.everybuddy.app.data.chat.ChatRoomUi
 import com.everybuddy.app.data.chat.dummyChatRooms
 import com.everybuddy.app.ui.theme.*
 
@@ -336,7 +336,7 @@ fun ChatListContent(
 
 @Composable
 fun ChatRoomItem(
-    room        : ChatRoom,
+    room        : ChatRoomUi,
     onClick     : () -> Unit,
     onLongClick : () -> Unit,
 ) {
@@ -413,7 +413,7 @@ fun ChatRoomItem(
 
 @Composable
 private fun ChatRoomContextMenu(
-    room         : ChatRoom,
+    room         : ChatRoomUi,
     onDismiss    : () -> Unit,
     onMenuAction : (String) -> Unit,
 ) {

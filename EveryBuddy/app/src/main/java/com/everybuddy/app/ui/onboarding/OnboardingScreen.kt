@@ -56,14 +56,14 @@ import com.everybuddy.app.ui.friend.KoreanChosung
  */
 @Composable
 fun OnboardingScreen(
-    onFinish  : () -> Unit,
+    onFinish  : (autoLoggedIn: Boolean) -> Unit,
     viewModel : OnboardingViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // 회원가입 API 성공 시 로그인 화면으로 이동
+    // 회원가입 API 성공 시 onFinish 호출 (autoLoggedIn 여부에 따라 NavGraph가 MAIN/LOGIN 분기)
     LaunchedEffect(uiState.registerSuccess) {
-        if (uiState.registerSuccess) onFinish()
+        if (uiState.registerSuccess) onFinish(uiState.autoLoggedIn)
     }
 
     OnboardingHost(
@@ -377,7 +377,8 @@ fun StepBasicInfo(
     onStateChange : (OnboardingUiState) -> Unit,
     onNext        : () -> Unit,
 ) {
-    val canProceed = uiState.name.isNotBlank() && uiState.gender != null && uiState.birthYear != null
+    val canProceed = uiState.name.isNotBlank() && uiState.gender != null &&
+            uiState.birthYear != null && uiState.birthMonth != null && uiState.birthDay != null
 
     // DatePicker 다이얼로그 (showDatePicker = true일 때만 표시)
     if (uiState.showDatePicker) {

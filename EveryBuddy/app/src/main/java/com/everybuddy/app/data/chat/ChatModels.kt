@@ -3,7 +3,7 @@ package com.everybuddy.app.data.chat
 import java.time.LocalDateTime
 
 // ChatRoom — [변경] createdAt, unreadCount, participantIds 추가
-data class ChatRoom(
+data class ChatRoomUi(
     val id             : String       = "",
     val name           : String       = "",
     val lastMessage    : String       = "",  // TODO: 서버 lastMessage 필드 추가 후 연동
@@ -15,12 +15,12 @@ data class ChatRoom(
     val participantIds : List<Long>   = emptyList(),
 )
 
-// ChatRoomResponse → ChatRoom 변환
-fun com.everybuddy.app.data.network.ChatRoomResponse.toChatRoom(): ChatRoom = ChatRoom(
+// ChatRoom(DTO) → ChatRoomUi 변환
+fun com.everybuddy.app.data.dto.ChatRoom.toChatRoomUi(): ChatRoomUi = ChatRoomUi(
     id             = chatRoomId.toString(),
     name           = roomName,
     createdAt      = createdAt,
-    unreadCount    = unreadCount,
+    unreadCount    = unreadCount ?: 0,
     participantIds = participantIds,
 )
 
@@ -64,19 +64,36 @@ data class ChatMessage(
     val translatedText   : String        = "",
 )
 
+// ChatRoomUiState — [변경] translatingMessageIds, contextMenuMessage, savedToastVisible 추가
+data class ChatRoomUiState(
+    val room                  : ChatRoomUi           = ChatRoomUi(),
+    val messages              : List<ChatMessage>    = emptyList(),
+    val inputText             : String               = "",
+    val isRecording           : Boolean              = false,
+    val recordingSeconds      : Int                  = 0,
+    val recordingAmplitudes   : List<Float>          = emptyList(),
+    val playingMessageId      : String?              = null,
+    val isMediaPanelOpen      : Boolean              = false,
+    val isAutoTranslate       : Boolean              = false,
+    val showTranslation       : Map<String, Boolean> = emptyMap(),
+    val translatingMessageIds : Set<String>          = emptySet(),
+    val contextMenuMessage    : ChatMessage?         = null,
+    val savedToastVisible     : Boolean              = false,
+)
+
 private val BASE_DATE = LocalDateTime.of(2026, 1, 25, 0, 0)
 
-val dummyChatRooms: List<ChatRoom> = listOf(
-    ChatRoom(
+val dummyChatRooms: List<ChatRoomUi> = listOf(
+    ChatRoomUi(
         id          = "r_woowonjai",
         name        = "우원재",
         lastMessage = "난 지금 눈을 감아야 해. 내일의 나는 달라져야 해.",
         timestamp   = "오후 11:53",
         unreadCount = 0,
     ),
-    ChatRoom(id = "r01", name = "Potter",   lastMessage = "안녕하세요!", timestamp = "방금",    unreadCount = 3),
-    ChatRoom(id = "r02", name = "오혁",     lastMessage = "좋아요",      timestamp = "1시간 전", unreadCount = 0),
-    ChatRoom(id = "r03", name = "Hermione", lastMessage = "See you!",   timestamp = "어제",    unreadCount = 1),
+    ChatRoomUi(id = "r01", name = "Potter",   lastMessage = "안녕하세요!", timestamp = "방금",    unreadCount = 3),
+    ChatRoomUi(id = "r02", name = "오혁",     lastMessage = "좋아요",      timestamp = "1시간 전", unreadCount = 0),
+    ChatRoomUi(id = "r03", name = "Hermione", lastMessage = "See you!",   timestamp = "어제",    unreadCount = 1),
 )
 
 val dummyMessages: Map<String, List<ChatMessage>> = mapOf(

@@ -3,9 +3,9 @@ package com.everybuddy.app.ui.friend
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.dto.ApiResult
-import com.everybuddy.app.data.dto.FriendStatusMessageDto
+import com.everybuddy.app.data.dto.FriendStatusMessage
 import com.everybuddy.app.data.dto.MyStatusMessageResponse
-import com.everybuddy.app.data.network.ApiErrorHandler
+import com.everybuddy.app.data.dto.userMessage
 import com.everybuddy.app.data.repository.StatusMessageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,11 +17,11 @@ import javax.inject.Inject
 
 data class StatusUiState(
     val myStatus            : MyStatusMessageResponse?     = null,
-    val friendStatuses      : List<FriendStatusMessageDto> = emptyList(),
+    val friendStatuses      : List<FriendStatusMessage> = emptyList(),
     val isWriteScreenOpen   : Boolean                      = false,
     val isEditMode          : Boolean                      = false,
     val draftText           : String                       = "",
-    val expandedStatus      : FriendStatusMessageDto?      = null,
+    val expandedStatus      : FriendStatusMessage?      = null,
     val isMyStatusMenuOpen  : Boolean                      = false,
     val isDeleteConfirmOpen : Boolean                      = false,
     val isReplying          : Boolean                      = false,
@@ -70,8 +70,8 @@ class StatusMessageViewModel @Inject constructor(
                                  else _state.value.friendStatuses + data.statusMessages
                     _state.update { it.copy(friendStatuses = merged, nextCursor = data.nextCursor, hasNext = data.hasNext, isLoading = false) }
                 }
-                is ApiResult.Error        -> _state.update { it.copy(isLoading = false, toastMessage = ApiErrorHandler.toUserMessage(r)) }
-                is ApiResult.NetworkError -> _state.update { it.copy(isLoading = false, toastMessage = ApiErrorHandler.toUserMessage(r)) }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _state.update { it.copy(isLoading = false, toastMessage = r.userMessage()) }
             }
         }
     }
@@ -103,8 +103,8 @@ class StatusMessageViewModel @Inject constructor(
                     loadMyStatus()
                     _state.update { it.copy(isWriteScreenOpen = false, draftText = "", isLoading = false, toastMessage = "상태메시지가 등록되었습니다.") }
                 }
-                is ApiResult.Error        -> _state.update { it.copy(isLoading = false, toastMessage = ApiErrorHandler.toUserMessage(r)) }
-                is ApiResult.NetworkError -> _state.update { it.copy(isLoading = false, toastMessage = ApiErrorHandler.toUserMessage(r)) }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _state.update { it.copy(isLoading = false, toastMessage = r.userMessage()) }
             }
         }
     }
@@ -119,13 +119,13 @@ class StatusMessageViewModel @Inject constructor(
         viewModelScope.launch {
             when (val r = statusRepo.deleteStatusMessage()) {
                 is ApiResult.Success      -> _state.update { it.copy(myStatus = null, isDeleteConfirmOpen = false, toastMessage = "상태메시지가 삭제되었습니다.") }
-                is ApiResult.Error        -> _state.update { it.copy(isDeleteConfirmOpen = false, toastMessage = ApiErrorHandler.toUserMessage(r)) }
-                is ApiResult.NetworkError -> _state.update { it.copy(isDeleteConfirmOpen = false, toastMessage = ApiErrorHandler.toUserMessage(r)) }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _state.update { it.copy(isDeleteConfirmOpen = false, toastMessage = r.userMessage()) }
             }
         }
     }
 
-    fun openFriendStatus(sm: FriendStatusMessageDto) {
+    fun openFriendStatus(sm: FriendStatusMessage) {
         _state.update { it.copy(expandedStatus = sm, isReplying = false, replyText = "", replySent = false) }
     }
 

@@ -118,6 +118,8 @@ data class OnboardingUiState(
     val errorMessage       : String?             = null,
     // 회원가입 API 성공 시 true → OnboardingScreen의 LaunchedEffect가 onFinish() 호출
     val registerSuccess    : Boolean             = false,
+    // 구글 가입은 응답에 토큰이 포함되어 바로 로그인 상태가 됨 → true면 MAIN, false면 LOGIN
+    val autoLoggedIn       : Boolean             = false,
 )
 
 // 샘플 데이터(현재는 하드 코딩, 추후 API 연동 시 교체)

@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.chat.*
-import com.everybuddy.app.data.network.AuthResult
-import com.everybuddy.app.data.network.ChatRepository
+import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.repository.ChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -35,14 +35,14 @@ class ChatViewModel @Inject constructor(
             _listState.update { it.copy(isLoading = true, errorMessage = null) }
 
             when (val result = chatRepository.getChatRooms()) {
-                is AuthResult.Success -> {
+                is ApiResult.Success -> {
                     val rooms = result.data
-                        ?.map { it.toChatRoom() }
+                        ?.map { it.toChatRoomUi() }
                         ?: emptyList()
                     _listState.update { it.copy(isLoading = false, rooms = rooms) }
                 }
 
-                is AuthResult.Error -> {
+                is ApiResult.Error -> {
                     // 401: JWT 만료 → 로그인 화면으로 이동 필요
                     // TODO: 401 시 로그아웃 처리 — AppNavGraph에서 Route.LOGIN으로 navigate
                     _listState.update {
@@ -72,15 +72,15 @@ class ChatViewModel @Inject constructor(
     fun createChatRoom(
         roomName       : String,
         participantIds : List<Long>,
-        onSuccess      : (ChatRoom) -> Unit,
+        onSuccess      : (ChatRoomUi) -> Unit,
         onError        : (String) -> Unit,
     ) {
         viewModelScope.launch {
             _listState.update { it.copy(isLoading = true) }
 
             when (val result = chatRepository.createChatRoom(roomName, participantIds)) {
-                is AuthResult.Success -> {
-                    val created = result.data?.toChatRoom()
+                is ApiResult.Success -> {
+                    val created = result.data?.toChatRoomUi()
                     if (created != null) {
                         // 목록 맨 앞에 추가
                         _listState.update { state ->
@@ -96,7 +96,7 @@ class ChatViewModel @Inject constructor(
                     }
                 }
 
-                is AuthResult.Error -> {
+                is ApiResult.Error -> {
                     _listState.update { it.copy(isLoading = false) }
                     // 400: 필드별 에러 메시지 조합
                     val errorMsg = when (result.code) {
@@ -108,7 +108,7 @@ class ChatViewModel @Inject constructor(
                     onError(errorMsg)
                 }
 
-                is AuthResult.Exception -> {
+                is ApiResult.NetworkError -> {
                     _listState.update { it.copy(isLoading = false) }
                     onError(result.e.localizedMessage ?: "네트워크 오류가 발생했습니다.")
                 }
@@ -128,7 +128,7 @@ class ChatViewModel @Inject constructor(
         // TODO: 검색창 AnimatedVisibility 토글 + 포커스 처리
     }
 
-    fun onContextMenu(room: ChatRoom) {
+    fun onContextMenu(room: ChatRoomUi) {
         _listState.update { it.copy(contextMenuRoom = room) }
     }
 
@@ -164,6 +164,7 @@ class ChatViewModel @Inject constructor(
         onDismissContextMenu()
     }
 
+    val filteredRooms: StateFlow<List<ChatRoomUi>> = listState.map { state ->
     fun dismissRoomInfo() {
         _listState.update { it.copy(infoRoom = null) }
     }

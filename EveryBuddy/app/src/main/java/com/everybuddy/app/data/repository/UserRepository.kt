@@ -11,7 +11,7 @@ package com.everybuddy.app.data.repository
 // =============================================================================
 
 import com.everybuddy.app.data.dto.*
-import com.everybuddy.app.data.network.ApiService
+import com.everybuddy.app.data.network.UserApi
 import com.google.gson.Gson
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -22,28 +22,9 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private fun <T> Response<T>.toApiResult(gson: Gson, onSuccess: (T?) -> ApiResult<T>): ApiResult<T> =
-    if (isSuccessful) onSuccess(body())
-    else try {
-        val err = gson.fromJson(errorBody()?.string(), ApiErrorResponse::class.java)
-        ApiResult.Error(err.code, err.name, err.message)
-    } catch (e: Exception) {
-        ApiResult.Error(code(), "PARSE_ERROR", "응답 파싱 오류")
-    }
-
-private suspend fun <T> safeApiCall(
-    gson      : Gson,
-    block     : suspend () -> Response<T>,
-    onSuccess : (T?) -> ApiResult<T> = { ApiResult.Success(it!!) },
-): ApiResult<T> = try {
-    block().toApiResult(gson, onSuccess)
-} catch (e: Exception) {
-    ApiResult.NetworkError(e)
-}
-
 @Singleton
 class UserRepository @Inject constructor(
-    private val api  : ApiService,
+    private val api  : UserApi,
     private val gson : Gson,
 ) {
 
@@ -63,7 +44,7 @@ class UserRepository @Inject constructor(
      * 200: [ { tag, category } ]
      * 에러: 401(인증) | 404(유저없음) | 410(탈퇴)
      */
-    suspend fun getUserTags(userId: Long): ApiResult<List<TagDto>> =
+    suspend fun getUserTags(userId: Long): ApiResult<List<UserTag>> =
         safeApiCall(gson, { api.getUserTags(userId) })
 
     /**

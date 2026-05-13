@@ -1,0 +1,6 @@
+# IDE
+.idea/
+*.iml
+
+# Claude memory (개인 메모리, 공유 X)
+memory/

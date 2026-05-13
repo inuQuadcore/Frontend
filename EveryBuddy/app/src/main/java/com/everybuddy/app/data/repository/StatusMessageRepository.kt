@@ -1,0 +1,62 @@
+package com.everybuddy.app.data.repository
+
+import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.dto.FriendStatusMessagesResponse
+import com.everybuddy.app.data.dto.MyStatusMessageResponse
+import com.everybuddy.app.data.dto.StatusMessageRequest
+import com.everybuddy.app.data.network.StatusMessageApi
+import com.google.gson.Gson
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class StatusMessageRepository @Inject constructor(
+    private val api  : StatusMessageApi,
+    private val gson : Gson,
+) {
+    /**
+     * 상태메시지 작성 — POST /api/v1/status-messages
+     * 1인 1개 제한 → 이미 있으면 409 STATUS_MESSAGE_ALREADY_EXISTS
+     * 에러: 401(인증) | 409(이미존재)
+     */
+    suspend fun postStatusMessage(content: String): ApiResult<Unit> =
+        safeApiCall(gson, { api.postStatusMessage(StatusMessageRequest(content)) }) {
+            ApiResult.Success(Unit)
+        }
+
+    /**
+     * 상태메시지 수정 — PATCH /api/v1/status-messages
+     * 24시간 이내만 수정 가능 → 만료 시 400 STATUS_MESSAGE_EXPIRED
+     * 에러: 400(STATUS_MESSAGE_EXPIRED) | 401(인증) | 404(없음)
+     */
+    suspend fun updateStatusMessage(content: String): ApiResult<Unit> =
+        safeApiCall(gson, { api.updateStatusMessage(StatusMessageRequest(content)) }) {
+            ApiResult.Success(Unit)
+        }
+
+    /**
+     * 상태메시지 삭제 — DELETE /api/v1/status-messages
+     * 에러: 401(인증) | 404(없음)
+     */
+    suspend fun deleteStatusMessage(): ApiResult<Unit> =
+        safeApiCall(gson, { api.deleteStatusMessage() }) { ApiResult.Success(Unit) }
+
+    /**
+     * 내 상태메시지 조회 — GET /api/v1/status-messages/me
+     * 없으면 404 → null 처리
+     * 에러: 401(인증) | 404(없음)
+     */
+    suspend fun getMyStatusMessage(): ApiResult<MyStatusMessageResponse> =
+        safeApiCall(gson, { api.getMyStatusMessage() })
+
+    /**
+     * 친구 상태메시지 목록 — GET /api/v1/status-messages/friends
+     * 커서 기반 무한스크롤. 본인 미포함 → getMyStatusMessage() 별도 호출 후 병합
+     * 에러: 401(인증) | 404(커서에 해당하는 메시지 없음)
+     */
+    suspend fun getFriendStatusMessages(
+        cursor : Long? = null,
+        size   : Int   = 20,
+    ): ApiResult<FriendStatusMessagesResponse> =
+        safeApiCall(gson, { api.getFriendStatusMessages(cursor, size) })
+}

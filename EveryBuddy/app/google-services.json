@@ -1,26 +1,45 @@
 {
   "project_info": {
-    "project_number": "1095562508279",
-    "project_id": "everybuddy-e2e59",
-    "storage_bucket": "everybuddy-e2e59.firebasestorage.app"
+    "project_number": "870774211470",
+    "firebase_url": "https://everybuddy-75801-default-rtdb.firebaseio.com",
+    "project_id": "everybuddy-75801",
+    "storage_bucket": "everybuddy-75801.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1095562508279:android:a5c9439e65a442f6fe60f2",
+        "mobilesdk_app_id": "1:870774211470:android:8df3a25cbd0ef6100d5adf",
         "android_client_info": {
           "package_name": "com.everybuddy.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "870774211470-pqgnpuc1jjrva16lrvo60h1cg28qfea4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.everybuddy.app",
+            "certificate_hash": "3f18373ee05d98556c1b366a9b0b7b87299c3a98"
+          }
+        },
+        {
+          "client_id": "870774211470-ei84dvr3f4sl511brrqnfg3v2qqd36lj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyDzsqjJv68grcI03YCwTTe6ebMle71RVBI"
+          "current_key": "AIzaSyCdaBqH7wwDfQwwcvqPOX3OZNoQbA1pAzQ"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "870774211470-ei84dvr3f4sl511brrqnfg3v2qqd36lj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
