@@ -39,8 +39,8 @@ class GoogleAuthManager @Inject constructor(
      * Google 로그인 실행
      *
      * @param activityContext Activity Context (Credential Manager는 Activity 필요)
-     * @param webClientId     Firebase Console에서 복사한 웹 클라이언트 ID
-     *                        → res/values/strings.xml의 default_web_client_id
+     * @param webClientId     백엔드에서 복사한 웹 클라이언트 ID
+     *
      */
     suspend fun signIn(
         activityContext : Context,
