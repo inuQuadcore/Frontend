@@ -89,7 +89,7 @@ class StatusMessageViewModel @Inject constructor(
     }
 
     fun updateDraftText(text: String) {
-        if (text.length <= 150) _state.update { it.copy(draftText = text) }
+        if (text.length <= 100) _state.update { it.copy(draftText = text) }
     }
 
     fun submitStatus() {
