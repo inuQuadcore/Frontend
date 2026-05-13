@@ -40,7 +40,7 @@ private val ClBadge     = Color(0xFF0167FF)   // unreadCount 배지 색
 
 @Composable
 fun ChatListScreen(
-    onRoomClick        : (ChatRoom) -> Unit = {},
+    onRoomClick        : (ChatRoomUi) -> Unit = {},
     onStartChat        : () -> Unit         = {},
     onNotificationClick: () -> Unit         = {},
     viewModel          : ChatViewModel      = hiltViewModel(),
@@ -68,15 +68,15 @@ fun ChatListScreen(
 @Composable
 fun ChatListContent(
     state               : ChatListUiState,
-    onRoomClick         : (ChatRoom) -> Unit,
+    onRoomClick         : (ChatRoomUi) -> Unit,
     onFilterSelect      : (ChatFilter) -> Unit,
     onSearchToggle      : () -> Unit,
     onSearchChange      : (String) -> Unit,
     onFabClick          : () -> Unit,
     onRetry             : () -> Unit,
-    onContextMenu       : (ChatRoom) -> Unit,
+    onContextMenu       : (ChatRoomUi) -> Unit,
     onDismissMenu       : () -> Unit,
-    onMenuAction        : (String, ChatRoom) -> Unit,
+    onMenuAction        : (String, ChatRoomUi) -> Unit,
     onDismissRoomInfo   : () -> Unit    = {},
     onNotificationClick : () -> Unit    = {},
     hasNotification     : Boolean       = false,
@@ -490,7 +490,7 @@ private fun ContextMenuItem(label: String, isDestructive: Boolean, onClick: () -
 }
 
 @Composable
-private fun ChatRoomInfoScreen(room: ChatRoom, onBack: () -> Unit) {
+private fun ChatRoomInfoScreen(room: ChatRoomUi, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     Scaffold(
         topBar = {

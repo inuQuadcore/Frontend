@@ -2,7 +2,7 @@ package com.everybuddy.app.ui.splash
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.everybuddy.app.data.network.TokenManager
+import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.navigation.Route
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow

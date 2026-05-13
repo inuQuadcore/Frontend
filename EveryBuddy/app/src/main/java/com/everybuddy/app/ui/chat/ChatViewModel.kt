@@ -54,7 +54,7 @@ class ChatViewModel @Inject constructor(
                     }
                 }
 
-                is AuthResult.Exception -> {
+                is ApiResult.NetworkError -> {
                     // 네트워크 오류
                     _listState.update {
                         it.copy(
@@ -136,7 +136,7 @@ class ChatViewModel @Inject constructor(
         _listState.update { it.copy(contextMenuRoom = null) }
     }
 
-    fun onMenuAction(action: String, room: ChatRoom) {
+    fun onMenuAction(action: String, room: ChatRoomUi) {
         val current = _listState.value
         when (action) {
             "toggle_mute" -> {
@@ -164,7 +164,6 @@ class ChatViewModel @Inject constructor(
         onDismissContextMenu()
     }
 
-    val filteredRooms: StateFlow<List<ChatRoomUi>> = listState.map { state ->
     fun dismissRoomInfo() {
         _listState.update { it.copy(infoRoom = null) }
     }
@@ -211,7 +210,7 @@ class ChatViewModel @Inject constructor(
         _listState.update { it.copy(activeFolderId = folderId) }
     }
 
-    val filteredRooms: StateFlow<List<ChatRoom>> = listState.map { state ->
+    val filteredRooms: StateFlow<List<ChatRoomUi>> = listState.map { state ->
         state.rooms
             .filter { room ->
                 val matchQuery = state.searchQuery.isEmpty() ||
@@ -230,6 +229,6 @@ class ChatViewModel @Inject constructor(
                 }
                 matchQuery && matchFilter
             }
-            .sortedWith(compareByDescending<ChatRoom> { it.isPinned })
+            .sortedWith(compareByDescending<ChatRoomUi> { it.isPinned })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }

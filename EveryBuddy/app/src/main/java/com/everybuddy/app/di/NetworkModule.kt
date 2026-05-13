@@ -20,7 +20,6 @@ import com.everybuddy.app.data.network.TokenAuthenticator
 import com.everybuddy.app.data.network.UserApi
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import com.everybuddy.app.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

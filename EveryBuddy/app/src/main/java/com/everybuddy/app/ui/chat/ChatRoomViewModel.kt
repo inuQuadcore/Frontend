@@ -49,7 +49,7 @@ class ChatRoomViewModel @Inject constructor(
 
     fun loadRoom(roomId: String) {
         val dummyRoom = if (BuildConfig.DEBUG) dummyChatRooms.find { it.id == roomId } else null
-        val room      = dummyRoom ?: ChatRoom(id = roomId)
+        val room      = dummyRoom ?: ChatRoomUi(id = roomId)
         val messages  = if (BuildConfig.DEBUG) dummyMessages[roomId] ?: emptyList() else emptyList()
         _uiState.update { it.copy(room = room, messages = messages) }
     }

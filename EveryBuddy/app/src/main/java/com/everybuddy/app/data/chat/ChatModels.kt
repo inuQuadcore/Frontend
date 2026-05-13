@@ -1,5 +1,6 @@
 package com.everybuddy.app.data.chat
 
+import com.everybuddy.app.ui.chat.CaptureOption
 import java.time.LocalDateTime
 
 // ChatRoom — [변경] createdAt, unreadCount, participantIds 추가
@@ -31,13 +32,13 @@ data class ChatFolder(
 )
 
 data class ChatListUiState(
-    val rooms           : List<ChatRoom>   = emptyList(),
+    val rooms           : List<ChatRoomUi> = emptyList(),
     val isLoading       : Boolean          = false,
     val errorMessage    : String?          = null,
     val searchQuery     : String           = "",
     val activeFilter    : ChatFilter       = ChatFilter.ALL,
-    val contextMenuRoom : ChatRoom?        = null,
-    val infoRoom        : ChatRoom?        = null,
+    val contextMenuRoom : ChatRoomUi?      = null,
+    val infoRoom        : ChatRoomUi?      = null,
     val folders         : List<ChatFolder> = emptyList(),
     val activeFolderId  : String?          = null,
 )
@@ -64,21 +65,45 @@ data class ChatMessage(
     val translatedText   : String        = "",
 )
 
-// ChatRoomUiState — [변경] translatingMessageIds, contextMenuMessage, savedToastVisible 추가
 data class ChatRoomUiState(
-    val room                  : ChatRoomUi           = ChatRoomUi(),
-    val messages              : List<ChatMessage>    = emptyList(),
-    val inputText             : String               = "",
-    val isRecording           : Boolean              = false,
-    val recordingSeconds      : Int                  = 0,
-    val recordingAmplitudes   : List<Float>          = emptyList(),
-    val playingMessageId      : String?              = null,
-    val isMediaPanelOpen      : Boolean              = false,
-    val isAutoTranslate       : Boolean              = false,
-    val showTranslation       : Map<String, Boolean> = emptyMap(),
-    val translatingMessageIds : Set<String>          = emptySet(),
-    val contextMenuMessage    : ChatMessage?         = null,
-    val savedToastVisible     : Boolean              = false,
+    val room                      : ChatRoomUi           = ChatRoomUi(),
+    val messages                  : List<ChatMessage>    = emptyList(),
+    val inputText                 : String               = "",
+
+    // 번역
+    val isAutoTranslate           : Boolean              = false,
+    val showTranslation           : Map<String, Boolean> = emptyMap(),
+    val translatingMessageIds     : Set<String>          = emptySet(),
+
+    // 음성 녹음
+    val isRecording               : Boolean              = false,
+    val isRecordingPaused         : Boolean              = false,
+    val recordingSeconds          : Int                  = 0,
+    val recordingAmplitudes       : List<Float>          = emptyList(),
+
+    // 음성 재생
+    val playingMessageId          : String?              = null,
+
+    // 미디어 패널
+    val isMediaPanelOpen          : Boolean              = false,
+
+    // 사진 선택 시트
+    val isPhotoPickerOpen         : Boolean              = false,
+    val selectedPhotoIndices      : Set<Int>             = emptySet(),
+
+    // 롱프레스 컨텍스트 메뉴 (단일 말풍선)
+    val contextMenuMessage        : ChatMessage?         = null,
+
+    // 단일 말풍선 스크립트 저장 시트
+    val scriptSaveMessage         : ChatMessage?         = null,
+
+    // 저장 완료 토스트
+    val savedToastVisible         : Boolean              = false,
+
+    // 대화 선택 저장 (미디어 패널 → 대화저장)
+    val isConversationSelectOpen  : Boolean              = false,
+    val conversationSaveMessages  : List<ChatMessage>    = emptyList(),
+    val conversationCaptureOption : CaptureOption        = CaptureOption.COMBINED,
 )
 
 private val BASE_DATE = LocalDateTime.of(2026, 1, 25, 0, 0)

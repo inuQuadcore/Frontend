@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.dto.ApiResult
-import com.everybuddy.app.data.network.TokenManager
+import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
