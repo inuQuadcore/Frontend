@@ -7,7 +7,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.navigation.AppNavGraph
+import com.everybuddy.app.navigation.Route
 import com.everybuddy.app.ui.theme.EveryBuddyTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -19,7 +21,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             EveryBuddyTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    AppNavGraph()
+                    AppNavGraph(
+                        startDest = if (BuildConfig.DEBUG) Route.MAIN else Route.SPLASH,
+                    )
                 }
             }
         }

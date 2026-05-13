@@ -1,20 +1,28 @@
 package com.everybuddy.app.ui.explore
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.everybuddy.app.BuildConfig
+import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.local.TokenManager
+import com.everybuddy.app.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 // ExploreViewModel — 탐색 탭
 data class ExploreUiState(
     val selectedTab        : Int               = 0,   // 0=추천친구, 1=필터
-    val cardSet            : List<DiscoverUser> = ExploreDemo.randomCards,
+    val cardSet            : List<DiscoverUser> = if (BuildConfig.DEBUG) ExploreDemo.randomCards else emptyList(),
     val currentCardIndex   : Int               = 0,
-    val tagMatchUsers      : List<DiscoverUser> = ExploreDemo.tagMatchUsers,
-    val learningLangUsers  : List<DiscoverUser> = ExploreDemo.learningLangUsers,
+    val tagMatchUsers      : List<DiscoverUser> = if (BuildConfig.DEBUG) ExploreDemo.tagMatchUsers else emptyList(),
+    val learningLangUsers  : List<DiscoverUser> = if (BuildConfig.DEBUG) ExploreDemo.learningLangUsers else emptyList(),
     val isRefreshing       : Boolean           = false,
     val filterSettings     : FilterSettings    = FilterSettings(),
     val filterResults      : List<DiscoverUser> = emptyList(),
@@ -23,6 +31,7 @@ data class ExploreUiState(
     val isFilterScreenOpen : Boolean           = false,
     val selectedUser       : DiscoverUser?     = null,
     val isProfileOpen      : Boolean           = false,
+    val followedUserIds    : Set<Long>         = emptySet(),
 )
 
 @HiltViewModel
@@ -92,11 +101,18 @@ class ExploreViewModel @Inject constructor() : ViewModel() {
     // 상대 프로필 팝업
     fun openProfile(user: DiscoverUser) { _uiState.update { it.copy(selectedUser = user, isProfileOpen = true) } }
     fun closeProfile()                  { _uiState.update { it.copy(selectedUser = null, isProfileOpen = false) } }
+
+    fun onFollowToggle(userId: Long) {
+        _uiState.update { s ->
+            val ids = s.followedUserIds
+            s.copy(followedUserIds = if (ids.contains(userId)) ids - userId else ids + userId)
+        }
+    }
 }
 
 // MyViewModel — 마이페이지
 data class MyUiState(
-    val profile         : MyProfile    = ExploreDemo.myProfile,
+    val profile         : MyProfile    = if (BuildConfig.DEBUG) ExploreDemo.myProfile else MyProfile(),
     val isEditMode      : Boolean      = false,
     val editName        : String       = "",
     val editBio         : String       = "",
@@ -108,13 +124,53 @@ data class MyUiState(
     val editingTags     : List<UserTag> = emptyList(),
     val openLanguageCode: String?      = null,
     val openSubMenu     : String?      = null,   // "guide" | "notice" | "settings" | "version"
+    val emailVisible    : Boolean      = true,
 )
 
 @HiltViewModel
-class MyViewModel @Inject constructor() : ViewModel() {
+class MyViewModel @Inject constructor(
+    private val userRepository : UserRepository,
+    private val tokenManager   : TokenManager,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MyUiState())
     val uiState: StateFlow<MyUiState> = _uiState.asStateFlow()
+
+    init { loadMyProfile() }
+
+    private fun loadMyProfile() {
+        viewModelScope.launch {
+            val userId = tokenManager.userId.first() ?: return@launch
+
+            val profileDeferred = async { userRepository.getUserProfile(userId) }
+            val tagsDeferred    = async { userRepository.getUserTags(userId) }
+            val langsDeferred   = async { userRepository.getUserLanguages(userId) }
+
+            val apiProfile = (profileDeferred.await() as? ApiResult.Success)?.data ?: return@launch
+            val tags = (tagsDeferred.await() as? ApiResult.Success)?.data
+                ?.map { UserTag(it.tag, it.category) }
+                ?: _uiState.value.profile.tags
+            val langs = (langsDeferred.await() as? ApiResult.Success)?.data?.languages
+                ?.map { UserLanguage(it.language, it.level) }
+                ?: _uiState.value.profile.learningLanguages
+
+            _uiState.update { s ->
+                s.copy(profile = s.profile.copy(
+                    userId            = userId,
+                    name              = apiProfile.name,
+                    profileImageUrl   = apiProfile.profileImageUrl,
+                    country           = apiProfile.country,
+                    age               = apiProfile.age,
+                    gender            = when (apiProfile.gender.uppercase()) {
+                                            "MALE" -> "남성"; "FEMALE" -> "여성"; else -> apiProfile.gender
+                                        },
+                    bio               = apiProfile.bio,
+                    tags              = tags,
+                    learningLanguages = langs,
+                ))
+            }
+        }
+    }
 
     // 프로필 수정
     fun openEdit() {
@@ -137,17 +193,29 @@ class MyViewModel @Inject constructor() : ViewModel() {
     fun updateEditGender(v: String)   { _uiState.update { it.copy(editGender   = v) } }
     fun updateEditCountry(v: String)  { _uiState.update { it.copy(editCountry  = v) } }
 
-    // TODO: 실제 API 호출 → PUT /api/v1/users/profile
     fun saveEdit() {
         val s = _uiState.value
-        val updated = s.profile.copy(
-            name     = s.editName,
-            bio      = s.editBio,
-            birthday = s.editBirthday,
-            gender   = s.editGender,
-            country  = s.editCountry,
-        )
-        _uiState.update { it.copy(profile = updated, isEditMode = false, toastMessage = "프로필이 저장되었습니다.") }
+        val apiGender = when (s.editGender) { "남성" -> "MALE"; "여성" -> "FEMALE"; else -> s.editGender }
+        _uiState.update { it.copy(
+            profile = it.profile.copy(
+                name     = s.editName,
+                bio      = s.editBio,
+                birthday = s.editBirthday,
+                gender   = s.editGender,
+                country  = s.editCountry,
+            ),
+            isEditMode   = false,
+            toastMessage = "프로필이 저장되었습니다.",
+        ) }
+        viewModelScope.launch {
+            userRepository.updateMyProfile(
+                name     = s.editName,
+                bio      = s.editBio,
+                birthday = s.editBirthday,
+                gender   = apiGender,
+                country  = s.editCountry,
+            )
+        }
     }
 
     // 태그 편집
@@ -161,14 +229,33 @@ class MyViewModel @Inject constructor() : ViewModel() {
         else if (current.size < 15) current.add(tag)
         _uiState.update { it.copy(editingTags = current) }
     }
-    // TODO: 실제 API 호출 → PUT /api/v1/users/tags
     fun saveTagEdit() {
-        _uiState.update { it.copy(profile = it.profile.copy(tags = it.editingTags), isTagEditOpen = false) }
+        val tags = _uiState.value.editingTags
+        _uiState.update { it.copy(profile = it.profile.copy(tags = tags), isTagEditOpen = false) }
+        viewModelScope.launch {
+            userRepository.updateMyTags(tags.map { it.tag })
+        }
     }
+
+    // 이메일 노출 토글
+    fun toggleEmailVisible() { _uiState.update { it.copy(emailVisible = !it.emailVisible) } }
 
     // 언어 상세
     fun openLanguage(code: String)  { _uiState.update { it.copy(openLanguageCode = code) } }
     fun closeLanguage()             { _uiState.update { it.copy(openLanguageCode = null) } }
+
+    fun saveLanguageLevel(language: String, level: Int) {
+        _uiState.update { s ->
+            s.copy(
+                profile = s.profile.copy(
+                    learningLanguages = s.profile.learningLanguages.map {
+                        if (it.language.equals(language, ignoreCase = true)) it.copy(level = level) else it
+                    },
+                ),
+                openLanguageCode = null,
+            )
+        }
+    }
 
     // 서브 메뉴
     fun openSubMenu(key: String)    { _uiState.update { it.copy(openSubMenu = key) } }

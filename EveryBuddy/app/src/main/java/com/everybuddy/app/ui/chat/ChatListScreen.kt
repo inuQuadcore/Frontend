@@ -1,5 +1,8 @@
+@file:Suppress("DEPRECATION")
+
 package com.everybuddy.app.ui.chat
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -37,39 +40,46 @@ private val ClBadge     = Color(0xFF0167FF)   // unreadCount 배지 색
 
 @Composable
 fun ChatListScreen(
-    onRoomClick : (ChatRoomUi) -> Unit = {},
-    onStartChat : () -> Unit         = {},
-    viewModel   : ChatViewModel      = hiltViewModel(),
+    onRoomClick        : (ChatRoomUi) -> Unit = {},
+    onStartChat        : () -> Unit         = {},
+    onNotificationClick: () -> Unit         = {},
+    viewModel          : ChatViewModel      = hiltViewModel(),
 ) {
     val state         by viewModel.listState.collectAsState()
     val filteredRooms by viewModel.filteredRooms.collectAsState()
 
     ChatListContent(
-        state          = state.copy(rooms = filteredRooms),
-        onRoomClick    = onRoomClick,
-        onFilterSelect = viewModel::onFilterSelect,
-        onSearchToggle = viewModel::onSearchToggle,
-        onSearchChange = viewModel::onSearchQueryChange,
-        onFabClick     = onStartChat,
-        onRetry        = viewModel::loadChatRooms,
-        onContextMenu  = viewModel::onContextMenu,
-        onDismissMenu  = viewModel::onDismissContextMenu,
-        onMenuAction   = viewModel::onMenuAction,
+        state               = state.copy(rooms = filteredRooms),
+        onRoomClick         = onRoomClick,
+        onFilterSelect      = viewModel::onFilterSelect,
+        onSearchToggle      = viewModel::onSearchToggle,
+        onSearchChange      = viewModel::onSearchQueryChange,
+        onFabClick          = onStartChat,
+        onRetry             = viewModel::loadChatRooms,
+        onContextMenu       = viewModel::onContextMenu,
+        onDismissMenu       = viewModel::onDismissContextMenu,
+        onMenuAction        = viewModel::onMenuAction,
+        onDismissRoomInfo   = viewModel::dismissRoomInfo,
+        onNotificationClick = onNotificationClick,
+        hasNotification     = false,
     )
 }
 
 @Composable
 fun ChatListContent(
-    state          : ChatListUiState,
-    onRoomClick    : (ChatRoomUi) -> Unit,
-    onFilterSelect : (ChatFilter) -> Unit,
-    onSearchToggle : () -> Unit,
-    onSearchChange : (String) -> Unit,
-    onFabClick     : () -> Unit,
-    onRetry        : () -> Unit,
-    onContextMenu  : (ChatRoomUi) -> Unit,
-    onDismissMenu  : () -> Unit,
-    onMenuAction   : (String, ChatRoomUi) -> Unit,
+    state               : ChatListUiState,
+    onRoomClick         : (ChatRoomUi) -> Unit,
+    onFilterSelect      : (ChatFilter) -> Unit,
+    onSearchToggle      : () -> Unit,
+    onSearchChange      : (String) -> Unit,
+    onFabClick          : () -> Unit,
+    onRetry             : () -> Unit,
+    onContextMenu       : (ChatRoomUi) -> Unit,
+    onDismissMenu       : () -> Unit,
+    onMenuAction        : (String, ChatRoomUi) -> Unit,
+    onDismissRoomInfo   : () -> Unit    = {},
+    onNotificationClick : () -> Unit    = {},
+    hasNotification     : Boolean       = false,
 ) {
     Box(
         modifier = Modifier
@@ -78,55 +88,62 @@ fun ChatListContent(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    // TODO padding: 앱바 높이 (현재 65dp) / horizontal (현재 20dp)
-                    .height(65.dp)
-                    .padding(horizontal = 20.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .height(56.dp)
+                    .background(Color.White)
+                    .padding(horizontal = 16.dp),
             ) {
                 Text(
                     text     = "채팅",
+                    modifier = Modifier.align(Alignment.Center),
                     style    = TextStyle(
-                        fontSize   = 20.sp,
+                        fontSize   = 18.sp,
                         fontFamily = PretendardFamily,
-                        fontWeight = FontWeight(600),
+                        fontWeight = FontWeight(700),
                         color      = Color(0xFF000000),
                     ),
-                    modifier = Modifier.weight(1f),
                 )
-
-                // 검색 버튼
-                // TODO UI: 클릭 시 AnimatedVisibility SearchBar 표시
-                IconButton(onClick = onSearchToggle, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        painter            = painterResource(R.drawable.ic_search),
-                        contentDescription = "검색",
-                        modifier           = Modifier.size(24.dp),
-                        tint               = Color.Black,
-                    )
-                }
-
-                // 알림 버튼 + 파란 뱃지 점
-                // TODO 기능: NotificationScreen 구현 후 onClick 연결
-                Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                    Icon(
-                        painter            = painterResource(R.drawable.ic_alarm),
-                        contentDescription = "알림",
-                        modifier           = Modifier.size(24.dp),
-                        tint               = Color.Black,
-                    )
-                    // TODO padding: 뱃지 점 위치 (현재 offset x -8dp, y 8dp)
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .align(Alignment.TopEnd)
-                            .offset(x = (-8).dp, y = 8.dp)
-                            .background(Color(0xFF0167FF), CircleShape),
-                    )
+                Row(
+                    modifier              = Modifier.align(Alignment.CenterEnd),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onSearchToggle, modifier = Modifier.size(40.dp)) {
+                        Icon(
+                            painter            = painterResource(R.drawable.ic_search),
+                            contentDescription = "검색",
+                            modifier           = Modifier.size(24.dp),
+                            tint               = Color.Black,
+                        )
+                    }
+                    Box {
+                        IconButton(
+                            onClick  = onNotificationClick,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                painter            = painterResource(R.drawable.ic_alarm),
+                                contentDescription = "알림",
+                                modifier           = Modifier.size(24.dp),
+                                tint               = Color.Black,
+                            )
+                        }
+                        if (hasNotification) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF0167FF))
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = (-6).dp, y = 6.dp),
+                            )
+                        }
+                    }
                 }
             }
+            HorizontalDivider(color = ClBorder, thickness = 0.5.dp)
 
             LazyRow(
                 modifier              = Modifier
@@ -185,24 +202,37 @@ fun ChatListContent(
             }
 
             Box(
-                modifier         = Modifier.weight(1f),
+                modifier         = Modifier.weight(1f).fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
                 when {
                     // 로딩
                     state.isLoading -> {
-                        LoadingIndicator()
+                        Column(
+                            modifier            = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            LoadingIndicator()
+                            Text(
+                                text      = "채팅방을 불러오는 중...",
+                                style     = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = ClTextSec),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
 
                     // 에러
                     state.errorMessage != null && state.rooms.isEmpty() -> {
                         Column(
+                            modifier            = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             Text(
-                                text  = "채팅방을 불러오지 못했습니다.",
-                                style = TextStyle(fontSize = 15.sp, color = ClTextSec),
+                                text      = "채팅방을 불러오지 못했습니다.",
+                                style     = TextStyle(fontSize = 15.sp, color = ClTextSec, fontFamily = PretendardFamily),
+                                textAlign = TextAlign.Center,
                             )
                             TextButton(onClick = onRetry) {
                                 Text("다시 시도", style = TextStyle(color = ClAccent, fontSize = 14.sp))
@@ -292,10 +322,14 @@ fun ChatListContent(
 
         state.contextMenuRoom?.let { room ->
             ChatRoomContextMenu(
-                room        = room,
-                onDismiss   = onDismissMenu,
+                room         = room,
+                onDismiss    = onDismissMenu,
                 onMenuAction = { action -> onMenuAction(action, room) },
             )
+        }
+
+        state.infoRoom?.let { room ->
+            ChatRoomInfoScreen(room = room, onBack = onDismissRoomInfo)
         }
     }
 }
@@ -309,103 +343,67 @@ fun ChatRoomItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick     = onClick,
-                onLongClick = onLongClick,
-            )
-            // TODO padding: 채팅방 아이템 horizontal 16dp / vertical 12dp
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // 아바타
-        // TODO: coil AsyncImage(model = avatarUrl)
+        // 아바타 (이니셜 원형)
         Box(
-            modifier = Modifier
-                // TODO size: 아바타 크기 (현재 48dp)
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(Color(0xFFDDDDDD)),
+            modifier         = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFDDDDDD)),
             contentAlignment = Alignment.Center,
         ) {
-            // TODO: 아바타 이미지 없으면 이름 첫 글자 표시
             Text(
                 text  = room.name.take(1),
-                style = TextStyle(
-                    fontSize   = 18.sp,
-                    fontFamily = PretendardFamily,
-                    fontWeight = FontWeight(600),
-                    color      = Color(0xFF888888),
-                ),
+                style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color(0xFF888888)),
             )
         }
 
         // 이름 + 마지막 메시지
-        Column(
-            modifier            = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text  = room.name,
-                style = TextStyle(
-                    fontSize   = 15.sp,
-                    fontFamily = PretendardFamily,
-                    fontWeight = FontWeight(600),
-                    color      = ClTextPri,
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (room.isPinned) {
+                    Icon(painterResource(R.drawable.ic_pin), "고정", Modifier.size(12.dp), tint = ClAccent)
+                }
+                Text(
+                    text     = room.name,
+                    style    = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = ClTextPri),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             if (room.lastMessage.isNotEmpty()) {
                 Text(
-                    text  = room.lastMessage,
-                    style = TextStyle(
-                        fontSize   = 13.sp,
-                        fontFamily = PretendardFamily,
-                        color      = ClTextSec,
-                    ),
+                    text     = room.lastMessage,
+                    style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = ClTextSec),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
 
-        // 시간 + 읽지 않은 수 배지
-        Column(
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (room.timestamp.isNotEmpty()) {
-                Text(
-                    text  = room.timestamp,
-                    style = TextStyle(
-                        fontSize   = 11.sp,
-                        fontFamily = PretendardFamily,
-                        color      = ClTextSec,
-                    ),
-                )
+        // 시간 + 배지
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (room.isMuted) {
+                    Icon(painterResource(R.drawable.ic_alarm_off), "알림 꺼짐", Modifier.size(13.dp), tint = ClTextSec)
+                }
+                if (room.timestamp.isNotEmpty()) {
+                    Text(text = room.timestamp, style = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = ClTextSec))
+                }
             }
-
-            // unreadCount 배지
             if (room.unreadCount > 0) {
                 Box(
                     modifier         = Modifier
-                        // TODO size: 배지 최소 크기 (현재 18dp)
                         .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
                         .clip(RoundedCornerShape(9.dp))
                         .background(ClBadge)
-                        // TODO padding: 배지 내부 패딩 (현재 horizontal 5dp)
                         .padding(horizontal = 5.dp, vertical = 2.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text  = if (room.unreadCount > 99) "99+" else room.unreadCount.toString(),
-                        style = TextStyle(
-                            fontSize   = 10.sp,
-                            fontFamily = PretendardFamily,
-                            fontWeight = FontWeight(600),
-                            color      = Color.White,
-                        ),
+                        style = TextStyle(fontSize = 10.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White),
                     )
                 }
             }
@@ -419,6 +417,10 @@ private fun ChatRoomContextMenu(
     onDismiss    : () -> Unit,
     onMenuAction : (String) -> Unit,
 ) {
+    val muteLabel    = if (room.isMuted) "알림 켜기" else "알림 끄기"
+    val pinLabel     = if (room.isPinned) "상단 고정 해제" else "상단 고정"
+    var showLeaveConfirm by remember { mutableStateOf(false) }
+
     Box(
         modifier         = Modifier
             .fillMaxSize()
@@ -427,33 +429,94 @@ private fun ChatRoomContextMenu(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier        = Modifier
-                .widthIn(min = 180.dp)
-                .clickable {},
+            modifier        = Modifier.widthIn(min = 220.dp).clickable {},
             shape           = RoundedCornerShape(12.dp),
             color           = Color.White,
             shadowElevation = 8.dp,
         ) {
             Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                listOf("채팅방 정보", "알림 끄기", "상단 고정", "채팅방 나가기").forEach { label ->
-                    Text(
-                        text     = label,
-                        style    = TextStyle(
-                            fontSize   = 15.sp,
-                            fontFamily = PretendardFamily,
-                            color      = if (label == "채팅방 나가기") Color(0xFFFF3333) else ClTextPri,
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onMenuAction(label); onDismiss() }
-                            // TODO padding: 메뉴 항목 패딩 (현재 horizontal 20dp, vertical 12dp)
-                            .padding(horizontal = 20.dp, vertical = 12.dp),
-                    )
-                    if (label != "채팅방 나가기") {
-                        HorizontalDivider(color = ClBorder, thickness = 0.5.dp)
-                    }
-                }
+                ContextMenuItem("채팅방 정보", false) { onMenuAction("info"); onDismiss() }
+                HorizontalDivider(color = ClBorder, thickness = 0.5.dp)
+                ContextMenuItem(muteLabel, false)    { onMenuAction("toggle_mute"); onDismiss() }
+                HorizontalDivider(color = ClBorder, thickness = 0.5.dp)
+                ContextMenuItem(pinLabel, false)     { onMenuAction("toggle_pin"); onDismiss() }
+                HorizontalDivider(color = ClBorder, thickness = 0.5.dp)
+                ContextMenuItem("채팅방 나가기", true) { showLeaveConfirm = true }
             }
+        }
+    }
+
+    if (showLeaveConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLeaveConfirm = false },
+            containerColor   = Color.White,
+            title = {
+                Text("채팅방 나가기", style = TextStyle(fontSize = 17.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = ClTextPri))
+            },
+            text = {
+                Text("정말 나가겠어요?", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = ClTextSec))
+            },
+            dismissButton = {
+                TextButton(onClick = { showLeaveConfirm = false }) {
+                    Text("취소", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = ClTextSec))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onMenuAction("leave"); onDismiss() }) {
+                    Text("확인", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color(0xFFFF3333)))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun ContextMenuItem(label: String, isDestructive: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+    ) {
+        Text(
+            text  = label,
+            style = TextStyle(
+                fontSize   = 15.sp,
+                fontFamily = PretendardFamily,
+                color      = if (isDestructive) Color(0xFFFF3333) else ClTextPri,
+            ),
+        )
+    }
+}
+
+@Composable
+private fun ChatRoomInfoScreen(room: ChatRoomUi, onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    Scaffold(
+        topBar = {
+            Column {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 8.dp),
+                ) {
+                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).size(40.dp)) {
+                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = ClTextPri)
+                    }
+                    Text(
+                        "채팅방 정보",
+                        modifier = Modifier.align(Alignment.Center),
+                        style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = ClTextPri),
+                    )
+                }
+                HorizontalDivider(color = ClBorder, thickness = 0.5.dp)
+            }
+        },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Column(modifier = Modifier.padding(innerPadding).fillMaxSize().padding(horizontal = 16.dp, vertical = 20.dp)) {
+            Text(
+                "내가 설정한 사진과 이름은 나에게만 보입니다.",
+                style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = ClTextSec),
+            )
         }
     }
 }
@@ -472,7 +535,8 @@ private fun PreviewChatListWithRooms() {
             onRetry        = {},
             onContextMenu  = {},
             onDismissMenu  = {},
-            onMenuAction   = { _, _ -> },
+            onMenuAction        = { _, _ -> },
+            onDismissRoomInfo   = {},
         )
     }
 }
@@ -491,7 +555,8 @@ private fun PreviewChatListEmpty() {
             onRetry        = {},
             onContextMenu  = {},
             onDismissMenu  = {},
-            onMenuAction   = { _, _ -> },
+            onMenuAction        = { _, _ -> },
+            onDismissRoomInfo   = {},
         )
     }
 }

@@ -46,8 +46,8 @@ android {
         jvmTarget = "11"
     }
     buildFeatures {
-        compose     = true
-        buildConfig = true   // BuildConfig.DEBUG 사용 (NetworkModule의 Release 분기용)
+        compose = true
+        buildConfig = true
     }
 }
 

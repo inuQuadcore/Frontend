@@ -1,6 +1,11 @@
 package com.everybuddy.app.ui.explore
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -25,32 +30,46 @@ private val C = AppColors
 
 @Composable
 fun UserProfileScreen(
-    user      : DiscoverUser,
-    isFriend  : Boolean = false,
-    myTags    : List<UserTag> = ExploreDemo.myProfile.tags,
-    onBack    : () -> Unit,
-    onChat    : (DiscoverUser) -> Unit = {},
-    onAddFriend: (DiscoverUser) -> Unit = {},
+    user            : DiscoverUser,
+    isFriend        : Boolean = false,
+    myTags          : List<UserTag> = ExploreDemo.myProfile.tags,
+    onBack          : () -> Unit,
+    onChat          : (DiscoverUser) -> Unit = {},
+    onAddFriend     : (DiscoverUser) -> Unit = {},
+    onRemoveFriend  : (DiscoverUser) -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
 
-    // 공통 태그 개수
+    var isSideBarOpen      by remember { mutableStateOf(false) }
+    var pendingAction       by remember { mutableStateOf<String?>(null) }
+    var isFriendLocal       by remember(isFriend) { mutableStateOf(isFriend) }
+    var showRemoveDialog    by remember { mutableStateOf(false) }
+
     val myTagKeys     = myTags.map { it.tag }.toSet()
     val matchingCount = user.tags.count { it.tag in myTagKeys }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
             Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 4.dp),
                 ) {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick  = onBack,
+                        modifier = Modifier.size(40.dp).align(Alignment.CenterStart),
+                    ) {
                         Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = C.TextPri)
                     }
-                    Text(user.name, style = TextStyle(fontSize = 17.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri))
-                    IconButton(onClick = { /* TODO: 신고/차단 더보기 메뉴 */ }) {
-                        // ic_more.xml (··· 점 3개)
+                    Text(
+                        text     = user.name,
+                        modifier = Modifier.align(Alignment.Center),
+                        style    = TextStyle(fontSize = 17.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                    )
+                    IconButton(
+                        onClick  = { isSideBarOpen = true },
+                        modifier = Modifier.size(40.dp).align(Alignment.CenterEnd),
+                    ) {
                         Icon(painterResource(R.drawable.ic_sidemenu), "더보기", Modifier.size(22.dp), tint = C.TextPri)
                     }
                 }
@@ -125,9 +144,8 @@ fun UserProfileScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // ic_location.xml
                     Icon(painterResource(R.drawable.ic_location), "국적", Modifier.size(14.dp), tint = C.TextSec)
-                    Text(user.countryFlag(), fontSize = 12.sp)
+                    Text(user.countryName(), style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
                 }
                 if (user.consecutiveDays > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -154,23 +172,23 @@ fun UserProfileScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                if (isFriend) {
-                    // [나의친구] — 파란 아이콘+텍스트 outline 버튼
+                if (isFriendLocal) {
+                    // [나의친구] — ic_follow 아이콘, 누르면 삭제 다이얼로그
                     OutlinedButton(
-                        onClick  = { /* TODO: 친구 삭제 확인 다이얼로그 */ },
+                        onClick  = { showRemoveDialog = true },
                         modifier = Modifier.weight(1f).height(48.dp),
                         shape    = RoundedCornerShape(10.dp),
                         border   = BorderStroke(1.5.dp, C.Accent),
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Icon(painterResource(R.drawable.ic_friend_add), "나의친구", Modifier.size(18.dp), tint = C.Accent)
+                            Icon(painterResource(R.drawable.ic_follow), "나의친구", Modifier.size(18.dp), tint = C.Accent)
                             Text("나의친구", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.Accent, fontWeight = FontWeight(600)))
                         }
                     }
                 } else {
-                    // [친구추가] — 파란 filled 버튼
+                    // [친구추가] — ic_friend_add 파란 filled 버튼
                     Button(
-                        onClick  = { onAddFriend(user) },
+                        onClick  = { isFriendLocal = true; onAddFriend(user) },
                         modifier = Modifier.weight(1f).height(48.dp),
                         shape    = RoundedCornerShape(10.dp),
                         colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
@@ -203,7 +221,7 @@ fun UserProfileScreen(
             Text("소통 언어", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri), modifier = Modifier.padding(horizontal = 16.dp))
             Spacer(Modifier.height(12.dp))
             user.languages.forEach { lang ->
-                LanguageLevelRow(lang = lang, onTap = { /* TODO: 언어 상세 */ })
+                LanguageLevelRow(lang = lang, onTap = {}, showChevron = false)
             }
 
             Spacer(Modifier.height(20.dp))
@@ -230,11 +248,190 @@ fun UserProfileScreen(
             Spacer(Modifier.height(32.dp))
         }
     }
+
+        // 딤 배경
+        AnimatedVisibility(
+            visible = isSideBarOpen,
+            enter   = fadeIn(),
+            exit    = fadeOut(),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f))
+                    .clickable { isSideBarOpen = false },
+            )
+        }
+
+        // 우측 사이드바
+        AnimatedVisibility(
+            visible  = isSideBarOpen,
+            enter    = slideInHorizontally(initialOffsetX = { it }),
+            exit     = slideOutHorizontally(targetOffsetX = { it }),
+            modifier = Modifier.align(Alignment.CenterEnd),
+        ) {
+            ProfileSideBar(
+                onDismiss = { isSideBarOpen = false },
+                onAction  = { action ->
+                    pendingAction  = action
+                    isSideBarOpen  = false
+                },
+            )
+        }
+
+        // 확인 다이얼로그 (차단/삭제/신고)
+        pendingAction?.let { action ->
+            ProfileActionDialog(
+                action    = action,
+                userName  = user.name,
+                onConfirm = {
+                    when (action) {
+                        "차단" -> { /* TODO: API - POST /api/v1/users/{userId}/block */ }
+                        "삭제" -> { /* TODO: API - DELETE /api/v1/friends/{userId} */ }
+                        "신고" -> { /* TODO: API - POST /api/v1/users/{userId}/report */ }
+                    }
+                    pendingAction = null
+                },
+                onDismiss = { pendingAction = null },
+            )
+        }
+
+        // 친구 삭제 확인 다이얼로그
+        if (showRemoveDialog) {
+            AlertDialog(
+                onDismissRequest = { showRemoveDialog = false },
+                containerColor   = Color.White,
+                shape            = RoundedCornerShape(16.dp),
+                title = {
+                    Text(
+                        "나의 친구에서 삭제하시겠습니까?",
+                        style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = C.TextPri),
+                    )
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRemoveDialog = false }) {
+                        Text("취소", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextSec))
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        isFriendLocal = false
+                        showRemoveDialog = false
+                        onRemoveFriend(user)
+                    }) {
+                        Text("삭제", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color(0xFFFF3333)))
+                    }
+                },
+                text = null,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileSideBar(
+    onDismiss : () -> Unit,
+    onAction  : (String) -> Unit,
+) {
+    val menuItems = listOf("차단", "삭제", "신고")
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(220.dp)
+            .background(Color.White)
+            .systemBarsPadding()
+            .padding(top = 56.dp),
+    ) {
+        menuItems.forEach { action ->
+            Text(
+                text     = action,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onAction(action) }
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
+                style = TextStyle(
+                    fontSize   = 16.sp,
+                    fontFamily = PretendardFamily,
+                    color      = if (action == "삭제") Color(0xFFFF3333) else Color(0xFF1B1B1B),
+                ),
+            )
+            HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+        }
+    }
+}
+
+@Composable
+private fun ProfileActionDialog(
+    action    : String,
+    userName  : String,
+    onConfirm : () -> Unit,
+    onDismiss : () -> Unit,
+) {
+    val description = when (action) {
+        "차단" -> "${userName}님을 차단하면 서로의 메시지를 받을 수 없습니다."
+        "삭제" -> "${userName}님을 친구 목록에서 삭제합니다."
+        "신고" -> "${userName}님을 신고합니다. 검토 후 조치됩니다."
+        else   -> ""
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "${userName}님을 ${action}하시겠습니까?",
+                style = TextStyle(
+                    fontSize   = 16.sp,
+                    fontFamily = PretendardFamily,
+                    fontWeight = FontWeight(600),
+                    color      = Color(0xFF1B1B1B),
+                ),
+            )
+        },
+        text = {
+            if (description.isNotEmpty()) {
+                Text(
+                    description,
+                    style = TextStyle(
+                        fontSize   = 14.sp,
+                        fontFamily = PretendardFamily,
+                        color      = Color(0xFF8F9399),
+                        lineHeight  = 20.sp,
+                    ),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    "확인",
+                    style = TextStyle(
+                        fontSize   = 15.sp,
+                        fontFamily = PretendardFamily,
+                        fontWeight = FontWeight(600),
+                        color      = if (action == "삭제") Color(0xFFFF3333) else C.Accent,
+                    ),
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    "취소",
+                    style = TextStyle(
+                        fontSize   = 15.sp,
+                        fontFamily = PretendardFamily,
+                        color      = Color(0xFF8F9399),
+                    ),
+                )
+            }
+        },
+        containerColor = Color.White,
+        shape          = RoundedCornerShape(16.dp),
+    )
 }
 
 // 언어 레벨 행
 @Composable
-fun LanguageLevelRow(lang: UserLanguage, onTap: () -> Unit) {
+fun LanguageLevelRow(lang: UserLanguage, onTap: () -> Unit, showChevron: Boolean = true) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).clickable(onClick = onTap),
         shape    = RoundedCornerShape(12.dp),
@@ -255,7 +452,6 @@ fun LanguageLevelRow(lang: UserLanguage, onTap: () -> Unit) {
                     },
                     style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = C.TextPri),
                 )
-                // 레벨 점 (● ● ● ○ ○)
                 Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                     repeat(5) { idx ->
                         Box(
@@ -265,7 +461,9 @@ fun LanguageLevelRow(lang: UserLanguage, onTap: () -> Unit) {
                     }
                 }
             }
-            Icon(painterResource(R.drawable.ic_chevron_right), "상세", Modifier.size(16.dp), tint = C.TextSec)
+            if (showChevron) {
+                Icon(painterResource(R.drawable.ic_chevron_right), "상세", Modifier.size(16.dp), tint = C.TextSec)
+            }
         }
     }
 }

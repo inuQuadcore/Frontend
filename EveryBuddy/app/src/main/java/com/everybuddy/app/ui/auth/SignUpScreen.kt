@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.everybuddy.app.ui.auth
 
 import androidx.compose.foundation.background

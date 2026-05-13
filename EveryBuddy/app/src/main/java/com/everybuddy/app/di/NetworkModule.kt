@@ -119,7 +119,7 @@ object NetworkModule {
         @Named("logging") loggingInterceptor : Interceptor,
     ): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(jwtInterceptor)
-        .addInterceptor(loggingInterceptor)  // TODO: Release 빌드에서 제거
+        .apply { if (BuildConfig.DEBUG) addInterceptor(loggingInterceptor) }
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)

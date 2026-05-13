@@ -32,11 +32,9 @@ private val C = AppColors
 // MyPageScreen 진입점
 @Composable
 fun MyPageScreen(
-    viewModel          : MyViewModel,
-    onNavigateToChat   : () -> Unit = {},
-    onNavigateToFriend : () -> Unit = {},
-    onNavigateToFind   : () -> Unit = {},
-    onNavigateToScript : () -> Unit = {},
+    viewModel      : MyViewModel,
+    onNotification : () -> Unit = {},
+    onLogout       : () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -45,69 +43,56 @@ fun MyPageScreen(
     }
 
     when {
-        uiState.isEditMode    -> ProfileEditScreen(viewModel = viewModel)
-        uiState.isTagEditOpen -> TagEditScreen(viewModel = viewModel)
-        uiState.openSubMenu != null -> SubMenuScreen(key = uiState.openSubMenu!!, onBack = viewModel::closeSubMenu)
-        else -> MyPageContent(
-            viewModel          = viewModel,
-            onNavigateToChat   = onNavigateToChat,
-            onNavigateToFriend = onNavigateToFriend,
-            onNavigateToFind   = onNavigateToFind,
-            onNavigateToScript = onNavigateToScript,
+        uiState.isEditMode           -> ProfileEditScreen(viewModel = viewModel)
+        uiState.isTagEditOpen        -> TagEditScreen(viewModel = viewModel)
+        uiState.openLanguageCode != null -> LanguageEditSubPage(
+            language = uiState.openLanguageCode!!,
+            currentLevel = uiState.profile.learningLanguages.find {
+                it.language.equals(uiState.openLanguageCode, ignoreCase = true)
+            }?.level ?: 1,
+            onSave   = { level -> viewModel.saveLanguageLevel(uiState.openLanguageCode!!, level) },
+            onBack   = viewModel::closeLanguage,
         )
+        uiState.openSubMenu != null  -> SubMenuScreen(key = uiState.openSubMenu!!, viewModel = viewModel, onBack = viewModel::closeSubMenu)
+        else -> MyPageContent(viewModel = viewModel, onNotification = onNotification, onLogout = onLogout)
     }
 }
 
 // 마이페이지 메인 콘텐츠
 @Composable
 private fun MyPageContent(
-    viewModel          : MyViewModel,
-    onNavigateToChat   : () -> Unit,
-    onNavigateToFriend : () -> Unit,
-    onNavigateToFind   : () -> Unit,
-    onNavigateToScript : () -> Unit,
+    viewModel      : MyViewModel,
+    onNotification : () -> Unit = {},
+    onLogout       : () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val profile = uiState.profile
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             Column {
-                Row(
+                Box(
                     modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("마이페이지", style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri))
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "마이페이지",
+                        modifier = Modifier.align(Alignment.Center),
+                        style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                    )
+                    Row(
+                        modifier              = Modifier.align(Alignment.CenterEnd),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
                         IconButton(onClick = { viewModel.openSubMenu("settings") }, modifier = Modifier.size(40.dp)) {
-                            // ic_settings.xml
-                            Icon(painterResource(R.drawable.ic_settings), "설정", Modifier.size(22.dp), tint = C.TextPri)
+                            Icon(painterResource(R.drawable.ic_settings), "설정", Modifier.size(24.dp), tint = C.TextPri)
                         }
-                        Box {
-                            IconButton(onClick = { /* TODO: 알림 */ }, modifier = Modifier.size(40.dp)) {
-                                Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(22.dp), tint = C.TextPri)
-                            }
-                            Box(Modifier.size(8.dp).clip(CircleShape).background(C.Accent).align(Alignment.TopEnd).offset(x = (-6).dp, y = 6.dp))
+                        IconButton(onClick = onNotification, modifier = Modifier.size(40.dp)) {
+                            Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(24.dp), tint = C.TextPri)
                         }
                     }
                 }
                 HorizontalDivider(color = C.Border, thickness = 0.5.dp)
-            }
-        },
-        bottomBar = {
-            Column {
-                HorizontalDivider(color = C.Border, thickness = 0.5.dp)
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(60.dp).background(Color.White).navigationBarsPadding(),
-                    horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    MyNavItem("대화",    R.drawable.ic_nav_chat,   false, onNavigateToChat)
-                    MyNavItem("친구",    R.drawable.ic_nav_friend, false, onNavigateToFriend)
-                    MyNavItem("탐색",    R.drawable.ic_nav_find,   false, onNavigateToFind)
-                    MyNavItem("스크립트", R.drawable.ic_nav_script, false, onNavigateToScript)
-                    MyNavItem("마이",    R.drawable.ic_nav_my,     true,  {})
-                }
             }
         },
         containerColor = Color.White,
@@ -140,7 +125,9 @@ private fun MyPageContent(
                             Icon(painterResource(R.drawable.ic_location), "국적", Modifier.size(14.dp), tint = C.TextSec)
                             Text(profile.countryName(), style = TextStyle(fontSize = 13.sp, color = C.TextSec, fontFamily = PretendardFamily))
                         }
-                        Text(profile.email, style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                        if (uiState.emailVisible) {
+                            Text(profile.email, style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                        }
                         Text("${profile.age}세 · ${profile.gender}", style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
                     }
                 }
@@ -207,6 +194,16 @@ private fun MyPageContent(
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
                 }
 
+                Text(
+                    "로그아웃",
+                    style    = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = Color(0xFFE53935)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showLogoutDialog = true }
+                        .padding(horizontal = 16.dp, vertical = 18.dp),
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
+
                 Spacer(Modifier.height(32.dp))
             }
 
@@ -220,6 +217,35 @@ private fun MyPageContent(
             }
         }
     }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            containerColor   = Color.White,
+            title = {
+                Text(
+                    "로그아웃",
+                    style = TextStyle(fontSize = 17.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                )
+            },
+            text = {
+                Text(
+                    "로그아웃하시겠습니까?",
+                    style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextSec),
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("취소", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextSec))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLogoutDialog = false; onLogout() }) {
+                    Text("확인", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = Color(0xFFE53935), fontWeight = FontWeight(600)))
+                }
+            },
+        )
+    }
 }
 
 // 프로필 수정 화면
@@ -228,114 +254,135 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     BackHandler { viewModel.closeEdit() }
 
-    Scaffold(
-        topBar = {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = { viewModel.closeEdit() }) {
-                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = C.TextPri)
+    var editSubPage by remember { mutableStateOf<String?>(null) }
+
+    when (editSubPage) {
+        "name"     -> NameEditSubPage(
+            current  = uiState.editName,
+            onSave   = { viewModel.updateEditName(it); editSubPage = null },
+            onBack   = { editSubPage = null },
+        )
+        "birthday" -> BirthdayPickerSubPage(
+            current = uiState.editBirthday,
+            onSave  = { viewModel.updateEditBirthday(it); editSubPage = null },
+            onBack  = { editSubPage = null },
+        )
+        "gender"   -> GenderSelectSubPage(
+            current = uiState.editGender,
+            onSave  = { viewModel.updateEditGender(it); editSubPage = null },
+            onBack  = { editSubPage = null },
+        )
+        "country"  -> CountrySelectSubPage(
+            current = uiState.editCountry,
+            onSave  = { viewModel.updateEditCountry(it); editSubPage = null },
+            onBack  = { editSubPage = null },
+        )
+        else -> {
+            Scaffold(
+                topBar = {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            IconButton(onClick = { viewModel.closeEdit() }) {
+                                Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = C.TextPri)
+                            }
+                            Text(
+                                "프로필 수정",
+                                style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.Center,
+                            )
+                            Box(Modifier.size(48.dp))
+                        }
+                        HorizontalDivider(color = C.Border, thickness = 0.5.dp)
                     }
-                    Text(
-                        "프로필 수정",
-                        style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                    )
-                    Box(Modifier.size(48.dp))
-                }
-                HorizontalDivider(color = C.Border, thickness = 0.5.dp)
-            }
-        },
-        bottomBar = {
-            Column {
-                HorizontalDivider(color = C.Border, thickness = 0.5.dp)
-                Button(
-                    onClick  = { viewModel.saveEdit() },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).navigationBarsPadding().height(52.dp),
-                    shape    = RoundedCornerShape(12.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
+                },
+                bottomBar = {
+                    Column {
+                        HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+                        Button(
+                            onClick  = { viewModel.saveEdit() },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).navigationBarsPadding().height(52.dp),
+                            shape    = RoundedCornerShape(12.dp),
+                            colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
+                        ) {
+                            Text("완료", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color.White))
+                        }
+                    }
+                },
+                containerColor = Color.White,
+            ) { innerPadding ->
+                Column(
+                    modifier = Modifier.padding(innerPadding).fillMaxSize().verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("완료", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color.White))
+                    Spacer(Modifier.height(24.dp))
+
+                    Box(modifier = Modifier.size(100.dp)) {
+                        Box(Modifier.size(100.dp).clip(CircleShape).background(Color(0xFFD0D0D0))) {
+                            AsyncImage(
+                                model              = uiState.profile.profileImageUrl,
+                                contentDescription = uiState.profile.name,
+                                contentScale       = ContentScale.Crop,
+                                modifier           = Modifier.fillMaxSize(),
+                            )
+                        }
+                        Box(
+                            modifier = Modifier.size(34.dp).clip(CircleShape).background(Color(0xFF888888).copy(alpha = 0.85f)).align(Alignment.BottomEnd),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(painterResource(R.drawable.ic_media_camera), "카메라", Modifier.size(18.dp), tint = Color.White)
+                        }
+                    }
+
+                    Spacer(Modifier.height(28.dp))
+
+                    Text("기본 정보", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+                    Spacer(Modifier.height(12.dp))
+
+                    listOf(
+                        Triple("이름", uiState.editName,              { editSubPage = "name" }),
+                        Triple("생일", uiState.editBirthday,          { editSubPage = "birthday" }),
+                        Triple("성별", uiState.editGender,            { editSubPage = "gender" }),
+                        Triple("국적", uiState.profile.countryName(), { editSubPage = "country" }),
+                    ).forEach { (label, value, onTap) ->
+                        EditInfoRow(label = label, value = value, onTap = onTap)
+                    }
+
+                    Spacer(Modifier.height(28.dp))
+
+                    Text("자기소개", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+                    Spacer(Modifier.height(10.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        shape    = RoundedCornerShape(12.dp),
+                        color    = Color(0xFFF8F8F8),
+                        border   = BorderStroke(0.5.dp, C.Border),
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            BasicTextField(
+                                value         = uiState.editBio,
+                                onValueChange = viewModel::updateEditBio,
+                                modifier      = Modifier.fillMaxWidth().defaultMinSize(minHeight = 80.dp),
+                                textStyle     = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 22.sp),
+                                decorationBox = { inner ->
+                                    if (uiState.editBio.isEmpty()) Text("자기소개를 입력해주세요", style = TextStyle(fontSize = 14.sp, color = C.TextSec))
+                                    inner()
+                                },
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "${uiState.editBio.length}/150",
+                                style    = TextStyle(fontSize = 11.sp, color = if (uiState.editBio.length >= 150) C.TextRed else C.TextSec),
+                                modifier = Modifier.align(Alignment.End),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
                 }
             }
-        },
-        containerColor = Color.White,
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier.padding(innerPadding).fillMaxSize().verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(Modifier.height(24.dp))
-
-            // 프로필 이미지
-            Box(modifier = Modifier.size(100.dp)) {
-                Box(Modifier.size(100.dp).clip(CircleShape).background(Color(0xFFD0D0D0))) {
-                    AsyncImage(
-                        model              = uiState.profile.profileImageUrl,
-                        contentDescription = uiState.profile.name,
-                        contentScale       = ContentScale.Crop,
-                        modifier           = Modifier.fillMaxSize(),
-                    )
-                }
-                Box(
-                    modifier = Modifier.size(34.dp).clip(CircleShape).background(Color(0xFF888888).copy(alpha = 0.85f)).align(Alignment.BottomEnd),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    // ic_camera.xml
-                    Icon(painterResource(R.drawable.ic_media_camera), "카메라", Modifier.size(18.dp), tint = Color.White)
-                }
-            }
-            // TODO: 갤러리 연동 - rememberLauncherForActivityResult 추가요망
-
-            Spacer(Modifier.height(28.dp))
-
-            // 기본 정보
-            Text("기본 정보", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
-            Spacer(Modifier.height(12.dp))
-
-            listOf(
-                Triple("이름",  uiState.editName,     { /* TODO: 이름 수정 시트 */ }),
-                Triple("생일",  uiState.editBirthday, { /* TODO: 날짜 피커 */ }),
-                Triple("성별",  uiState.editGender,   { /* TODO: 성별 선택 시트 */ }),
-                Triple("국적",  uiState.profile.countryName(), { /* TODO: 국적 선택 시트 */ }),
-            ).forEach { (label, value, onTap) ->
-                EditInfoRow(label = label, value = value, onTap = onTap)
-            }
-
-            Spacer(Modifier.height(28.dp))
-
-            // 자기소개
-            Text("자기소개", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
-            Spacer(Modifier.height(10.dp))
-            Surface(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                shape    = RoundedCornerShape(12.dp),
-                color    = Color(0xFFF8F8F8),
-                border   = BorderStroke(0.5.dp, C.Border),
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    BasicTextField(
-                        value         = uiState.editBio,
-                        onValueChange = viewModel::updateEditBio,
-                        modifier      = Modifier.fillMaxWidth().defaultMinSize(minHeight = 80.dp),
-                        textStyle     = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 22.sp),
-                        decorationBox = { inner ->
-                            if (uiState.editBio.isEmpty()) Text("자기소개를 입력해주세요", style = TextStyle(fontSize = 14.sp, color = C.TextSec))
-                            inner()
-                        },
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "${uiState.editBio.length}/150",
-                        style    = TextStyle(fontSize = 11.sp, color = if (uiState.editBio.length >= 150) C.TextRed else C.TextSec),
-                        modifier = Modifier.align(Alignment.End),
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
         }
     }
 }
@@ -353,10 +400,365 @@ private fun EditInfoRow(label: String, value: String, onTap: () -> Unit) {
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 국적 행에는 국기 이모지
             val display = if (label == "국적") "🇺🇸 $value" else value
             Text(display, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
             Icon(painterResource(R.drawable.ic_chevron_right), "수정", Modifier.size(16.dp), tint = C.TextSec)
+        }
+    }
+}
+
+// 이름 수정 서브페이지
+@Composable
+private fun NameEditSubPage(current: String, onSave: (String) -> Unit, onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    var name by remember { mutableStateOf(current) }
+    Scaffold(
+        topBar = { SubScreenTopBar(title = "이름 수정", onBack = onBack) },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
+            Spacer(Modifier.height(12.dp))
+            Text("이름", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.TextSec))
+            Spacer(Modifier.height(8.dp))
+            Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFF8F8F8), border = BorderStroke(0.5.dp, C.Border), modifier = Modifier.fillMaxWidth()) {
+                BasicTextField(
+                    value = name, onValueChange = { name = it },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+                    textStyle = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri),
+                    singleLine = true,
+                )
+            }
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = { onSave(name) },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = C.Accent),
+            ) {
+                Text("저장", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color.White))
+            }
+        }
+    }
+}
+
+// 생년월일 선택 서브페이지 (년/월/일 분리)
+@Composable
+private fun BirthdayPickerSubPage(current: String, onSave: (String) -> Unit, onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+
+    val parsed = current.split(".").let {
+        Triple(
+            it.getOrNull(0)?.toIntOrNull() ?: 2000,
+            it.getOrNull(1)?.toIntOrNull() ?: 1,
+            it.getOrNull(2)?.toIntOrNull() ?: 1,
+        )
+    }
+
+    var selectedYear  by remember { mutableStateOf(parsed.first) }
+    var selectedMonth by remember { mutableStateOf(parsed.second) }
+    var selectedDay   by remember { mutableStateOf(parsed.third) }
+
+    val years  = (1950..2015).toList()
+    val months = (1..12).toList()
+    val days   = (1..31).toList()
+
+    Scaffold(
+        topBar = { SubScreenTopBar(title = "생년월일", onBack = onBack) },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier.padding(innerPadding).fillMaxSize().padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(Modifier.height(24.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DrumRollPicker(
+                    label    = "년",
+                    items    = years.map { "${it}년" },
+                    selected = years.indexOf(selectedYear).coerceAtLeast(0),
+                    onSelect = { selectedYear = years[it] },
+                    modifier = Modifier.weight(2f),
+                )
+                DrumRollPicker(
+                    label    = "월",
+                    items    = months.map { "${it}월" },
+                    selected = months.indexOf(selectedMonth).coerceAtLeast(0),
+                    onSelect = { selectedMonth = months[it] },
+                    modifier = Modifier.weight(1f),
+                )
+                DrumRollPicker(
+                    label    = "일",
+                    items    = days.map { "${it}일" },
+                    selected = days.indexOf(selectedDay).coerceAtLeast(0),
+                    onSelect = { selectedDay = days[it] },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Spacer(Modifier.height(32.dp))
+            Button(
+                onClick  = { onSave("%04d.%02d.%02d".format(selectedYear, selectedMonth, selectedDay)) },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape    = RoundedCornerShape(12.dp),
+                colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
+            ) {
+                Text("저장", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color.White))
+            }
+        }
+    }
+}
+
+@Composable
+private fun DrumRollPicker(
+    label    : String,
+    items    : List<String>,
+    selected : Int,
+    onSelect : (Int) -> Unit,
+    modifier : Modifier = Modifier,
+) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextSec))
+        Spacer(Modifier.height(6.dp))
+        Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFF8F8F8), border = BorderStroke(0.5.dp, C.Border), modifier = Modifier.fillMaxWidth()) {
+            androidx.compose.foundation.lazy.LazyColumn(
+                modifier = Modifier.height(180.dp),
+                state    = androidx.compose.foundation.lazy.rememberLazyListState(
+                    initialFirstVisibleItemIndex = (selected - 1).coerceAtLeast(0),
+                ),
+                contentPadding = PaddingValues(vertical = 72.dp),
+            ) {
+                items.forEachIndexed { idx, item ->
+                    item(key = idx) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(idx) }
+                                .background(if (idx == selected) C.Accent.copy(alpha = 0.08f) else Color.Transparent)
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                item,
+                                style = TextStyle(
+                                    fontSize   = 15.sp,
+                                    fontFamily = PretendardFamily,
+                                    color      = if (idx == selected) C.Accent else C.TextPri,
+                                    fontWeight = if (idx == selected) FontWeight(600) else FontWeight(400),
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 성별 선택 서브페이지
+@Composable
+private fun GenderSelectSubPage(current: String, onSave: (String) -> Unit, onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    var selected by remember { mutableStateOf(current) }
+    val options = listOf("남성", "여성", "선택 안 함")
+    Scaffold(
+        topBar = { SubScreenTopBar(title = "성별", onBack = onBack) },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
+            Spacer(Modifier.height(12.dp))
+            options.forEach { opt ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selected = opt }
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(opt, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
+                    if (selected == opt) {
+                        Icon(painterResource(R.drawable.ic_chevron_right), null, Modifier.size(18.dp), tint = C.Accent)
+                    }
+                }
+                HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+            }
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = { onSave(selected) },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = C.Accent),
+            ) {
+                Text("저장", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color.White))
+            }
+        }
+    }
+}
+
+// 국적 선택 서브페이지
+@Composable
+private fun CountrySelectSubPage(current: String, onSave: (String) -> Unit, onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    var selected by remember { mutableStateOf(current) }
+    val options = listOf("KR" to "한국", "US" to "미국", "JP" to "일본", "CN" to "중국", "FR" to "프랑스")
+    Scaffold(
+        topBar = { SubScreenTopBar(title = "국적", onBack = onBack) },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
+            Spacer(Modifier.height(12.dp))
+            options.forEach { (code, name) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selected = code }
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(name, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
+                    if (selected == code) {
+                        Icon(painterResource(R.drawable.ic_chevron_right), null, Modifier.size(18.dp), tint = C.Accent)
+                    }
+                }
+                HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+            }
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = { onSave(selected) },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = C.Accent),
+            ) {
+                Text("저장", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color.White))
+            }
+        }
+    }
+}
+
+// 언어 레벨 수정 하위 페이지
+@Composable
+private fun LanguageEditSubPage(
+    language     : String,
+    currentLevel : Int,
+    onSave       : (Int) -> Unit,
+    onBack       : () -> Unit,
+) {
+    BackHandler(onBack = onBack)
+    var selectedLevel by remember { mutableIntStateOf(currentLevel) }
+
+    val langName = when (language.uppercase()) {
+        "ENGLISH"  -> "영어"; "JAPANESE" -> "일본어"; "KOREAN"  -> "한국어"
+        "CHINESE"  -> "중국어"; "FRENCH" -> "프랑스어"; else     -> language
+    }
+    val levelLabels = listOf("입문", "초급", "중급", "고급", "원어민")
+
+    Scaffold(
+        topBar = {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = C.TextPri)
+                    }
+                    Text(
+                        langName,
+                        style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                    )
+                    Box(Modifier.size(48.dp))
+                }
+                HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+            }
+        },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier.padding(innerPadding).fillMaxSize().padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(Modifier.height(48.dp))
+
+            Text(
+                langName,
+                style = TextStyle(fontSize = 22.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                levelLabels.getOrElse(selectedLevel - 1) { "" },
+                style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.Accent, fontWeight = FontWeight(600)),
+            )
+
+            Spacer(Modifier.height(40.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                repeat(5) { idx ->
+                    val isSelected = idx < selectedLevel
+                    Box(
+                        modifier = Modifier
+                            .size(if (idx == selectedLevel - 1) 22.dp else 16.dp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) C.Accent else C.Border)
+                            .clickable { selectedLevel = idx + 1 },
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            ) {
+                levelLabels.forEachIndexed { idx, label ->
+                    Text(
+                        label,
+                        style    = TextStyle(
+                            fontSize   = 11.sp,
+                            fontFamily = PretendardFamily,
+                            color      = if (idx < selectedLevel) C.Accent else C.TextSec,
+                            fontWeight = if (idx == selectedLevel - 1) FontWeight(700) else FontWeight(400),
+                        ),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+
+            Spacer(Modifier.weight(1f))
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp).navigationBarsPadding(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(
+                    onClick  = onBack,
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    shape    = RoundedCornerShape(12.dp),
+                    border   = BorderStroke(1.dp, C.Border),
+                ) {
+                    Text("취소", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = C.TextPri))
+                }
+                Button(
+                    onClick  = { onSave(selectedLevel) },
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    shape    = RoundedCornerShape(12.dp),
+                    colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
+                ) {
+                    Text("수정 완료", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color.White))
+                }
+            }
         }
     }
 }
@@ -424,9 +826,9 @@ private fun TagEditScreen(viewModel: MyViewModel) {
 
 // 서브 메뉴 화면 분기
 @Composable
-private fun SubMenuScreen(key: String, onBack: () -> Unit) {
+private fun SubMenuScreen(key: String, viewModel: MyViewModel, onBack: () -> Unit) {
     when (key) {
-        "settings" -> SettingsScreen(onBack = onBack)
+        "settings" -> SettingsScreen(viewModel = viewModel, onBack = onBack)
         "version"  -> VersionScreen(onBack = onBack)
         else       -> EmptySubScreen(
             title = when (key) {
@@ -441,10 +843,12 @@ private fun SubMenuScreen(key: String, onBack: () -> Unit) {
 
 // 설정 화면
 @Composable
-private fun SettingsScreen(onBack: () -> Unit) {
+private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
-    var soundEnabled    by remember { mutableStateOf(true) }
+    val uiState by viewModel.uiState.collectAsState()
+    var soundEnabled     by remember { mutableStateOf(true) }
     var vibrationEnabled by remember { mutableStateOf(true) }
+    val emailVisible = uiState.emailVisible
 
     Scaffold(
         topBar = {
@@ -457,7 +861,6 @@ private fun SettingsScreen(onBack: () -> Unit) {
             Text("알림", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.TextSec), modifier = Modifier.padding(horizontal = 16.dp))
             Spacer(Modifier.height(8.dp))
 
-            // 소리 알림
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -467,13 +870,11 @@ private fun SettingsScreen(onBack: () -> Unit) {
                 Switch(
                     checked         = soundEnabled,
                     onCheckedChange = { soundEnabled = it },
-                    // TODO: DataStore에 소리 설정 저장
                     colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = C.Accent),
                 )
             }
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
 
-            // 진동 알림
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -483,13 +884,34 @@ private fun SettingsScreen(onBack: () -> Unit) {
                 Switch(
                     checked         = vibrationEnabled,
                     onCheckedChange = { vibrationEnabled = it },
-                    // TODO: DataStore에 진동 설정 저장
                     colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = C.Accent),
                 )
             }
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
 
-            // TODO: 추가 설정 항목 추가요망 (언어 설정, 개인정보 처리방침 등)
+            Spacer(Modifier.height(16.dp))
+            Text("프로필", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.TextSec), modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("이메일 노출", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
+                    Text(
+                        if (emailVisible) "다른 사용자에게 이메일이 표시됩니다" else "이메일이 숨김 처리됩니다",
+                        style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextSec),
+                    )
+                }
+                Switch(
+                    checked         = emailVisible,
+                    onCheckedChange = { viewModel.toggleEmailVisible() },
+                    colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = C.Accent),
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
         }
     }
 }
@@ -521,7 +943,7 @@ private fun VersionScreen(onBack: () -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    painterResource(R.drawable.ic_nav_chat),
+                    painterResource(R.drawable.ic_logo),
                     contentDescription = "앱 아이콘",
                     modifier = Modifier.size(56.dp),
                     tint = Color.White,

@@ -1,6 +1,7 @@
 package com.everybuddy.app.ui.friend
 
 import androidx.lifecycle.ViewModel
+import com.everybuddy.app.BuildConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,8 +12,8 @@ import javax.inject.Inject
 
 data class FriendUiState(
     // 전체 데이터
-    val friends             : List<FriendProfile>   = FriendDemoData.friends,
-    val statusMessages      : List<StatusMessage>   = FriendDemoData.statusMessages.toList(),
+    val friends             : List<FriendProfile>   = if (BuildConfig.DEBUG) FriendDemoData.friends else emptyList(),
+    val statusMessages      : List<StatusMessage>   = if (BuildConfig.DEBUG) FriendDemoData.statusMessages.toList() else emptyList(),
     val myStatusMessage     : StatusMessage?        = null,   // 내 상태메시지 (null = 미작성)
 
     // 정렬
@@ -36,7 +37,13 @@ data class FriendUiState(
     val replySent           : Boolean               = false,  // "전송 완료!" 토스트
 
     // 채팅방 목록 (답장 → 채팅방 생성/업데이트)
-    val chatRooms           : MutableList<FriendDemoData.DemoChatRoom> = FriendDemoData.chatRooms,
+    val chatRooms           : MutableList<FriendDemoData.DemoChatRoom> = if (BuildConfig.DEBUG) FriendDemoData.chatRooms else mutableListOf(),
+
+    // 프로필 화면
+    val selectedFriend      : FriendProfile?        = null,
+
+    // 팔로우 상태
+    val followedFriendIds   : Set<String>           = emptySet(),
 
     // 토스트
     val toastMessage        : String?               = null,
@@ -200,6 +207,34 @@ class FriendViewModel @Inject constructor() : ViewModel() {
                 isWritingStatus  = false,
                 draftStatusText  = "",
                 toastMessage     = "상태메시지가 등록되었습니다.",
+            )
+        }
+    }
+
+    fun selectFriend(friend: FriendProfile) { _uiState.update { it.copy(selectedFriend = friend) } }
+    fun clearSelectedFriend() { _uiState.update { it.copy(selectedFriend = null) } }
+
+    fun onFollowToggle(id: String) {
+        _uiState.update { s ->
+            val ids = s.followedFriendIds
+            s.copy(followedFriendIds = if (ids.contains(id)) ids - id else ids + id)
+        }
+    }
+
+    fun addFriendById(friendId: String) {
+        _uiState.update { s ->
+            s.copy(
+                friends = s.friends.map { if (it.id == friendId) it.copy(isFriend = true) else it },
+                selectedFriend = s.selectedFriend?.let { if (it.id == friendId) it.copy(isFriend = true) else it },
+            )
+        }
+    }
+
+    fun removeFriendById(friendId: String) {
+        _uiState.update { s ->
+            s.copy(
+                friends = s.friends.map { if (it.id == friendId) it.copy(isFriend = false) else it },
+                selectedFriend = s.selectedFriend?.let { if (it.id == friendId) it.copy(isFriend = false) else it },
             )
         }
     }
