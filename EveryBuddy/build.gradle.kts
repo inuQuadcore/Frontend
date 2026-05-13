@@ -7,6 +7,6 @@ plugins {
     id("com.google.gms.google-services") version "4.4.4" apply false
 
     // Hilt - app 모듈에서 id("com.google.dagger.hilt.android") 사용을 위해 필요
-    id("com.google.dagger.hilt.android") version "2.51.1" apply false
+    id("com.google.dagger.hilt.android") version "2.57" apply false
     id("com.google.devtools.ksp")        version "2.1.0-1.0.29" apply false
 }

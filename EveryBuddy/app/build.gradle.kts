@@ -88,6 +88,8 @@ dependencies {
     // Hilt (DI)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    // Hilt 2.57+ unshaded kotlin-metadata-jvm — Kotlin 2.2.0 metadata 처리용
+    ksp("org.jetbrains.kotlin:kotlin-metadata-jvm:2.2.0")
     implementation(libs.androidx.hilt.navigation.compose)
 
     // Test
