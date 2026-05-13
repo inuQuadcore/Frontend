@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import java.util.UUID
 import javax.inject.Inject
 
 data class FriendUiState(
@@ -35,9 +34,6 @@ data class FriendUiState(
     val isReplying          : Boolean               = false,  // 답장 입력창 열림
     val replyText           : String                = "",
     val replySent           : Boolean               = false,  // "전송 완료!" 토스트
-
-    // 채팅방 목록 (답장 → 채팅방 생성/업데이트)
-    val chatRooms           : MutableList<FriendDemoData.DemoChatRoom> = if (BuildConfig.DEBUG) FriendDemoData.chatRooms else mutableListOf(),
 
     // 프로필 화면
     val selectedFriend      : FriendProfile?        = null,
@@ -114,56 +110,6 @@ class FriendViewModel @Inject constructor() : ViewModel() {
 
     fun updateReplyText(text: String) {
         _uiState.update { it.copy(replyText = text) }
-    }
-
-    /**
-     * 답장 전송
-     * - 기존 채팅방이 있으면 메시지 추가
-     * - 없으면 새 채팅방 생성
-     * - 채팅방 내 상태메시지 인용 표시 (15자 제한)
-     */
-    fun sendReply() {
-        val state = _uiState.value
-        val target = state.expandedStatus ?: return
-        val text   = state.replyText.trim().ifBlank { return }
-
-        val statusPreview = target.preview15()
-
-        val existingRoom = state.chatRooms.find { it.friendId == target.authorId }
-        if (existingRoom != null) {
-            existingRoom.messages.add(
-                FriendDemoData.DemoChatMsg(
-                    text                  = text,
-                    isMine                = true,
-                    isStatusReply         = true,
-                    originalStatusPreview = statusPreview,
-                )
-            )
-        } else {
-            state.chatRooms.add(
-                FriendDemoData.DemoChatRoom(
-                    id         = UUID.randomUUID().toString(),
-                    friendId   = target.authorId,
-                    friendName = target.authorName,
-                    messages   = mutableListOf(
-                        FriendDemoData.DemoChatMsg(
-                            text                  = text,
-                            isMine                = true,
-                            isStatusReply         = true,
-                            originalStatusPreview = statusPreview,
-                        )
-                    ),
-                )
-            )
-        }
-
-        _uiState.update {
-            it.copy(replySent = true, replyText = "")
-        }
-    }
-
-    fun consumeReplySent() {
-        _uiState.update { it.copy(replySent = false) }
     }
 
     fun openStatusPage()  { _uiState.update { it.copy(isStatusPageOpen = true)  } }
