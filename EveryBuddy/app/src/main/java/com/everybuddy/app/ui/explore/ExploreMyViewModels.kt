@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.local.TokenManager
+import com.everybuddy.app.data.repository.AuthRepository
 import com.everybuddy.app.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
@@ -131,12 +132,23 @@ data class MyUiState(
 class MyViewModel @Inject constructor(
     private val userRepository : UserRepository,
     private val tokenManager   : TokenManager,
+    private val authRepository : AuthRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MyUiState())
     val uiState: StateFlow<MyUiState> = _uiState.asStateFlow()
 
+    private val _logoutComplete = MutableStateFlow(false)
+    val logoutComplete: StateFlow<Boolean> = _logoutComplete.asStateFlow()
+
     init { loadMyProfile() }
+
+    fun logout() {
+        viewModelScope.launch {
+            authRepository.logout()
+            _logoutComplete.value = true
+        }
+    }
 
     private fun loadMyProfile() {
         viewModelScope.launch {

@@ -66,8 +66,13 @@ private fun MyPageContent(
     onLogout       : () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val logoutComplete by viewModel.logoutComplete.collectAsState()
     val profile = uiState.profile
     var showLogoutDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(logoutComplete) {
+        if (logoutComplete) onLogout()
+    }
 
     Scaffold(
         topBar = {
@@ -240,7 +245,7 @@ private fun MyPageContent(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showLogoutDialog = false; onLogout() }) {
+                TextButton(onClick = { showLogoutDialog = false; viewModel.logout() }) {
                     Text("확인", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = Color(0xFFE53935), fontWeight = FontWeight(600)))
                 }
             },
