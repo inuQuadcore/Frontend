@@ -8,7 +8,7 @@ data class GoogleAuthRequest(
 )
 
 data class GoogleAuthResponse(
-    @SerializedName("isNewUser") val isNewUser : Boolean,
+    @SerializedName("newUser")   val isNewUser : Boolean,
     @SerializedName("tempToken") val tempToken : String?,
     @SerializedName("loginData") val loginData : LoginData?,
 )
