@@ -2,13 +2,14 @@ package com.everybuddy.app.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.chat.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.util.UUID
@@ -24,39 +25,33 @@ class ChatRoomViewModel @Inject constructor(
     val uiState: StateFlow<ChatRoomUiState> = _uiState.asStateFlow()
 
     init {
-        // 녹음 타이머 구독
         viewModelScope.launch {
             voiceRecorder.seconds.collect { sec ->
                 _uiState.update { it.copy(recordingSeconds = sec) }
             }
         }
-        // 녹음 진폭 구독 (파형 UI)
         viewModelScope.launch {
             voiceRecorder.amplitudes.collect { amps ->
                 _uiState.update { it.copy(recordingAmplitudes = amps) }
             }
         }
-        // 재생 상태 구독
         viewModelScope.launch {
             voicePlayer.state.collect { playerState ->
                 when (playerState) {
-                    is PlayerState.Playing  ->
-                        _uiState.update { it.copy(playingMessageId = playerState.messageId) }
+                    is PlayerState.Playing  -> _uiState.update { it.copy(playingMessageId = playerState.messageId) }
                     is PlayerState.Finished,
                     is PlayerState.Idle,
-                    is PlayerState.Paused   ->
-                        _uiState.update { it.copy(playingMessageId = null) }
+                    is PlayerState.Paused   -> _uiState.update { it.copy(playingMessageId = null) }
                 }
             }
         }
     }
 
     fun loadRoom(roomId: String) {
-        val room     = dummyChatRooms.find { it.id == roomId } ?: return
-        val messages = dummyMessages[roomId] ?: emptyList()
+        val dummyRoom = if (BuildConfig.DEBUG) dummyChatRooms.find { it.id == roomId } else null
+        val room      = dummyRoom ?: ChatRoom(id = roomId)
+        val messages  = if (BuildConfig.DEBUG) dummyMessages[roomId] ?: emptyList() else emptyList()
         _uiState.update { it.copy(room = room, messages = messages) }
-        // TODO: 실제 메시지 로드
-        // viewModelScope.launch { chatRepository.getMessages(roomId, page=0) }
     }
 
     fun onInputChange(text: String) {
@@ -66,7 +61,6 @@ class ChatRoomViewModel @Inject constructor(
     fun onSendText() {
         val text = _uiState.value.inputText.trim()
         if (text.isEmpty()) return
-
         val msg = ChatMessage(
             id         = UUID.randomUUID().toString(),
             roomId     = _uiState.value.room.id,
@@ -76,82 +70,57 @@ class ChatRoomViewModel @Inject constructor(
             text       = text,
             timestamp  = LocalDateTime.now(),
         )
-        _uiState.update { state ->
-            state.copy(messages = state.messages + msg, inputText = "")
-        }
-        // TODO: ChatRepository.sendTextMessage(roomId, text)
+        _uiState.update { state -> state.copy(messages = state.messages + msg, inputText = "") }
     }
 
     fun onStartRecording() {
-        // TODO: RECORD_AUDIO 권한 체크 — ChatRoomScreen에서 accompanist-permissions로 처리 후 호출
         val started = voiceRecorder.startRecording()
-        if (started) {
-            _uiState.update { it.copy(isRecording = true, isMediaPanelOpen = false) }
-        }
+        if (started) _uiState.update { it.copy(isRecording = true, isMediaPanelOpen = false) }
     }
 
     fun onPauseRecording() {
-        // TODO: VoiceRecorder.pause() 구현 후 연결
-        //       현재 MediaRecorder는 API 24+부터 pause() 지원
-        //       if (Build.VERSION.SDK_INT >= 24) recorder.pause()
+        val paused = _uiState.value.isRecordingPaused
+        if (paused) { voiceRecorder.resumeRecording(); _uiState.update { it.copy(isRecordingPaused = false) } }
+        else        { voiceRecorder.pauseRecording();  _uiState.update { it.copy(isRecordingPaused = true)  } }
     }
 
     fun onStopRecording() {
-        val filePath    = voiceRecorder.stopRecording() ?: run {
-            _uiState.update { it.copy(isRecording = false) }
-            return
-        }
+        val filePath    = voiceRecorder.stopRecording() ?: run { _uiState.update { it.copy(isRecording = false) }; return }
         val durationSec = _uiState.value.recordingSeconds
-
         val msg = ChatMessage(
             id               = UUID.randomUUID().toString(),
             roomId           = _uiState.value.room.id,
             senderId         = "me",
             senderName       = "나",
             type             = MessageType.VOICE,
-            voiceUrl         = filePath,    // 로컬 경로 → Firebase Storage URL로 교체 예정
+            voiceUrl         = filePath,
             voiceDurationSec = durationSec,
             timestamp        = LocalDateTime.now(),
         )
-        _uiState.update { state ->
-            state.copy(messages = state.messages + msg, isRecording = false)
-        }
-
-        // TODO: Firebase Storage 업로드 후 voiceUrl 업데이트
-        // viewModelScope.launch {
-        //     val url     = firebaseStorageRepo.uploadVoice(filePath)
-        //     val updated = msg.copy(voiceUrl = url)
-        //     chatRepository.sendFileMessage(roomId, "", File(filePath))
-        // }
+        _uiState.update { state -> state.copy(messages = state.messages + msg, isRecording = false, isRecordingPaused = false) }
     }
 
     fun onCancelRecording() {
         voiceRecorder.cancelRecording()
-        _uiState.update { it.copy(isRecording = false) }
+        _uiState.update { it.copy(isRecording = false, isRecordingPaused = false) }
     }
 
     fun onPlayVoice(messageId: String) {
-        if (_uiState.value.playingMessageId == messageId) {
-            voicePlayer.stop()
-            return
-        }
+        if (_uiState.value.playingMessageId == messageId) { voicePlayer.stop(); return }
         val msg = _uiState.value.messages.find { it.id == messageId } ?: return
         val url = msg.voiceUrl.ifEmpty { return }
-        // TODO: 로컬 파일 경로(file://) vs 원격 URL(https://) 분기 처리
         voicePlayer.play(messageId, url)
     }
 
     fun onToggleTranslation(messageId: String) {
         val state   = _uiState.value
         val current = state.showTranslation[messageId] ?: state.isAutoTranslate
-
         if (!current) {
             val msg = state.messages.find { it.id == messageId } ?: return
             if (msg.translatedText.isEmpty()) {
-                // translatedText 없음 → 로딩 표시 후 번역 API 호출 (TODO: POST /api/v1/translate)
                 _uiState.update { it.copy(translatingMessageIds = it.translatingMessageIds + messageId) }
                 viewModelScope.launch {
-                    delay(1200) // TODO: 실제 번역 API 응답 대기
+                    delay(1200)
                     _uiState.update { it.copy(
                         translatingMessageIds = it.translatingMessageIds - messageId,
                         showTranslation       = it.showTranslation + (messageId to true),
@@ -160,43 +129,109 @@ class ChatRoomViewModel @Inject constructor(
                 return
             }
         }
-
-        _uiState.update { s ->
-            s.copy(showTranslation = s.showTranslation + (messageId to !current))
-        }
+        _uiState.update { s -> s.copy(showTranslation = s.showTranslation + (messageId to !current)) }
     }
 
     fun onToggleAutoTranslate() {
         _uiState.update { it.copy(isAutoTranslate = !it.isAutoTranslate) }
-        // TODO: DataStore에 isAutoTranslate 설정 저장 (앱 재시작 후 유지)
     }
 
     fun onToggleMediaPanel() {
-        _uiState.update { it.copy(isMediaPanelOpen = !it.isMediaPanelOpen) }
+        _uiState.update { it.copy(isMediaPanelOpen = !it.isMediaPanelOpen, isPhotoPickerOpen = false) }
+    }
+
+    fun onOpenPhotoPicker() {
+        _uiState.update { it.copy(isPhotoPickerOpen = true, isMediaPanelOpen = false) }
+    }
+
+    fun onClosePhotoPicker() {
+        _uiState.update { it.copy(isPhotoPickerOpen = false) }
+    }
+
+    // 선택된 사진 인덱스 토글 (최대 10개)
+    fun onTogglePhotoSelection(index: Int) {
+        val current = _uiState.value.selectedPhotoIndices
+        val updated = if (current.contains(index)) {
+            current - index
+        } else if (current.size < 10) {
+            current + index
+        } else {
+            current  // 10개 제한 초과 → 무시
+        }
+        _uiState.update { it.copy(selectedPhotoIndices = updated) }
+    }
+
+    fun onSendSelectedPhotos() {
+        val selected = _uiState.value.selectedPhotoIndices
+        if (selected.isEmpty()) return
+        // TODO: 실제 갤러리 URI → Firebase Storage 업로드 후 IMAGE 메시지 전송
+        _uiState.update { it.copy(isPhotoPickerOpen = false, selectedPhotoIndices = emptySet()) }
+    }
+
+    fun onLongPressMessage(message: ChatMessage) {
+        _uiState.update { it.copy(contextMenuMessage = message) }
+    }
+
+    fun onDismissContextMenu() {
+        _uiState.update { it.copy(contextMenuMessage = null) }
+    }
+
+    fun onStartScriptSave(messageId: String) {
+        val msg = _uiState.value.messages.find { it.id == messageId } ?: return
+        _uiState.update { it.copy(scriptSaveMessage = msg, contextMenuMessage = null) }
+    }
+
+    fun onDismissScriptSave() {
+        _uiState.update { it.copy(scriptSaveMessage = null) }
+    }
+
+    fun onScriptSaved() {
+        _uiState.update { it.copy(scriptSaveMessage = null, savedToastVisible = true) }
+        viewModelScope.launch {
+            delay(2000)
+            _uiState.update { it.copy(savedToastVisible = false) }
+        }
+    }
+
+    fun onOpenConversationSelect() {
+        _uiState.update { it.copy(isConversationSelectOpen = true, isMediaPanelOpen = false) }
+    }
+
+    fun onDismissConversationSelect() {
+        _uiState.update { it.copy(isConversationSelectOpen = false) }
+    }
+
+    fun onConversationSelected(selectedMessages: List<ChatMessage>, captureOption: CaptureOption) {
+        _uiState.update { it.copy(
+            isConversationSelectOpen  = false,
+            conversationSaveMessages  = selectedMessages,
+            conversationCaptureOption = captureOption,
+        )}
+    }
+
+    fun onDismissConversationSave() {
+        _uiState.update { it.copy(conversationSaveMessages = emptyList(), conversationCaptureOption = CaptureOption.COMBINED) }
+    }
+
+    fun onConversationSaved() {
+        _uiState.update { it.copy(
+            conversationSaveMessages  = emptyList(),
+            conversationCaptureOption = CaptureOption.COMBINED,
+            savedToastVisible         = true,
+        )}
+        viewModelScope.launch {
+            delay(2000)
+            _uiState.update { it.copy(savedToastVisible = false) }
+        }
+    }
+
+    fun onToggleMuteRoom() {
+        _uiState.update { it.copy(room = it.room.copy(isMuted = !it.room.isMuted)) }
     }
 
     override fun onCleared() {
         super.onCleared()
         voiceRecorder.release()
         voicePlayer.release()
-    }
-
-    // 말풍선 꾹 누르기 → 컨텍스트 메뉴 열기
-    fun onLongPressMessage(message: ChatMessage) {
-        _uiState.update { it.copy(contextMenuMessage = message) }
-    }
-
-    // 컨텍스트 메뉴 닫기
-    fun onDismissContextMenu() {
-        _uiState.update { it.copy(contextMenuMessage = null) }
-    }
-
-    // "저장되었습니다." 토스트 표시
-    fun onScriptSaved() {
-        _uiState.update { it.copy(savedToastVisible = true) }
-        viewModelScope.launch {
-            delay(2000)
-            _uiState.update { it.copy(savedToastVisible = false) }
-        }
     }
 }

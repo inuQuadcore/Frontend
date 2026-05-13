@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.everybuddy.app.ui.explore
 
 import androidx.compose.foundation.*

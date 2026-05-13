@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.everybuddy.app.ui.auth
 
 import androidx.compose.foundation.Image
@@ -148,7 +150,7 @@ fun LoginScreenContent(
                 painter            = painterResource(id = R.drawable.ic_logo),
                 contentDescription = "EveryBuddy 로고",
                 contentScale       = ContentScale.Fit,
-                modifier           = Modifier.size(155.dp),
+                modifier           = Modifier.size(100.dp),
             )
 
             Spacer(Modifier.height(32.dp))

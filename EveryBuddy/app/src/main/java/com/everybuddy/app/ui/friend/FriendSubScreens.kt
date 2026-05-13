@@ -187,11 +187,8 @@ fun StatusMessageAllScreen(
                         IconButton(onClick = {}, modifier = Modifier.size(40.dp)) {
                             Icon(painterResource(R.drawable.ic_search), "검색", Modifier.size(22.dp), tint = C.TextPri)
                         }
-                        Box {
-                            IconButton(onClick = {}, modifier = Modifier.size(40.dp)) {
-                                Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(22.dp), tint = C.TextPri)
-                            }
-                            Box(Modifier.size(8.dp).clip(CircleShape).background(C.Accent).align(Alignment.TopEnd).offset(x = (-6).dp, y = 6.dp))
+                        IconButton(onClick = {}, modifier = Modifier.size(40.dp)) {
+                            Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(22.dp), tint = C.TextPri)
                         }
                     }
                 }

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.everybuddy.app.ui.chat
 
 import androidx.compose.foundation.*

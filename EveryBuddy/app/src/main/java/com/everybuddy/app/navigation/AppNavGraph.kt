@@ -9,17 +9,18 @@ import com.everybuddy.app.ui.main.MainScreen
 import com.everybuddy.app.ui.auth.LoginScreen
 import com.everybuddy.app.ui.auth.SignUpScreen
 import com.everybuddy.app.ui.onboarding.OnboardingScreen
+import com.everybuddy.app.ui.splash.SplashScreen
 
-// 최상위 라우트
 object Route {
+    const val SPLASH     = "splash"
     const val SIGN_UP    = "sign_up"
     const val ONBOARDING = "onboarding"
     const val LOGIN      = "login"
     const val MAIN       = "main"
 }
 
-// AppNavGraph — 회원가입 → 온보딩 → 로그인 → 메인
-// TODO: 자동 로그인 (SplashScreen에서 JWT 토큰 존재 시 Route.MAIN으로 직행)
+// AppNavGraph — 스플래시 → 로그인/자동로그인 → 회원가입 → 온보딩 → 메인
+// SPLASH: 저장된 JWT 토큰 확인 → 있으면 MAIN, 없으면 LOGIN
 // TODO: 딥링크 — 푸시 알림 클릭 시 특정 채팅방 진입
 @Composable
 fun AppNavGraph(
@@ -30,6 +31,17 @@ fun AppNavGraph(
         navController    = navController,
         startDestination = startDest,
     ) {
+        // 스플래시 — JWT 토큰 확인 후 MAIN 또는 LOGIN으로 자동 이동
+        composable(Route.SPLASH) {
+            SplashScreen(
+                onNavigate = { dest ->
+                    navController.navigate(dest) {
+                        popUpTo(Route.SPLASH) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         // 회원가입
         composable(Route.SIGN_UP) {
             SignUpScreen(
@@ -41,7 +53,7 @@ fun AppNavGraph(
             )
         }
 
-        // 온보딩
+        // 온보딩 — 회원가입 완료(register API) 후 로그인 화면으로
         composable(Route.ONBOARDING) {
             OnboardingScreen(
                 onFinish = {
@@ -70,7 +82,13 @@ fun AppNavGraph(
         }
 
         composable(Route.MAIN) {
-            MainScreen()
+            MainScreen(
+                onLogout = {
+                    navController.navigate(Route.LOGIN) {
+                        popUpTo(Route.MAIN) { inclusive = true }
+                    }
+                }
+            )
         }
     }
 }
