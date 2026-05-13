@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
@@ -53,7 +54,8 @@ fun LoginScreen(
     val uiState    by viewModel.uiState.collectAsState()
     val navEvent   by viewModel.navEvent.collectAsState()
     val focusManager = LocalFocusManager.current
-    val context    = LocalContext.current
+    val context     = LocalContext.current
+    val webClientId = stringResource(R.string.default_web_client_id)
 
     // 이메일 로그인 성공
     LaunchedEffect(uiState.loginSuccess) {
@@ -82,10 +84,7 @@ fun LoginScreen(
         onTogglePasswordVisible = viewModel::onTogglePasswordVisibility,
         onLoginClick            = { focusManager.clearFocus(); viewModel.onLoginClick() },
         onSignUpClick           = onSignUpClick,
-        onGoogleLoginClick      = {
-            val webClientId = context.getString(com.everybuddy.app.R.string.default_web_client_id)
-            viewModel.onGoogleLogin(context, webClientId)
-        },
+        onGoogleLoginClick      = { viewModel.onGoogleLogin(context, webClientId) },
     )
 }
 
