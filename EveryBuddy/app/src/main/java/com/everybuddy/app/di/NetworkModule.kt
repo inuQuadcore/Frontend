@@ -13,6 +13,7 @@ import com.everybuddy.app.data.network.BlockApi
 import com.everybuddy.app.data.network.ChatApiService
 import com.everybuddy.app.data.network.ChatRoomApi
 import com.everybuddy.app.data.network.DiscoverApi
+import com.everybuddy.app.data.network.FcmTokenApi
 import com.everybuddy.app.data.network.FriendApi
 import com.everybuddy.app.data.network.MessageApi
 import com.everybuddy.app.data.network.StatusMessageApi
@@ -189,4 +190,8 @@ object NetworkModule {
     @Provides @Singleton
     fun provideChatApiService(retrofit: Retrofit): ChatApiService =
         retrofit.create(ChatApiService::class.java)
+
+    @Provides @Singleton
+    fun provideFcmTokenApi(retrofit: Retrofit): FcmTokenApi =
+        retrofit.create(FcmTokenApi::class.java)
 }

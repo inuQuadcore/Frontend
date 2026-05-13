@@ -6,6 +6,7 @@ import com.everybuddy.app.data.auth.AuthDataHolder
 import com.everybuddy.app.data.auth.FirebaseAuthManager
 import com.everybuddy.app.data.auth.GoogleAuthManager
 import com.everybuddy.app.data.auth.GoogleSignInResult
+import com.everybuddy.app.data.firebase.FcmTokenManager
 import com.everybuddy.app.data.dto.ApiErrorResponse
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.GoogleAuthRequest
@@ -29,6 +30,7 @@ class AuthRepository @Inject constructor(
     private val api                 : AuthApi,
     private val googleAuthManager   : GoogleAuthManager,
     private val firebaseAuthManager : FirebaseAuthManager,
+    private val fcmTokenManager     : FcmTokenManager,
     private val tokenManager        : TokenManager,
     private val authDataHolder      : AuthDataHolder,
 ) {
@@ -49,6 +51,7 @@ class AuthRepository @Inject constructor(
                     userId                = body.userId,
                 )
                 signInToFirebase()
+                fcmTokenManager.register()
                 ApiResult.Success(body)
             } else {
                 parseError(res)
@@ -133,6 +136,7 @@ class AuthRepository @Inject constructor(
                     userId                = loginData.userId,
                 )
                 signInToFirebase()
+                fcmTokenManager.register()
                 ApiResult.Success(false)
             } else {
                 val tempToken = body.tempToken
@@ -158,6 +162,7 @@ class AuthRepository @Inject constructor(
                     userId                = body.userId,
                 )
                 signInToFirebase()
+                fcmTokenManager.register()
                 ApiResult.Success(body)
             } else {
                 parseError(res)
@@ -177,10 +182,12 @@ class AuthRepository @Inject constructor(
             } else {
                 ApiResult.Success(Unit)
             }
+            fcmTokenManager.delete()    // JWT 살아있을 때 백엔드에서 토큰 제거
             tokenManager.clearToken()
             firebaseAuthManager.signOut()
             result
         } catch (e: Exception) {
+            fcmTokenManager.delete()
             tokenManager.clearToken()   // 옵션 A: 네트워크 실패해도 로컬 토큰은 삭제 (UX 우선)
             firebaseAuthManager.signOut()
             ApiResult.NetworkError(e)

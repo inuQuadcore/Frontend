@@ -103,6 +103,7 @@ dependencies {
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.database)
+    implementation(libs.firebase.messaging)
 
     // ExoPlayer (Media3) — 음성 메시지 재생
     implementation(libs.androidx.media3.exoplayer)
