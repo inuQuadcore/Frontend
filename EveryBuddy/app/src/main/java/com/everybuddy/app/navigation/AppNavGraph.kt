@@ -58,10 +58,13 @@ fun AppNavGraph(
         }
 
         // 온보딩
+        // 일반 가입: 토큰 없음 → LOGIN으로 (다시 로그인 필요)
+        // 구글 가입: googleRegister 응답에 토큰 포함되어 이미 로그인 상태 → MAIN으로 직행
         composable(Route.ONBOARDING) {
             OnboardingScreen(
-                onFinish = {
-                    navController.navigate(Route.LOGIN) {
+                onFinish = { autoLoggedIn ->
+                    val dest = if (autoLoggedIn) Route.MAIN else Route.LOGIN
+                    navController.navigate(dest) {
                         popUpTo(Route.ONBOARDING) { inclusive = true }
                     }
                 },

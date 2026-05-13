@@ -53,14 +53,14 @@ import com.everybuddy.app.ui.theme.*
  */
 @Composable
 fun OnboardingScreen(
-    onFinish  : () -> Unit,
+    onFinish  : (autoLoggedIn: Boolean) -> Unit,
     viewModel : OnboardingViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // 회원가입 API 성공 시 로그인 화면으로 이동
+    // 회원가입 API 성공 시 onFinish 호출 (autoLoggedIn 여부에 따라 NavGraph가 MAIN/LOGIN 분기)
     LaunchedEffect(uiState.registerSuccess) {
-        if (uiState.registerSuccess) onFinish()
+        if (uiState.registerSuccess) onFinish(uiState.autoLoggedIn)
     }
 
     OnboardingHost(

@@ -6,6 +6,7 @@ import com.everybuddy.app.data.auth.AuthDataHolder
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.GoogleRegisterRequest
 import com.everybuddy.app.data.dto.LanguageLevel
+import com.everybuddy.app.data.dto.LoginResponse
 import com.everybuddy.app.data.dto.RegisterRequest
 import com.everybuddy.app.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -90,8 +91,17 @@ class OnboardingViewModel @Inject constructor(
 
             when (result) {
                 is ApiResult.Success<*> -> {
+                    // 구글 가입(googleRegister)은 LoginResponse를 반환하며 토큰이 이미 저장됨 → MAIN으로 직행
+                    // 일반 가입(register)은 Unit을 반환하며 별도 로그인 필요 → LOGIN으로
+                    val autoLoggedIn = result.data is LoginResponse
                     authDataHolder.clear()
-                    _uiState.update { it.copy(isLoading = false, registerSuccess = true) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading       = false,
+                            registerSuccess = true,
+                            autoLoggedIn    = autoLoggedIn,
+                        )
+                    }
                 }
                 is ApiResult.Error -> {
                     val msg = when (result.code) {
