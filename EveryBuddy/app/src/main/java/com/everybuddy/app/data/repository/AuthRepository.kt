@@ -178,9 +178,11 @@ class AuthRepository @Inject constructor(
                 ApiResult.Success(Unit)
             }
             tokenManager.clearToken()
+            firebaseAuthManager.signOut()
             result
         } catch (e: Exception) {
             tokenManager.clearToken()   // 옵션 A: 네트워크 실패해도 로컬 토큰은 삭제 (UX 우선)
+            firebaseAuthManager.signOut()
             ApiResult.NetworkError(e)
         }
     }
