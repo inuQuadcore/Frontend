@@ -31,15 +31,18 @@ data class ChatFolder(
 )
 
 data class ChatListUiState(
-    val rooms           : List<ChatRoom>   = emptyList(),
-    val isLoading       : Boolean          = false,
-    val errorMessage    : String?          = null,
-    val searchQuery     : String           = "",
-    val activeFilter    : ChatFilter       = ChatFilter.ALL,
-    val contextMenuRoom : ChatRoom?        = null,
-    val infoRoom        : ChatRoom?        = null,
-    val folders         : List<ChatFolder> = emptyList(),
-    val activeFolderId  : String?          = null,
+    val rooms              : List<ChatRoom>   = emptyList(),
+    val isLoading          : Boolean          = false,
+    val errorMessage       : String?          = null,
+    val searchQuery        : String           = "",
+    val activeFilter       : ChatFilter       = ChatFilter.ALL,
+    val contextMenuRoom    : ChatRoom?        = null,
+    val infoRoom           : ChatRoom?        = null,
+    val folders            : List<ChatFolder> = emptyList(),
+    val activeFolderId     : String?          = null,
+    val isFolderManageOpen : Boolean          = false,
+    val isFolderCreateOpen : Boolean          = false,
+    val editingFolder      : ChatFolder?      = null,
 )
 
 enum class ChatFilter(val label: String) {
@@ -62,6 +65,8 @@ data class ChatMessage(
     val timestamp        : LocalDateTime = LocalDateTime.now(),
     val isTranslated     : Boolean       = false,
     val translatedText   : String        = "",
+    val isStatusReply    : Boolean       = false,
+    val statusPreview    : String        = "",
 )
 
 private val BASE_DATE = LocalDateTime.of(2026, 1, 25, 0, 0)

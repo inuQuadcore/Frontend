@@ -2,6 +2,7 @@ package com.everybuddy.app.ui.friend
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.FriendStatusMessageDto
 import com.everybuddy.app.data.dto.MyStatusMessageResponse
@@ -11,13 +12,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class StatusUiState(
     val myStatus            : MyStatusMessageResponse?     = null,
-    val friendStatuses      : List<FriendStatusMessageDto> = emptyList(),
+    val friendStatuses      : List<FriendStatusMessageDto> = if (BuildConfig.DEBUG) FriendDemoData.demoFriendStatusDtos else emptyList(),
     val isWriteScreenOpen   : Boolean                      = false,
     val isEditMode          : Boolean                      = false,
     val draftText           : String                       = "",
@@ -25,6 +27,7 @@ data class StatusUiState(
     val isMyStatusMenuOpen  : Boolean                      = false,
     val isDeleteConfirmOpen : Boolean                      = false,
     val isReplying          : Boolean                      = false,
+    val isSending           : Boolean                      = false,
     val replyText           : String                       = "",
     val replySent           : Boolean                      = false,
     val isLoading           : Boolean                      = false,
@@ -138,8 +141,42 @@ class StatusMessageViewModel @Inject constructor(
     fun updateReplyText(text: String) { _state.update { it.copy(replyText = text) } }
 
     fun sendReply() {
-        // TODO: ChatRoomRepository integration
-        _state.update { it.copy(replySent = true, replyText = "") }
+        if (_state.value.replyText.isBlank() || _state.value.isSending) return
+        val replyText = _state.value.replyText.trim()
+        val target    = _state.value.expandedStatus ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(isSending = true, replyText = "") }
+
+            if (BuildConfig.DEBUG) {
+                val statusPreview = if (target.content.length > 15) target.content.take(15) + "…" else target.content
+                val friendId      = target.userId.toString()
+                val existing      = FriendDemoData.chatRooms.find { it.friendId == friendId }
+                val msg = FriendDemoData.DemoChatMsg(
+                    text                  = replyText,
+                    isMine                = true,
+                    isStatusReply         = true,
+                    originalStatusPreview = statusPreview,
+                )
+                if (existing != null) {
+                    existing.messages.add(msg)
+                } else {
+                    FriendDemoData.chatRooms.add(
+                        FriendDemoData.DemoChatRoom(
+                            id         = java.util.UUID.randomUUID().toString(),
+                            friendId   = friendId,
+                            friendName = target.userName,
+                            messages   = mutableListOf(msg),
+                        )
+                    )
+                }
+            }
+            // TODO: ChatRoomRepository integration — 실제 API 전송
+
+            delay(700)
+            _state.update { it.copy(isSending = false, replySent = true) }
+            delay(1500)
+            _state.update { it.copy(replySent = false, expandedStatus = null, isReplying = false) }
+        }
     }
 
     fun consumeReplySent() { _state.update { it.copy(replySent = false) } }

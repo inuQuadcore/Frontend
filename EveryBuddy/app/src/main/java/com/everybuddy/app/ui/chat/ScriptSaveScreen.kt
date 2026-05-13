@@ -1,6 +1,8 @@
 package com.everybuddy.app.ui.chat
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,6 +20,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +30,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import com.everybuddy.app.R
 import com.everybuddy.app.data.chat.ChatMessage
 import com.everybuddy.app.data.chat.MessageType
@@ -326,7 +330,7 @@ fun ScriptFolderThumbnail(folder: ScriptFolder, isSelected: Boolean, onClick: ()
         modifier = Modifier
             .size(width = 120.dp, height = 90.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFFD0D0D0))   // TODO: coil AsyncImage
+            .background(Color(0xFFD0D0D0))
             .border(
                 width = if (isSelected) 2.5.dp else 0.dp,
                 color = if (isSelected) SsAccent else Color.Transparent,
@@ -335,6 +339,14 @@ fun ScriptFolderThumbnail(folder: ScriptFolder, isSelected: Boolean, onClick: ()
             .clickable(onClick = onClick),
         contentAlignment = Alignment.BottomStart,
     ) {
+        if (folder.coverImage.isNotEmpty()) {
+            AsyncImage(
+                model              = folder.coverImage,
+                contentDescription = folder.name,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
+            )
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -401,7 +413,6 @@ fun ConversationSelectScreen(
 ) {
     var selectedRange     by remember { mutableStateOf<IntRange?>(null) }
     var captureOptionOpen by remember { mutableStateOf(false) }
-    var captureOption     by remember { mutableStateOf(CaptureOption.COMBINED) }
 
     BackHandler(onBack = onBack)
 
@@ -443,33 +454,29 @@ fun ConversationSelectScreen(
             bottomBar = {
                 Column {
                     HorizontalDivider(color = SsBorder, thickness = 0.5.dp)
-                    Row(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(Color.White)
                             .padding(horizontal = 20.dp, vertical = 12.dp)
                             .navigationBarsPadding(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment     = Alignment.CenterVertically,
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Row(
-                            modifier              = Modifier.clickable { captureOptionOpen = true },
-                            verticalAlignment     = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            // TODO: ic_list_option.xml로 교체 (현재 ic_sidemenu 임시)
-                            Icon(painterResource(R.drawable.ic_sidemenu), "저장옵션", Modifier.size(18.dp), tint = SsTextPri)
-                            Text("저장옵션", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SsTextPri))
-                        }
                         Button(
-                            onClick  = { if (selectedMessages.isNotEmpty()) onSave(selectedMessages, captureOption) },
+                            onClick = {
+                                if (selectedMessages.size > 1) {
+                                    captureOptionOpen = true
+                                } else if (selectedMessages.size == 1) {
+                                    onSave(selectedMessages, CaptureOption.SEPARATE)
+                                }
+                            },
                             enabled  = selectedMessages.isNotEmpty(),
                             shape    = RoundedCornerShape(10.dp),
                             colors   = ButtonDefaults.buttonColors(
                                 containerColor         = SsAccent,
                                 disabledContainerColor = Color(0xFFCCCCCC),
                             ),
-                            modifier = Modifier.width(160.dp).height(46.dp),
+                            modifier = Modifier.fillMaxWidth().height(46.dp),
                         ) {
                             Text("저장하기", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
                         }
@@ -497,8 +504,11 @@ fun ConversationSelectScreen(
 
         if (captureOptionOpen) {
             CaptureOptionDialog(
-                selected  = captureOption,
-                onSelect  = { captureOption = it },
+                selected  = CaptureOption.COMBINED,
+                onSelect  = { option ->
+                    captureOptionOpen = false
+                    onSave(selectedMessages, option)
+                },
                 onDismiss = { captureOptionOpen = false },
             )
         }
@@ -690,6 +700,10 @@ fun NewFolderScreen(
     var folderName by remember { mutableStateOf("") }
     var imageUri   by remember { mutableStateOf<String?>(null) }
 
+    val imageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri -> if (uri != null) imageUri = uri.toString() }
+
     Scaffold(
         topBar = {
             Column {
@@ -742,18 +756,28 @@ fun NewFolderScreen(
                     .size(width = 160.dp, height = 130.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(Color(0xFFF0F0F0))
-                    .clickable { /* TODO: image picker */ },
+                    .clickable { imageLauncher.launch("image/*") },
             ) {
                 if (imageUri != null) {
-                    // TODO: coil AsyncImage
+                    AsyncImage(
+                        model              = imageUri,
+                        contentDescription = "폴더 커버",
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize(),
+                    )
                 } else {
                     Column(
                         modifier            = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        Text("+", style = TextStyle(fontSize = 28.sp, color = Color(0xFFAAAAAA)))
-                        Spacer(Modifier.height(4.dp))
+                        Icon(
+                            painter            = painterResource(R.drawable.ic_media_camera),
+                            contentDescription = "사진 추가",
+                            modifier           = Modifier.size(32.dp),
+                            tint               = Color(0xFFAAAAAA),
+                        )
+                        Spacer(Modifier.height(6.dp))
                         Text("커버사진추가", style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = SsTextSec))
                     }
                 }

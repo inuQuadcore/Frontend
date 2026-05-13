@@ -192,6 +192,9 @@ class MyViewModel @Inject constructor(
     fun updateEditBirthday(v: String) { _uiState.update { it.copy(editBirthday = v) } }
     fun updateEditGender(v: String)   { _uiState.update { it.copy(editGender   = v) } }
     fun updateEditCountry(v: String)  { _uiState.update { it.copy(editCountry  = v) } }
+    fun updateProfileImageUrl(uri: String) {
+        _uiState.update { it.copy(profile = it.profile.copy(profileImageUrl = uri)) }
+    }
 
     fun saveEdit() {
         val s = _uiState.value

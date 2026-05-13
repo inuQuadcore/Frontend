@@ -1,5 +1,6 @@
 package com.everybuddy.app.ui.friend
 
+import com.everybuddy.app.data.dto.FriendStatusMessageDto
 import java.util.UUID
 
 object FriendDemoData {
@@ -189,6 +190,65 @@ object FriendDemoData {
             content      = "주현아너요즘교회왜안나오니아다시나온다고?갑자기모범생...",
             createdAt    = System.currentTimeMillis() - 22 * 3_600_000L,
             isMyMessage  = false,
+        ),
+    )
+
+    val demoFriendStatusDtos: List<FriendStatusMessageDto> = listOf(
+        FriendStatusMessageDto(
+            statusMessageId = 4L,
+            userId          = 9L,
+            userName        = "김감전",
+            profileImageUrl = null,
+            content         = "나는 다채로운 랩핑과 라이밍 혹은 랩스킬로 혼을 쏙 빼놓는 대한민국 최고의 r.a.p 뱉는자 손심바 하지만 데일리 5명의 감상자 oh man 하지만 난 déjà vu 소속 래퍼들이 전부갓마백 군대 갔다 온 비와이한테 대접해 손심바로 끓인 보신탕 정신차려 심바 넌 31살",
+            timeAgo         = "21시간 전",
+        ),
+        FriendStatusMessageDto(
+            statusMessageId = 1L,
+            userId          = 7L,
+            userName        = "홍길동",
+            profileImageUrl = null,
+            content         = "배고파 양식을 먹을까 일식을 먹을까 중식을 먹을까 한식을 먹을까 한식, 양식, 중식, 일식 매운 거 안 매운 거~ 빵이냐 밥이냐 면이냐 떡 뜨거운 거 차가운 거 아무거나 다 좋아",
+            timeAgo         = "2시간 전",
+        ),
+        FriendStatusMessageDto(
+            statusMessageId = 2L,
+            userId          = 8L,
+            userName        = "はるか",
+            profileImageUrl = null,
+            content         = "まるでこの世界で二人だけみたいだね なんて少しだけ夢をみてしまったよ つま先に月明かり 花束の香り 指に触れる指 さよなら",
+            timeAgo         = "3시간 전",
+        ),
+        FriendStatusMessageDto(
+            statusMessageId = 3L,
+            userId          = 5L,
+            userName        = "우원재",
+            profileImageUrl = null,
+            content         = "밤새 모니터에 튀긴 침이 마르기도 전에 강의실로 아 참, 교수님이 문신 때문에 날 팔고 오래 나 시작도 전에 눈을 감았지 날 한심하게 볼 게 뻔하니 이게",
+            timeAgo         = "21시간 전",
+        ),
+        FriendStatusMessageDto(
+            statusMessageId = 5L,
+            userId          = 99L,
+            userName        = "D8",
+            profileImageUrl = null,
+            content         = "海城 静卧在星空 不规律波动 不经意随风 似梦 是梦？ 沉睡得太熟 而漂流太久 好像没有尽头 当冬天来临的那一天 被围巾遮掩",
+            timeAgo         = "22시간 전",
+        ),
+        FriendStatusMessageDto(
+            statusMessageId = 6L,
+            userId          = 98L,
+            userName        = "황정민",
+            profileImageUrl = null,
+            content         = "아이 씹브라더~",
+            timeAgo         = "22시간 전",
+        ),
+        FriendStatusMessageDto(
+            statusMessageId = 7L,
+            userId          = 6L,
+            userName        = "이예지",
+            profileImageUrl = null,
+            content         = "주현아 너 요즘 교회 왜 안 나오니 아 다시 나온다고? 갑자기 모범생ㅋㅋ",
+            timeAgo         = "22시간 전",
         ),
     )
 

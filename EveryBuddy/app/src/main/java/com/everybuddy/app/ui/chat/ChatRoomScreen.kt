@@ -48,6 +48,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
@@ -494,8 +495,8 @@ fun ChatRoomContent(
             NewFolderScreen(
                 roomName = state.room.name,
                 onBack   = { showNewFolderScreen = false },
-                onSave   = { name, _ ->
-                    val newFolder = ScriptFolder(id = name.hashCode().toString(), name = name)
+                onSave   = { name, coverUri ->
+                    val newFolder = ScriptFolder(id = name.hashCode().toString(), name = name, coverImage = coverUri ?: "")
                     localFolders          = localFolders + newFolder
                     newFolderAutoSelectId = newFolder.id
                     showNewFolderScreen   = false
@@ -890,10 +891,16 @@ fun TextMessageBubble(
                         .padding(horizontal = 14.dp, vertical = 10.dp)
                         .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
                 ) {
-                    Text(
-                        text  = displayText,
-                        style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary, lineHeight = 22.sp),
-                    )
+                    Column {
+                        if (message.isStatusReply && message.statusPreview.isNotEmpty()) {
+                            StatusReplyQuote(preview = message.statusPreview, isMe = true)
+                            Spacer(Modifier.height(6.dp))
+                        }
+                        Text(
+                            text  = displayText,
+                            style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary, lineHeight = 22.sp),
+                        )
+                    }
                 }
             }
         } else {
@@ -929,10 +936,16 @@ fun TextMessageBubble(
                                 .padding(horizontal = 14.dp, vertical = 10.dp)
                                 .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
                         ) {
-                            Text(
-                                text  = displayText,
-                                style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary, lineHeight = 22.sp),
-                            )
+                            Column {
+                                if (message.isStatusReply && message.statusPreview.isNotEmpty()) {
+                                    StatusReplyQuote(preview = message.statusPreview, isMe = false)
+                                    Spacer(Modifier.height(6.dp))
+                                }
+                                Text(
+                                    text  = displayText,
+                                    style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary, lineHeight = 22.sp),
+                                )
+                            }
                         }
                         if (!isAutoTranslate) {
                             Spacer(Modifier.width(4.dp))
@@ -981,6 +994,41 @@ fun TextMessageBubble(
 }
 
 // 번역 아이콘 버튼
+@Composable
+private fun StatusReplyQuote(preview: String, isMe: Boolean) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (isMe) Color.White.copy(alpha = 0.25f) else Color(0xFFE8E8E8))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        Column {
+            Text(
+                "상태메시지에 답장",
+                style = TextStyle(
+                    fontSize   = 10.sp,
+                    fontFamily = PretendardFamily,
+                    fontWeight = FontWeight(500),
+                    color      = if (isMe) Color.White.copy(alpha = 0.75f) else Color(0xFF888888),
+                ),
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                preview,
+                style    = TextStyle(
+                    fontSize   = 12.sp,
+                    fontFamily = PretendardFamily,
+                    fontWeight = FontWeight(600),
+                    color      = if (isMe) Color.White else Color(0xFF444444),
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
 @Composable
 fun TranslateIconButton(onClick: () -> Unit) {
     Box(

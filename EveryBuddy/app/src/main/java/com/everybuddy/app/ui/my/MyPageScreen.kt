@@ -3,6 +3,8 @@ package com.everybuddy.app.ui.my
 // MyPageScreen — 마이페이지
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -254,6 +256,10 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     BackHandler { viewModel.closeEdit() }
 
+    val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) viewModel.updateProfileImageUrl(uri.toString())
+    }
+
     var editSubPage by remember { mutableStateOf<String?>(null) }
 
     when (editSubPage) {
@@ -320,7 +326,7 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
                 ) {
                     Spacer(Modifier.height(24.dp))
 
-                    Box(modifier = Modifier.size(100.dp)) {
+                    Box(modifier = Modifier.size(100.dp).clickable { imageLauncher.launch("image/*") }) {
                         Box(Modifier.size(100.dp).clip(CircleShape).background(Color(0xFFD0D0D0))) {
                             AsyncImage(
                                 model              = uiState.profile.profileImageUrl,
@@ -333,7 +339,11 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
                             modifier = Modifier.size(34.dp).clip(CircleShape).background(Color(0xFF888888).copy(alpha = 0.85f)).align(Alignment.BottomEnd),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(painterResource(R.drawable.ic_media_camera), "카메라", Modifier.size(18.dp), tint = Color.White)
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_media_camera),
+                                contentDescription = null,
+                                modifier = Modifier.size(50.dp)
+                            )
                         }
                     }
 
@@ -346,7 +356,8 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
                         Triple("이름", uiState.editName,              { editSubPage = "name" }),
                         Triple("생일", uiState.editBirthday,          { editSubPage = "birthday" }),
                         Triple("성별", uiState.editGender,            { editSubPage = "gender" }),
-                        Triple("국적", uiState.profile.countryName(), { editSubPage = "country" }),
+                        // uiState.editCountry를 사용하도록 변경해야 합니다.
+                        Triple("국적", uiState.editCountry, { editSubPage = "country" }),
                     ).forEach { (label, value, onTap) ->
                         EditInfoRow(label = label, value = value, onTap = onTap)
                     }

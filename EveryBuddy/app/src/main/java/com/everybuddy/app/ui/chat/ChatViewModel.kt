@@ -210,6 +210,16 @@ class ChatViewModel @Inject constructor(
         _listState.update { it.copy(activeFolderId = folderId) }
     }
 
+    fun openFolderManage() { _listState.update { it.copy(isFolderManageOpen = true) } }
+    fun closeFolderManage() { _listState.update { it.copy(isFolderManageOpen = false) } }
+
+    fun openFolderCreate(folder: ChatFolder? = null) {
+        _listState.update { it.copy(isFolderCreateOpen = true, editingFolder = folder) }
+    }
+    fun closeFolderCreate() {
+        _listState.update { it.copy(isFolderCreateOpen = false, editingFolder = null) }
+    }
+
     val filteredRooms: StateFlow<List<ChatRoom>> = listState.map { state ->
         state.rooms
             .filter { room ->

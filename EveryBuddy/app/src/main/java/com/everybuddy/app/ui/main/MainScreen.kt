@@ -163,10 +163,15 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                     isChatRoomOpen = false
                     val friendVm: FriendViewModel = hiltViewModel()
                     FriendMainScreen(
-                        viewModel      = friendVm,
-                        onAddFriend    = { selectedTab = MainTab.EXPLORE },
-                        onStartChat    = { user -> chatNavController.navigate(MainRoute.chatRoom("chat_${user.userId}")); selectedTab = MainTab.CHAT },
-                        onNotification = { showNotification = true },
+                        viewModel       = friendVm,
+                        onAddFriend     = { selectedTab = MainTab.EXPLORE },
+                        onStartChat     = { user -> chatNavController.navigate(MainRoute.chatRoom("chat_${user.userId}")); selectedTab = MainTab.CHAT },
+                        onNotification  = { showNotification = true },
+                        onReplyToStatus = { friendId, _ ->
+                            isChatRoomOpen = true
+                            chatNavController.navigate(MainRoute.chatRoom("reply_$friendId"))
+                            selectedTab = MainTab.CHAT
+                        },
                     )
                 }
 
