@@ -2,6 +2,7 @@ package com.everybuddy.app.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.repository.ChatRepository
@@ -48,19 +49,18 @@ class ChatViewModel @Inject constructor(
                         it.copy(
                             isLoading    = false,
                             errorMessage = result.message,
-                            // API 실패 시 더미 데이터 폴백 (개발 단계)
-                            rooms        = dummyChatRooms,
+                            rooms        = if (BuildConfig.DEBUG) dummyChatRooms else emptyList(),
                         )
                     }
                 }
 
-                is ApiResult.NetworkError -> {
-                    // 네트워크 오류 — 더미 데이터 폴백
+                is AuthResult.Exception -> {
+                    // 네트워크 오류
                     _listState.update {
                         it.copy(
                             isLoading    = false,
                             errorMessage = result.e.localizedMessage,
-                            rooms        = dummyChatRooms,
+                            rooms        = if (BuildConfig.DEBUG) dummyChatRooms else emptyList(),
                         )
                     }
                 }
@@ -117,7 +117,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onFilterSelect(filter: ChatFilter) {
-        _listState.update { it.copy(activeFilter = filter) }
+        _listState.update { it.copy(activeFilter = filter, activeFolderId = null) }
     }
 
     fun onSearchQueryChange(query: String) {
@@ -136,37 +136,100 @@ class ChatViewModel @Inject constructor(
         _listState.update { it.copy(contextMenuRoom = null) }
     }
 
-    fun onMenuAction(action: String, room: ChatRoomUi) {
+    fun onMenuAction(action: String, room: ChatRoom) {
+        val current = _listState.value
         when (action) {
-            "알림 끄기"   -> {
+            "toggle_mute" -> {
+                val updated = current.rooms.map {
+                    if (it.id == room.id) it.copy(isMuted = !it.isMuted) else it
+                }
+                _listState.update { it.copy(rooms = updated) }
                 // TODO: PATCH /api/v1/chatrooms/{roomId}/mute
             }
-            "상단 고정"   -> {
+            "toggle_pin" -> {
+                val updated = current.rooms.map {
+                    if (it.id == room.id) it.copy(isPinned = !it.isPinned) else it
+                }
+                _listState.update { it.copy(rooms = updated) }
                 // TODO: PATCH /api/v1/chatrooms/{roomId}/pin
             }
-            "채팅방 나가기" -> {
+            "leave" -> {
+                _listState.update { it.copy(rooms = current.rooms.filter { r -> r.id != room.id }) }
                 // TODO: DELETE /api/v1/chatrooms/{roomId}
+            }
+            "info" -> {
+                _listState.update { it.copy(infoRoom = room) }
             }
         }
         onDismissContextMenu()
     }
 
     val filteredRooms: StateFlow<List<ChatRoomUi>> = listState.map { state ->
+    fun dismissRoomInfo() {
+        _listState.update { it.copy(infoRoom = null) }
+    }
+
+    fun markRoomAsRead(roomId: String) {
+        _listState.update { state ->
+            state.copy(rooms = state.rooms.map {
+                if (it.id == roomId) it.copy(unreadCount = 0) else it
+            })
+        }
+    }
+
+    fun updateRoomMute(roomId: String, isMuted: Boolean) {
+        _listState.update { state ->
+            state.copy(rooms = state.rooms.map {
+                if (it.id == roomId) it.copy(isMuted = isMuted) else it
+            })
+        }
+    }
+
+    fun saveFolder(folder: ChatFolder) {
+        _listState.update { state ->
+            val list = state.folders.toMutableList()
+            val idx  = list.indexOfFirst { it.id == folder.id }
+            if (idx >= 0) list[idx] = folder else list.add(folder)
+            state.copy(folders = list.toList())
+        }
+    }
+
+    fun deleteFolder(id: String) {
+        _listState.update { state ->
+            state.copy(
+                folders        = state.folders.filter { it.id != id },
+                activeFolderId = if (state.activeFolderId == id) null else state.activeFolderId,
+            )
+        }
+    }
+
+    fun reorderFolders(ordered: List<ChatFolder>) {
+        _listState.update { it.copy(folders = ordered) }
+    }
+
+    fun onFolderTabSelect(folderId: String?) {
+        _listState.update { it.copy(activeFolderId = folderId) }
+    }
+
+    val filteredRooms: StateFlow<List<ChatRoom>> = listState.map { state ->
         state.rooms
             .filter { room ->
-                // 검색어 필터
                 val matchQuery = state.searchQuery.isEmpty() ||
                         room.name.contains(state.searchQuery, ignoreCase = true) ||
                         room.lastMessage.contains(state.searchQuery, ignoreCase = true)
-                // 탭 필터
-                val matchFilter = when (state.activeFilter) {
-                    ChatFilter.ALL      -> true
-                    ChatFilter.UNREAD   -> room.unreadCount > 0
-                    ChatFilter.FAVORITE -> room.isPinned
+                val matchFilter = when {
+                    state.activeFolderId != null -> {
+                        val folder = state.folders.find { it.id == state.activeFolderId }
+                        folder?.chatRoomIds?.contains(room.id) ?: false
+                    }
+                    else -> when (state.activeFilter) {
+                        ChatFilter.ALL      -> true
+                        ChatFilter.UNREAD   -> room.unreadCount > 0
+                        ChatFilter.FAVORITE -> room.isPinned
+                    }
                 }
                 matchQuery && matchFilter
             }
-            // 고정 방 최상단 정렬 → 최근 메시지 순 (timestamp 미구현이므로 현재 유지)
-            .sortedWith(compareByDescending<ChatRoomUi> { it.isPinned })
+            .sortedWith(compareByDescending<ChatRoom> { it.isPinned })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }

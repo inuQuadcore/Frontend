@@ -1,18 +1,9 @@
 package com.everybuddy.app.ui.explore
 
-// =============================================================================
-// ExploreMyModels.kt
-// 탐색 탭 + 마이페이지 공통 데이터 모델 & 데모 데이터
-// API 응답 구조 (이미지 7~11 참고):
-//   GET /api/v1/discover/random  → users[]
-//   GET /api/v1/discover/filter  → users[], hasNext, nextCursor
-// =============================================================================
-
 import androidx.compose.ui.graphics.Color
+import com.everybuddy.app.ui.onboarding.InterestCategory
+import com.everybuddy.app.ui.onboarding.sampleTags
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 공통 색상
-// ─────────────────────────────────────────────────────────────────────────────
 object AppColors {
     val Accent      = Color(0xFF0167FF)
     val TextPri     = Color(0xFF000000)
@@ -28,9 +19,6 @@ object AppColors {
     val BannerBg    = Color(0xFFEEF4FF)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 온보딩/서버에서 내려오는 유저 프로필 (API userId, name, profileImageUrl, ...)
-// ─────────────────────────────────────────────────────────────────────────────
 data class DiscoverUser(
     val userId          : Long,
     val name            : String,
@@ -42,6 +30,7 @@ data class DiscoverUser(
     val lastSeenAt      : String      = "",    // ISO 날짜 문자열
     val isOnline        : Boolean     = false, // lastSeenAt 기반 파생
     val consecutiveDays : Int         = 0,     // 연속 출석일
+    val isFollowing     : Boolean     = false,
 ) {
     /** 한줄소개 15자 제한 */
     fun bioPreview15() = if (bio.length > 15) bio.take(15) + "…" else bio
@@ -65,6 +54,17 @@ data class DiscoverUser(
         "FRANCE", "FR" -> "🇫🇷"
         "CZECH", "CZ", "CS" -> "🇨🇿"
         else -> "🌐"
+    }
+
+    /** 국적 → 국가 이름 */
+    fun countryName() = when (country.uppercase()) {
+        "KOREA", "KR"        -> "한국"
+        "USA", "US"          -> "미국"
+        "JAPAN", "JP"        -> "일본"
+        "CHINA", "CN"        -> "중국"
+        "FRANCE", "FR"       -> "프랑스"
+        "CZECH", "CZ", "CS"  -> "체코"
+        else                 -> country
     }
 
     /** 언어 코드 표시 */
@@ -103,9 +103,6 @@ data class UserTag(
     val displayName: String = tag, // 한국어 표시명
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 필터 설정 상태
-// ─────────────────────────────────────────────────────────────────────────────
 enum class GenderFilter(val label: String) { FEMALE("여성"), MALE("남성"), ALL("모든 성별") }
 enum class ActivityFilter(val label: String, val desc: String) {
     ONLINE("현재활동중인 친구", "지금 이 앱에서 활발히 활동 중이에요."),
@@ -130,9 +127,6 @@ data class FilterSettings(
             activityFilters.isEmpty() && selectedTags.isEmpty()
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 내 프로필 (마이페이지)
-// ─────────────────────────────────────────────────────────────────────────────
 data class MyProfile(
     val userId          : Long    = 1L,
     val name            : String  = "홍길동",
@@ -147,13 +141,11 @@ data class MyProfile(
         UserLanguage("JAPANESE", 3),
     ),
     val tags            : List<UserTag> = listOf(
-        UserTag("TRAVEL",   "HOBBY", "✈️", "여행"),
-        UserTag("PHOTO",    "HOBBY", "📷", "사진찍기"),
-        UserTag("RUNNING",  "HOBBY", "🏃", "러닝"),
-        UserTag("RUNNING",  "HOBBY", "🏃", "러닝"),
-        UserTag("PHOTO",    "HOBBY", "📷", "사진찍기"),
-        UserTag("PHOTO",    "HOBBY", "📷", "사진찍기"),
-        UserTag("RUNNING",  "HOBBY", "🏃", "러닝"),
+        UserTag("TRAVEL",       "HOBBY",         "✈️", "여행"),
+        UserTag("PHOTOGRAPHY",  "HOBBY",         "📷", "사진찍기"),
+        UserTag("RUNNING",      "HOBBY",         "🏃", "러닝"),
+        UserTag("CAFE_TOUR",    "HOBBY",         "☕", "카페탐방"),
+        UserTag("MOVIE",        "ENTERTAINMENT", "🎬", "영화보기"),
     ),
     val birthday        : String  = "2005.11.30",
 ) {
@@ -171,77 +163,68 @@ data class MyProfile(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 데모 데이터
-// ─────────────────────────────────────────────────────────────────────────────
 object ExploreDemo {
 
     // 온보딩에서 설정한 내 정보 (마이페이지 / 필터 기준)
     val myProfile = MyProfile()
 
-    // 온보딩 태그 목록 (필터 화면에서 사용)
-    val allTags = listOf(
-        UserTag("TRAVEL",      "HOBBY",       "✈️", "여행"),
-        UserTag("PHOTO",       "HOBBY",       "📷", "사진찍기"),
-        UserTag("RUNNING",     "HOBBY",       "🏃", "러닝"),
-        UserTag("BADMINTON",   "HOBBY",       "🏸", "배드민턴"),
-        UserTag("COOKING",     "HOBBY",       "🍳", "요리"),
-        UserTag("RESTAURANT",  "HOBBY",       "🍜", "맛집찾기"),
-        UserTag("HIKING",      "HOBBY",       "⛰️", "등산"),
-        UserTag("MUSIC",       "HOBBY",       "🎵", "음악"),
-        UserTag("GAMING",      "HOBBY",       "🎮", "게임"),
-        UserTag("READING",     "HOBBY",       "📚", "독서"),
-        UserTag("INTROVERT",   "PERSONALITY", "🌙", "내향적"),
-        UserTag("EXTROVERT",   "PERSONALITY", "☀️", "외향적"),
-        UserTag("MBTI_INFP",   "PERSONALITY", "💭", "INFP"),
-        UserTag("JAPANESE",    "FOOD",        "🍱", "일식"),
-        UserTag("KOREAN",      "FOOD",        "🍲", "한식"),
-        UserTag("MOVIE",       "ENTERTAINMENT","🎬", "영화"),
-        UserTag("KPOP",        "ENTERTAINMENT","🎤", "K-POP"),
-    )
+    // 온보딩 sampleTags에서 파생 — 항상 동기화 유지
+    val allTags: List<UserTag> = sampleTags.map { tag ->
+        UserTag(
+            tag         = tag.apiValue,
+            category    = when (tag.category) {
+                InterestCategory.HOBBY          -> "HOBBY"
+                InterestCategory.MBTI           -> "PERSONALITY"
+                InterestCategory.FOOD           -> "FOOD"
+                InterestCategory.ENTERTAINMENT  -> "ENTERTAINMENT"
+            },
+            emoji       = tag.emoji,
+            displayName = tag.label,
+        )
+    }
 
     // 탐색 카드 랜덤 세트 (6개씩)
     val randomCards = listOf(
         DiscoverUser(
-            userId = 10, name = "Olivia", profileImageUrl = "olivia_card", // TODO
+            userId = 10, name = "Olivia", profileImageUrl = "olivia_card",
             country = "USA", bio = "Hello! I'm from the U.S. 😊",
             languages = listOf(UserLanguage("ENGLISH", 5), UserLanguage("KOREAN", 1)),
-            tags = listOf(UserTag("PHOTO","HOBBY","📷","사진찍기"), UserTag("RUNNING","HOBBY","🏃","러닝"), UserTag("TRAVEL","HOBBY","✈️","여행")),
+            tags = listOf(UserTag("PHOTOGRAPHY","HOBBY","📷","사진찍기"), UserTag("RUNNING","HOBBY","🏃","러닝"), UserTag("TRAVEL","HOBBY","✈️","여행")),
             isOnline = true, consecutiveDays = 7,
         ),
         DiscoverUser(
-            userId = 11, name = "홍현준", profileImageUrl = "user_hong", // TODO
+            userId = 11, name = "홍현준", profileImageUrl = "user_hong",
             country = "USA", bio = "영어 배우고 싶어요",
             languages = listOf(UserLanguage("ENGLISH", 2), UserLanguage("JAPANESE", 1)),
-            tags = listOf(UserTag("BADMINTON","HOBBY","🏸","배드민턴"), UserTag("COOKING","HOBBY","🍳","요리"), UserTag("RESTAURANT","HOBBY","🍜","맛집찾기")),
+            tags = listOf(UserTag("WORKOUT","HOBBY","🏋️","운동하기"), UserTag("COOKING","HOBBY","🍳","요리"), UserTag("FOOD_TOUR","FOOD","📍","맛집탐방")),
             isOnline = true, consecutiveDays = 5,
         ),
         DiscoverUser(
-            userId = 12, name = "손나은", profileImageUrl = "user_son", // TODO
+            userId = 12, name = "손나은", profileImageUrl = "user_son",
             country = "USA", bio = "영어 배우고 싶어요",
             languages = listOf(UserLanguage("ENGLISH", 2), UserLanguage("JAPANESE", 1)),
-            tags = listOf(UserTag("BADMINTON","HOBBY","🏸","배드민턴"), UserTag("COOKING","HOBBY","🍳","요리"), UserTag("RESTAURANT","HOBBY","🍜","맛집찾기")),
+            tags = listOf(UserTag("HIKING","HOBBY","⛰️","등산"), UserTag("COOKING","HOBBY","🍳","요리"), UserTag("FOOD_TOUR","FOOD","📍","맛집탐방")),
             isOnline = false, consecutiveDays = 3,
         ),
         DiscoverUser(
-            userId = 13, name = "Alex", profileImageUrl = "user_alex", // TODO
+            userId = 13, name = "Alex", profileImageUrl = "user_alex",
             country = "CS", bio = "Ahoj! 😊",
             languages = listOf(UserLanguage("CZECH", 5), UserLanguage("FRENCH", 3)),
-            tags = listOf(UserTag("BADMINTON","HOBBY","🏸","배드민턴"), UserTag("COOKING","HOBBY","🍳","요리"), UserTag("RESTAURANT","HOBBY","🍜","맛집찾기")),
+            tags = listOf(UserTag("CAMPING","HOBBY","⛺","캠핑"), UserTag("READING","HOBBY","📚","독서"), UserTag("COFFEE","FOOD","☕","커피러버")),
             isOnline = false, consecutiveDays = 1,
         ),
         DiscoverUser(
-            userId = 14, name = "はるか", profileImageUrl = "user_haruka", // TODO
+            userId = 14, name = "はるか", profileImageUrl = "user_haruka",
             country = "JAPAN", bio = "日本語で話しましょう！",
             languages = listOf(UserLanguage("JAPANESE", 5), UserLanguage("ENGLISH", 2)),
-            tags = listOf(UserTag("MUSIC","HOBBY","🎵","음악"), UserTag("COOKING","HOBBY","🍳","요리")),
+            tags = listOf(UserTag("MUSIC","ENTERTAINMENT","🎵","음악감상"), UserTag("COOKING","HOBBY","🍳","요리")),
             isOnline = true, consecutiveDays = 12,
         ),
         DiscoverUser(
-            userId = 15, name = "김민준", profileImageUrl = "user_kim", // TODO
+            userId = 15, name = "김민준", profileImageUrl = "user_kim",
             country = "KOREA", bio = "영어 배우고 싶어요",
             languages = listOf(UserLanguage("ENGLISH", 3), UserLanguage("JAPANESE", 1)),
-            tags = listOf(UserTag("PHOTO","HOBBY","📷","사진찍기"), UserTag("RUNNING","HOBBY","🏃","러닝"), UserTag("TRAVEL","HOBBY","✈️","여행")),
+            tags = listOf(UserTag("PHOTOGRAPHY","HOBBY","📷","사진찍기"), UserTag("RUNNING","HOBBY","🏃","러닝"), UserTag("TRAVEL","HOBBY","✈️","여행")),
             isOnline = true, consecutiveDays = 30,
         ),
     )

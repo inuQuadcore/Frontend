@@ -10,11 +10,11 @@ object FriendDemoData {
         FriendProfile(
             id               = "user_1",
             name             = "김민준",
-            profileImageUrl  = "demo_kiminjun",       // TODO: 실제 이미지
+            profileImageUrl  = "demo_kiminjun",
             nationality      = "US",
             nativeLanguages  = listOf("EN"),
             learningLanguages= listOf("EN", "JP"),
-            interests        = listOf("사진찍기", "러닝", "여행"),
+            interests        = listOf("PHOTOGRAPHY", "RUNNING", "TRAVEL"),
             bio              = "영어 배우고 싶어요",
             isOnline         = true,
             isFriend         = true,
@@ -22,11 +22,11 @@ object FriendDemoData {
         FriendProfile(
             id               = "user_2",
             name             = "홍현준",
-            profileImageUrl  = "demo_honghyunjun",    // TODO: 실제 이미지
+            profileImageUrl  = "demo_honghyunjun",
             nationality      = "US",
             nativeLanguages  = listOf("EN"),
             learningLanguages= listOf("EN", "JP"),
-            interests        = listOf("배드민턴", "요리", "맛집찾기"),
+            interests        = listOf("WORKOUT", "COOKING", "FOOD_TOUR"),
             bio              = "영어 배우고 싶어요",
             isOnline         = false,
             isFriend         = true,
@@ -34,11 +34,11 @@ object FriendDemoData {
         FriendProfile(
             id               = "user_3",
             name             = "임채민",
-            profileImageUrl  = "demo_imchaemın",      // TODO: 실제 이미지
+            profileImageUrl  = "demo_imchaemın",
             nationality      = "US",
             nativeLanguages  = listOf("EN"),
             learningLanguages= listOf("EN", "JP"),
-            interests        = listOf("등산", "러닝", "여행"),
+            interests        = listOf("HIKING", "RUNNING", "TRAVEL"),
             bio              = "영어 배우고 싶어요",
             isOnline         = false,
             isFriend         = true,
@@ -46,11 +46,11 @@ object FriendDemoData {
         FriendProfile(
             id               = "user_4",
             name             = "조윤성",
-            profileImageUrl  = "demo_joyoonsung",     // TODO: 실제 이미지
+            profileImageUrl  = "demo_joyoonsung",
             nationality      = "US",
             nativeLanguages  = listOf("EN"),
             learningLanguages= listOf("EN", "JP"),
-            interests        = listOf("사진찍기", "러닝", "여행"),
+            interests        = listOf("PHOTOGRAPHY", "RUNNING", "TRAVEL"),
             bio              = "영어 배우고 싶어요",
             isOnline         = false,
             isFriend         = true,
@@ -58,11 +58,11 @@ object FriendDemoData {
         FriendProfile(
             id               = "user_5",
             name             = "우원재",
-            profileImageUrl  = "demo_woowonzae",      // TODO: 실제 이미지
+            profileImageUrl  = "demo_woowonzae",
             nationality      = "FR",
             nativeLanguages  = listOf("FR"),
             learningLanguages= listOf("FR", "EN"),
-            interests        = listOf("피아노", "랩", "잠자기"),
+            interests        = listOf("INSTRUMENT", "HIPHOP", "QUIET"),
             bio              = "난 파리의 시간을 사는 중",
             isOnline         = true,
             isFriend         = true,
@@ -70,11 +70,11 @@ object FriendDemoData {
         FriendProfile(
             id               = "user_6",
             name             = "이예지",
-            profileImageUrl  = "demo_leeyeji",        // TODO: 실제 이미지
+            profileImageUrl  = "demo_leeyeji",
             nationality      = "KR",
             nativeLanguages  = listOf("KR"),
             learningLanguages= listOf("KR", "CN"),
-            interests        = listOf("배드민턴", "요리", "맛집찾기"),
+            interests        = listOf("PET", "COOKING", "FOOD_TOUR"),
             bio              = "해리 키우기",
             isOnline         = false,
             isFriend         = true,
@@ -82,11 +82,11 @@ object FriendDemoData {
         FriendProfile(
             id               = "user_7",
             name             = "홍길동",
-            profileImageUrl  = "demo_hongkildong",    // TODO: 실제 이미지
+            profileImageUrl  = "demo_hongkildong",
             nationality      = "US",
             nativeLanguages  = listOf("EN"),
             learningLanguages= listOf("EN"),
-            interests        = listOf("배드민턴", "요리"),
+            interests        = listOf("WORKOUT", "COOKING"),
             bio              = "",
             isOnline         = false,
             isFriend         = true,
@@ -94,11 +94,11 @@ object FriendDemoData {
         FriendProfile(
             id               = "user_8",
             name             = "はるか",
-            profileImageUrl  = "demo_haruka",         // TODO: 실제 이미지
+            profileImageUrl  = "demo_haruka",
             nationality      = "JP",
             nativeLanguages  = listOf("JP"),
             learningLanguages= listOf("JP", "EN"),
-            interests        = listOf("요리", "음악"),
+            interests        = listOf("COOKING", "MUSIC"),
             bio              = "",
             isOnline         = false,
             isFriend         = true,
@@ -106,11 +106,11 @@ object FriendDemoData {
         FriendProfile(
             id               = "user_9",
             name             = "김감전",
-            profileImageUrl  = "demo_kimgamjeon",     // TODO: 실제 이미지
+            profileImageUrl  = "demo_kimgamjeon",
             nationality      = "KR",
             nativeLanguages  = listOf("KR"),
             learningLanguages= listOf("EN"),
-            interests        = listOf("랩", "음악"),
+            interests        = listOf("HIPHOP", "MUSIC"),
             bio              = "",
             isOnline         = false,
             isFriend         = true,

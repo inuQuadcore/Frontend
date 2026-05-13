@@ -29,6 +29,7 @@ data class FriendProfile(
     val bio             : String    = "",     // 자기소개
     val isOnline        : Boolean   = false,  // 현재활동중
     val isFriend        : Boolean   = true,
+    val isFollowing     : Boolean   = false,
 )
 
 data class StatusMessage(
