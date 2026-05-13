@@ -8,8 +8,10 @@ data class StatusMessageRequest(
 
 data class MyStatusMessageResponse(
     @SerializedName("statusMessageId") val statusMessageId : Long,
+    @SerializedName("profileImageUrl") val profileImageUrl : String? = null,
+    @SerializedName("nickname")        val nickname        : String,
     @SerializedName("content")         val content         : String,
-    @SerializedName("timeAgo")         val timeAgo         : String,
+    @SerializedName("updatedAt")       val updatedAt       : String,   // ISO 8601 LocalDateTime
 )
 
 data class FriendStatusMessagesResponse(
@@ -20,9 +22,8 @@ data class FriendStatusMessagesResponse(
 
 data class FriendStatusMessage(
     @SerializedName("statusMessageId") val statusMessageId : Long,
-    @SerializedName("userId")          val userId          : Long,
-    @SerializedName("userName")        val userName        : String,
     @SerializedName("profileImageUrl") val profileImageUrl : String? = null,
+    @SerializedName("nickname")        val nickname        : String,
     @SerializedName("content")         val content         : String,
-    @SerializedName("timeAgo")         val timeAgo         : String,
+    @SerializedName("updatedAt")       val updatedAt       : String,
 )

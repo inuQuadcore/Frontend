@@ -27,6 +27,10 @@ import com.everybuddy.app.R
 import com.everybuddy.app.data.dto.FriendStatusMessage
 import com.everybuddy.app.ui.theme.PretendardFamily
 import kotlinx.coroutines.delay
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 private val C = FriendColors
 
@@ -201,7 +205,7 @@ fun MyStatusCard(viewModel: StatusMessageViewModel) {
             )
             if (myStatus != null) {
                 Spacer(Modifier.height(6.dp))
-                Text(myStatus.timeAgo, style = TextStyle(fontSize = 10.sp, color = C.TextSec))
+                Text(myStatus.updatedAt.toRelativeTime(), style = TextStyle(fontSize = 10.sp, color = C.TextSec))
             }
         }
     }
@@ -337,13 +341,13 @@ fun FriendStatusDetailPopup(
                     ) {
                         AsyncImage(
                             model              = sm.profileImageUrl,
-                            contentDescription = sm.userName,
+                            contentDescription = sm.nickname,
                             contentScale       = ContentScale.Crop,
                             modifier           = Modifier.fillMaxSize(),
                         )
                     }
                     Text(
-                        sm.userName,
+                        sm.nickname,
                         style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
                     )
                 }
@@ -362,7 +366,7 @@ fun FriendStatusDetailPopup(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment     = Alignment.CenterVertically,
                 ) {
-                    Text(sm.timeAgo, style = TextStyle(fontSize = 12.sp, color = C.TextSec))
+                    Text(sm.updatedAt.toRelativeTime(), style = TextStyle(fontSize = 12.sp, color = C.TextSec))
 
                     if (!state.isReplying && !state.replySent) {
                         Button(
@@ -460,14 +464,14 @@ fun FriendStatusPreviewCard(
             ) {
                 AsyncImage(
                     model              = sm.profileImageUrl,
-                    contentDescription = sm.userName,
+                    contentDescription = sm.nickname,
                     contentScale       = ContentScale.Crop,
                     modifier           = Modifier.fillMaxSize(),
                 )
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                text     = sm.userName,
+                text     = sm.nickname,
                 style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = C.TextPri),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -480,7 +484,7 @@ fun FriendStatusPreviewCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(6.dp))
-            Text(sm.timeAgo, style = TextStyle(fontSize = 10.sp, color = C.TextSec))
+            Text(sm.updatedAt.toRelativeTime(), style = TextStyle(fontSize = 10.sp, color = C.TextSec))
         }
     }
 }
@@ -508,14 +512,14 @@ fun FriendStatusFullItem(
             ) {
                 AsyncImage(
                     model              = sm.profileImageUrl,
-                    contentDescription = sm.userName,
+                    contentDescription = sm.nickname,
                     contentScale       = ContentScale.Crop,
                     modifier           = Modifier.fillMaxSize(),
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text  = sm.userName,
+                    text  = sm.nickname,
                     style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = C.TextPri),
                 )
                 Spacer(Modifier.height(3.dp))
@@ -524,9 +528,27 @@ fun FriendStatusFullItem(
                     style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 20.sp),
                 )
                 Spacer(Modifier.height(4.dp))
-                Text(sm.timeAgo, style = TextStyle(fontSize = 11.sp, color = C.TextSec))
+                Text(sm.updatedAt.toRelativeTime(), style = TextStyle(fontSize = 11.sp, color = C.TextSec))
             }
         }
     }
     HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+}
+
+// 서버 ISO 8601 LocalDateTime(KST 가정) → "방금 / N분 전 / N시간 전 / N일 전".
+private fun String.toRelativeTime(): String {
+    val past = try {
+        LocalDateTime.parse(this).atZone(ZoneId.systemDefault()).toInstant()
+    } catch (_: Exception) {
+        return this
+    }
+    val diff = Duration.between(past, Instant.now())
+    val minutes = diff.toMinutes()
+    val hours = diff.toHours()
+    return when {
+        minutes < 1 -> "방금"
+        hours < 1   -> "${minutes}분 전"
+        hours < 24  -> "${hours}시간 전"
+        else        -> "${diff.toDays()}일 전"
+    }
 }
