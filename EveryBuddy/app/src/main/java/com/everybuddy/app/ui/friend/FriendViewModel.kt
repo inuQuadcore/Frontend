@@ -192,20 +192,32 @@ class FriendViewModel @Inject constructor(
     }
 
     fun addFriendById(friendId: Long) {
-        _uiState.update { s ->
-            s.copy(
-                friends = s.friends.map { if (it.id == friendId) it.copy(isFriend = true) else it },
-                selectedFriend = s.selectedFriend?.let { if (it.id == friendId) it.copy(isFriend = true) else it },
-            )
+        viewModelScope.launch {
+            when (val r = friendRepository.addFriend(friendId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { s ->
+                        s.copy(selectedFriend = s.selectedFriend?.let { if (it.id == friendId) it.copy(isFriend = true) else it })
+                    }
+                    loadFriends()
+                }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _uiState.update { it.copy(toastMessage = r.userMessage()) }
+            }
         }
     }
 
     fun removeFriendById(friendId: Long) {
-        _uiState.update { s ->
-            s.copy(
-                friends = s.friends.map { if (it.id == friendId) it.copy(isFriend = false) else it },
-                selectedFriend = s.selectedFriend?.let { if (it.id == friendId) it.copy(isFriend = false) else it },
-            )
+        viewModelScope.launch {
+            when (val r = friendRepository.removeFriend(friendId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { s ->
+                        s.copy(selectedFriend = s.selectedFriend?.let { if (it.id == friendId) it.copy(isFriend = false) else it })
+                    }
+                    loadFriends()
+                }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _uiState.update { it.copy(toastMessage = r.userMessage()) }
+            }
         }
     }
 
