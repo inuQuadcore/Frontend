@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.everybuddy.app.R
 import com.everybuddy.app.data.chat.ChatFilter
+import com.everybuddy.app.data.chat.ChatFolder
 import com.everybuddy.app.data.chat.ChatListUiState
 import com.everybuddy.app.data.chat.ChatRoomUi
 import com.everybuddy.app.data.chat.dummyChatRooms
@@ -38,6 +39,7 @@ private val ClTextSec   = Color(0xFF8F9399)
 private val ClBorder    = Color(0xFFE5E5E5)
 private val ClBadge     = Color(0xFF0167FF)   // unreadCount 배지 색
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
     onRoomClick        : (ChatRoomUi) -> Unit = {},
@@ -45,13 +47,23 @@ fun ChatListScreen(
     onNotificationClick: () -> Unit         = {},
     viewModel          : ChatViewModel      = hiltViewModel(),
 ) {
-    val state         by viewModel.listState.collectAsState()
+    val rawState      by viewModel.listState.collectAsState()
     val filteredRooms by viewModel.filteredRooms.collectAsState()
 
     ChatListContent(
-        state               = state.copy(rooms = filteredRooms),
+        state               = rawState.copy(rooms = filteredRooms),
+        allRooms            = rawState.rooms,
+        isRefreshing        = rawState.isRefreshing,
+        onRefresh           = viewModel::refresh,
         onRoomClick         = onRoomClick,
         onFilterSelect      = viewModel::onFilterSelect,
+        onFolderTabSelect   = viewModel::onFolderTabSelect,
+        onFolderPlusClick   = viewModel::openFolderManage,
+        onFolderManageClose = viewModel::closeFolderManage,
+        onFolderCreateOpen  = viewModel::openFolderCreate,
+        onFolderCreateClose = viewModel::closeFolderCreate,
+        onFolderSave        = { folder -> viewModel.saveFolder(folder); viewModel.closeFolderCreate() },
+        onFolderDelete      = viewModel::deleteFolder,
         onSearchToggle      = viewModel::onSearchToggle,
         onSearchChange      = viewModel::onSearchQueryChange,
         onFabClick          = onStartChat,
@@ -65,11 +77,23 @@ fun ChatListScreen(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListContent(
     state               : ChatListUiState,
+    allRooms            : List<ChatRoom>       = emptyList(),
+    isRefreshing        : Boolean              = false,
+    onRefresh           : () -> Unit           = {},
+    onRoomClick         : (ChatRoom) -> Unit,
     onRoomClick         : (ChatRoomUi) -> Unit,
     onFilterSelect      : (ChatFilter) -> Unit,
+    onFolderTabSelect   : (String?) -> Unit    = {},
+    onFolderPlusClick   : () -> Unit           = {},
+    onFolderManageClose : () -> Unit           = {},
+    onFolderCreateOpen  : (ChatFolder?) -> Unit = {},
+    onFolderCreateClose : () -> Unit           = {},
+    onFolderSave        : (ChatFolder) -> Unit  = {},
+    onFolderDelete      : (String) -> Unit     = {},
     onSearchToggle      : () -> Unit,
     onSearchChange      : (String) -> Unit,
     onFabClick          : () -> Unit,
@@ -148,12 +172,11 @@ fun ChatListContent(
             LazyRow(
                 modifier              = Modifier
                     .fillMaxWidth()
-                    // TODO padding: 필터 탭 horizontal 14dp / vertical 25dp
                     .padding(horizontal = 14.dp, vertical = 25.dp),
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 items(ChatFilter.entries.toList()) { filter ->
-                    val isSelected = filter == state.activeFilter
+                    val isSelected = state.activeFolderId == null && filter == state.activeFilter
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(99.dp))
@@ -164,7 +187,6 @@ fun ChatListContent(
                                 shape = RoundedCornerShape(99.dp),
                             )
                             .clickable { onFilterSelect(filter) }
-                            // TODO padding: 필터 탭 내부 패딩 (현재 horizontal 18dp, vertical 9dp)
                             .padding(horizontal = 18.dp, vertical = 9.dp),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -180,7 +202,33 @@ fun ChatListContent(
                     }
                 }
 
-                // 폴더(그룹) 추가 버튼
+                items(state.folders, key = { it.id }) { folder ->
+                    val isSelected = folder.id == state.activeFolderId
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(if (isSelected) Color(0xFF0167FF) else Color.White)
+                            .border(
+                                width = 1.dp,
+                                color = if (isSelected) Color(0xFF0167FF) else Color(0xFFE5E5E5),
+                                shape = RoundedCornerShape(99.dp),
+                            )
+                            .clickable { onFolderTabSelect(if (isSelected) null else folder.id) }
+                            .padding(horizontal = 18.dp, vertical = 9.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text  = folder.name,
+                            style = TextStyle(
+                                fontSize   = 15.sp,
+                                fontFamily = PretendardFamily,
+                                fontWeight = FontWeight(400),
+                                color      = if (isSelected) Color.White else Color(0xFF111111),
+                            ),
+                        )
+                    }
+                }
+
                 item {
                     Box(
                         modifier = Modifier
@@ -188,7 +236,7 @@ fun ChatListContent(
                             .clip(RoundedCornerShape(33.dp))
                             .background(Color.White)
                             .border(1.dp, Color(0xFFE5E5E5), RoundedCornerShape(33.dp))
-                            .clickable { /* TODO: 채팅방 그룹화 */ },
+                            .clickable { onFolderPlusClick() },
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -201,7 +249,9 @@ fun ChatListContent(
                 }
             }
 
-            Box(
+            PullToRefreshBox(
+                isRefreshing     = isRefreshing,
+                onRefresh        = onRefresh,
                 modifier         = Modifier.weight(1f).fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
@@ -330,6 +380,29 @@ fun ChatListContent(
 
         state.infoRoom?.let { room ->
             ChatRoomInfoScreen(room = room, onBack = onDismissRoomInfo)
+        }
+
+        if (state.isFolderManageOpen) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+                FolderManageScreen(
+                    folders     = state.folders,
+                    onBack      = onFolderManageClose,
+                    onCreateNew = { onFolderCreateOpen(null) },
+                    onEdit      = { folder -> onFolderCreateOpen(folder) },
+                    onDelete    = onFolderDelete,
+                )
+            }
+        }
+
+        if (state.isFolderCreateOpen) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+                FolderCreateScreen(
+                    editingFolder = state.editingFolder,
+                    allRooms      = allRooms,
+                    onBack        = onFolderCreateClose,
+                    onSave        = onFolderSave,
+                )
+            }
         }
     }
 }

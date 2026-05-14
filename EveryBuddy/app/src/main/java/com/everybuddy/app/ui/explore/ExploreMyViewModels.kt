@@ -20,10 +20,10 @@ import javax.inject.Inject
 // ExploreViewModel — 탐색 탭
 data class ExploreUiState(
     val selectedTab        : Int               = 0,   // 0=추천친구, 1=필터
-    val cardSet            : List<DiscoverUser> = if (BuildConfig.DEBUG) ExploreDemo.randomCards else emptyList(),
+    val cardSet            : List<DiscoverUser> = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.randomCards else emptyList(),
     val currentCardIndex   : Int               = 0,
-    val tagMatchUsers      : List<DiscoverUser> = if (BuildConfig.DEBUG) ExploreDemo.tagMatchUsers else emptyList(),
-    val learningLangUsers  : List<DiscoverUser> = if (BuildConfig.DEBUG) ExploreDemo.learningLangUsers else emptyList(),
+    val tagMatchUsers      : List<DiscoverUser> = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.tagMatchUsers else emptyList(),
+    val learningLangUsers  : List<DiscoverUser> = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.learningLangUsers else emptyList(),
     val isRefreshing       : Boolean           = false,
     val filterSettings     : FilterSettings    = FilterSettings(),
     val filterResults      : List<DiscoverUser> = emptyList(),
@@ -113,7 +113,7 @@ class ExploreViewModel @Inject constructor() : ViewModel() {
 
 // MyViewModel — 마이페이지
 data class MyUiState(
-    val profile         : MyProfile    = if (BuildConfig.DEBUG) ExploreDemo.myProfile else MyProfile(),
+    val profile         : MyProfile    = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.myProfile else MyProfile(),
     val isEditMode      : Boolean      = false,
     val editName        : String       = "",
     val editBio         : String       = "",
@@ -204,6 +204,9 @@ class MyViewModel @Inject constructor(
     fun updateEditBirthday(v: String) { _uiState.update { it.copy(editBirthday = v) } }
     fun updateEditGender(v: String)   { _uiState.update { it.copy(editGender   = v) } }
     fun updateEditCountry(v: String)  { _uiState.update { it.copy(editCountry  = v) } }
+    fun updateProfileImageUrl(uri: String) {
+        _uiState.update { it.copy(profile = it.profile.copy(profileImageUrl = uri)) }
+    }
 
     fun saveEdit() {
         val s = _uiState.value

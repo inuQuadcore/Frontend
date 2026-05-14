@@ -282,6 +282,8 @@ private fun RandomCardSection(
 
     val cardUser = cardSet.getOrNull(currentIndex) ?: return
 
+    val cardRotations = remember { floatArrayOf(+6f, -3f, +2f, -5f) }
+
     Column(
         modifier            = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -291,24 +293,41 @@ private fun RandomCardSection(
             modifier         = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.TopCenter,
         ) {
+            // Back card (visualIndex = 2)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .offset(y = (-20).dp)
+                    .padding(horizontal = 16.dp)
                     .aspectRatio(3f / 4f)
+                    .graphicsLayer {
+                        translationX = 24.dp.toPx()
+                        translationY = (-12).dp.toPx()
+                        scaleX       = 0.92f
+                        scaleY       = 0.92f
+                        rotationZ    = cardRotations[(currentIndex + 2) % cardRotations.size]
+                        alpha        = 0.75f
+                    }
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color(0xFFB8C8FF)),
             )
+            // Middle card (visualIndex = 1)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .offset(y = (-10).dp)
+                    .padding(horizontal = 16.dp)
                     .aspectRatio(3f / 4f)
+                    .graphicsLayer {
+                        translationX = 12.dp.toPx()
+                        translationY = (-6).dp.toPx()
+                        scaleX       = 0.96f
+                        scaleY       = 0.96f
+                        rotationZ    = cardRotations[(currentIndex + 1) % cardRotations.size]
+                        alpha        = 0.9f
+                    }
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color(0xFFC8D5FF)),
             )
+            // Front card (visualIndex = 0) — draggable
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -343,6 +362,7 @@ private fun RandomCardSection(
                     .graphicsLayer {
                         translationX = offsetX.value
                         translationY = offsetY.value
+                        rotationZ    = 0f
                         alpha        = (1f - offsetY.value / 700f).coerceAtLeast(0f)
                     },
             ) {

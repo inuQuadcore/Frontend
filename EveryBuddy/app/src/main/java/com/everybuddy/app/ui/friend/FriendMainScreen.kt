@@ -35,11 +35,12 @@ private val C = FriendColors
 
 @Composable
 fun FriendMainScreen(
-    viewModel      : FriendViewModel,
-    statusVm       : StatusMessageViewModel = hiltViewModel(),
-    onAddFriend    : () -> Unit = {},
-    onStartChat    : (DiscoverUser) -> Unit = {},
-    onNotification : () -> Unit = {},
+    viewModel       : FriendViewModel,
+    statusVm        : StatusMessageViewModel = hiltViewModel(),
+    onAddFriend     : () -> Unit = {},
+    onStartChat     : (DiscoverUser) -> Unit = {},
+    onNotification  : () -> Unit = {},
+    onReplyToStatus : (friendId: String, friendName: String) -> Unit = { _, _ -> },
 ) {
     val uiState     by viewModel.uiState.collectAsState()
     val statusState by statusVm.state.collectAsState()
@@ -71,7 +72,7 @@ fun FriendMainScreen(
             onAddFriend    = { viewModel.addFriendById(uiState.selectedFriend!!.id) },
             onRemoveFriend = { viewModel.removeFriendById(uiState.selectedFriend!!.id) },
         )
-        uiState.isSearchActive         -> FriendSearchScreen(viewModel = viewModel)
+        uiState.isSearchActive         -> FriendSearchScreen(viewModel = viewModel, statusVm = statusVm)
         statusState.isWriteScreenOpen  -> StatusWriteScreen(viewModel = statusVm)
         uiState.isStatusPageOpen       -> StatusMessageAllScreen(viewModel = viewModel, statusVm = statusVm)
         else                           -> FriendMainContent(
@@ -80,6 +81,8 @@ fun FriendMainScreen(
             onFriendClick  = { viewModel.selectFriend(it) },
             onAddFriend    = onAddFriend,
             onNotification = onNotification,
+            isRefreshing   = uiState.isRefreshing,
+            onRefresh      = viewModel::refresh,
         )
     }
 
@@ -92,7 +95,7 @@ fun FriendMainScreen(
     }
 
     statusState.expandedStatus?.let { sm ->
-        FriendStatusDetailPopup(sm = sm, viewModel = statusVm)
+        FriendStatusDetailPopup(sm = sm, viewModel = statusVm, onReplySent = onReplyToStatus)
     }
 }
 
@@ -107,6 +110,7 @@ private fun FriendProfile.toDiscoverUser() = DiscoverUser(
     isOnline        = isOnline,
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FriendMainContent(
     viewModel      : FriendViewModel,
@@ -114,6 +118,8 @@ private fun FriendMainContent(
     onFriendClick  : (FriendProfile) -> Unit,
     onAddFriend    : () -> Unit,
     onNotification : () -> Unit = {},
+    isRefreshing   : Boolean    = false,
+    onRefresh      : () -> Unit = {},
 ) {
     val uiState     by viewModel.uiState.collectAsState()
     val statusState by statusVm.state.collectAsState()
@@ -134,6 +140,11 @@ private fun FriendMainContent(
 
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
 
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh    = onRefresh,
+                modifier     = Modifier.fillMaxSize(),
+            ) {
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
 
                 item {
@@ -174,7 +185,7 @@ private fun FriendMainContent(
                         item {
                             MyStatusCard(viewModel = statusVm)
                         }
-                        items(statusState.friendStatuses.take(2)) { sm ->
+                        items(statusState.friendStatuses.take(3)) { sm ->
                             FriendStatusPreviewCard(sm = sm, onClick = { statusVm.openFriendStatus(sm) })
                         }
                     }
@@ -218,6 +229,7 @@ private fun FriendMainContent(
                         onClick        = onFriendClick,
                     )
                 }
+            }
             }
 
             val toastMsg = uiState.toastMessage ?: statusState.toastMessage

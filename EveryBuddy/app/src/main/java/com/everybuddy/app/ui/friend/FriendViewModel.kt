@@ -17,9 +17,9 @@ import javax.inject.Inject
 
 data class FriendUiState(
     // 전체 데이터
-    val friends             : List<FriendProfile>   = emptyList(),
+    val friends             : List<FriendProfile>   = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.friends else emptyList(),
     val isLoading           : Boolean               = false,
-    val statusMessages      : List<StatusMessage>   = if (BuildConfig.DEBUG) FriendDemoData.statusMessages.toList() else emptyList(),
+    val statusMessages      : List<StatusMessage>   = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.statusMessages.toList() else emptyList(),
     val myStatusMessage     : StatusMessage?        = null,   // 내 상태메시지 (null = 미작성)
 
     // 정렬
@@ -42,6 +42,9 @@ data class FriendUiState(
     val replyText           : String                = "",
     val replySent           : Boolean               = false,  // "전송 완료!" 토스트
 
+    // 채팅방 목록 (답장 → 채팅방 생성/업데이트)
+    val chatRooms           : MutableList<FriendDemoData.DemoChatRoom> = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.chatRooms else mutableListOf(),
+
     // 프로필 화면
     val selectedFriend      : FriendProfile?        = null,
 
@@ -49,6 +52,7 @@ data class FriendUiState(
     val followedFriendIds   : Set<Long>             = emptySet(),
 
     // 토스트
+    val isRefreshing        : Boolean               = false,
     val toastMessage        : String?               = null,
 )
 
@@ -72,6 +76,18 @@ class FriendViewModel @Inject constructor(
                 is ApiResult.Error, is ApiResult.NetworkError ->
                     _uiState.update { it.copy(isLoading = false, toastMessage = r.userMessage()) }
             }
+        }
+    }
+
+    fun refresh() {
+        _uiState.update { it.copy(isRefreshing = true) }
+        // TODO: 실제 API 호출 → GET /api/v1/friends + 상태메시지 목록
+        _uiState.update { state ->
+            state.copy(
+                isRefreshing   = false,
+                friends        = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.friends else emptyList(),
+                statusMessages = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.statusMessages.toList() else emptyList(),
+            )
         }
     }
 
@@ -134,6 +150,56 @@ class FriendViewModel @Inject constructor(
 
     fun updateReplyText(text: String) {
         _uiState.update { it.copy(replyText = text) }
+    }
+
+    /**
+     * 답장 전송
+     * - 기존 채팅방이 있으면 메시지 추가
+     * - 없으면 새 채팅방 생성
+     * - 채팅방 내 상태메시지 인용 표시 (15자 제한)
+     */
+    fun sendReply() {
+        val state = _uiState.value
+        val target = state.expandedStatus ?: return
+        val text   = state.replyText.trim().ifBlank { return }
+
+        val statusPreview = target.preview15()
+
+        val existingRoom = state.chatRooms.find { it.friendId == target.authorId }
+        if (existingRoom != null) {
+            existingRoom.messages.add(
+                FriendDemoData.DemoChatMsg(
+                    text                  = text,
+                    isMine                = true,
+                    isStatusReply         = true,
+                    originalStatusPreview = statusPreview,
+                )
+            )
+        } else {
+            state.chatRooms.add(
+                FriendDemoData.DemoChatRoom(
+                    id         = UUID.randomUUID().toString(),
+                    friendId   = target.authorId,
+                    friendName = target.authorName,
+                    messages   = mutableListOf(
+                        FriendDemoData.DemoChatMsg(
+                            text                  = text,
+                            isMine                = true,
+                            isStatusReply         = true,
+                            originalStatusPreview = statusPreview,
+                        )
+                    ),
+                )
+            )
+        }
+
+        _uiState.update {
+            it.copy(replySent = true, replyText = "")
+        }
+    }
+
+    fun consumeReplySent() {
+        _uiState.update { it.copy(replySent = false) }
     }
 
     fun openStatusPage()  { _uiState.update { it.copy(isStatusPageOpen = true)  } }

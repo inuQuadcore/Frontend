@@ -51,9 +51,9 @@ fun UserProfileScreen(
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
-            Column {
+            Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 4.dp),
+                    modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
                 ) {
                     IconButton(
                         onClick  = onBack,
@@ -122,7 +122,7 @@ fun UserProfileScreen(
                             }
                         }
                     }
-                    Text("${user.consecutiveDays}세 · 여성", style = TextStyle(fontSize = 13.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                    Text("${user.age}세 · 여성", style = TextStyle(fontSize = 13.sp, color = C.TextSec, fontFamily = PretendardFamily))
                 }
             }
 

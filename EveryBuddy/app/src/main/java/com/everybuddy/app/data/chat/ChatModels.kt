@@ -32,15 +32,19 @@ data class ChatFolder(
 )
 
 data class ChatListUiState(
-    val rooms           : List<ChatRoomUi> = emptyList(),
-    val isLoading       : Boolean          = false,
-    val errorMessage    : String?          = null,
-    val searchQuery     : String           = "",
-    val activeFilter    : ChatFilter       = ChatFilter.ALL,
-    val contextMenuRoom : ChatRoomUi?      = null,
-    val infoRoom        : ChatRoomUi?      = null,
-    val folders         : List<ChatFolder> = emptyList(),
-    val activeFolderId  : String?          = null,
+    val rooms              : List<ChatRoomUi>   = emptyList(),
+    val isLoading          : Boolean          = false,
+    val isRefreshing       : Boolean          = false,
+    val errorMessage       : String?          = null,
+    val searchQuery        : String           = "",
+    val activeFilter       : ChatFilter       = ChatFilter.ALL,
+    val contextMenuRoom    : ChatRoomUi?        = null,
+    val infoRoom           : ChatRoomUi?        = null,
+    val folders            : List<ChatFolder> = emptyList(),
+    val activeFolderId     : String?          = null,
+    val isFolderManageOpen : Boolean          = false,
+    val isFolderCreateOpen : Boolean          = false,
+    val editingFolder      : ChatFolder?      = null,
 )
 
 enum class ChatFilter(val label: String) {
@@ -63,6 +67,8 @@ data class ChatMessage(
     val timestamp        : LocalDateTime = LocalDateTime.now(),
     val isTranslated     : Boolean       = false,
     val translatedText   : String        = "",
+    val isStatusReply    : Boolean       = false,
+    val statusPreview    : String        = "",
 )
 
 data class ChatRoomUiState(

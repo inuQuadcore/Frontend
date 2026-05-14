@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.chat.*
+import com.everybuddy.app.ui.friend.FriendDemoData
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,9 +49,29 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     fun loadRoom(roomId: String) {
-        val dummyRoom = if (BuildConfig.DEBUG) dummyChatRooms.find { it.id == roomId } else null
-        val room      = dummyRoom ?: ChatRoomUi(id = roomId)
-        val messages  = if (BuildConfig.DEBUG) dummyMessages[roomId] ?: emptyList() else emptyList()
+        if (BuildConfig.USE_DUMMY_DATA && roomId.startsWith("reply_")) {
+            val friendId = roomId.removePrefix("reply_")
+            val demoRoom = FriendDemoData.chatRooms.find { it.friendId == friendId }
+            val room     = ChatRoom(id = roomId, name = demoRoom?.friendName ?: friendId)
+            val messages = demoRoom?.messages?.mapIndexed { i, msg ->
+                ChatMessage(
+                    id         = "reply_msg_$i",
+                    roomId     = roomId,
+                    senderId   = if (msg.isMine) "me" else friendId,
+                    senderName = if (msg.isMine) "나" else (demoRoom.friendName),
+                    type       = MessageType.TEXT,
+                    text       = msg.text,
+                    isStatusReply  = msg.isStatusReply,
+                    statusPreview  = msg.originalStatusPreview,
+                    timestamp  = LocalDateTime.now().minusMinutes((demoRoom.messages.size - i).toLong()),
+                )
+            } ?: emptyList()
+            _uiState.update { it.copy(room = room, messages = messages) }
+            return
+        }
+        val dummyRoom = if (BuildConfig.USE_DUMMY_DATA) dummyChatRooms.find { it.id == roomId } else null
+        val room      = dummyRoom ?: ChatRoom(id = roomId)
+        val messages  = if (BuildConfig.USE_DUMMY_DATA) dummyMessages[roomId] ?: emptyList() else emptyList()
         _uiState.update { it.copy(room = room, messages = messages) }
     }
 

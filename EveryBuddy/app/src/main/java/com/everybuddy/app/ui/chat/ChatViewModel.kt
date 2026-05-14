@@ -49,7 +49,7 @@ class ChatViewModel @Inject constructor(
                         it.copy(
                             isLoading    = false,
                             errorMessage = result.message,
-                            rooms        = if (BuildConfig.DEBUG) dummyChatRooms else emptyList(),
+                            rooms        = if (BuildConfig.USE_DUMMY_DATA) dummyChatRooms else emptyList(),
                         )
                     }
                 }
@@ -60,9 +60,29 @@ class ChatViewModel @Inject constructor(
                         it.copy(
                             isLoading    = false,
                             errorMessage = result.e.localizedMessage,
-                            rooms        = if (BuildConfig.DEBUG) dummyChatRooms else emptyList(),
+                            rooms        = if (BuildConfig.USE_DUMMY_DATA) dummyChatRooms else emptyList(),
                         )
                     }
+                }
+            }
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _listState.update { it.copy(isRefreshing = true) }
+            when (val result = chatRepository.getChatRooms()) {
+                is ApiResult.Success -> {
+                    val rooms = result.data?.map { it.toChatRoom() } ?: emptyList()
+                    _listState.update { it.copy(isRefreshing = false, errorMessage = null, rooms = rooms) }
+                }
+                is ApiResult.Error -> {
+                    _listState.update { it.copy(isRefreshing = false, errorMessage = result.message,
+                        rooms = if (BuildConfig.USE_DUMMY_DATA && it.rooms.isEmpty()) dummyChatRooms else it.rooms) }
+                }
+                is ApiResult.Exception -> {
+                    _listState.update { it.copy(isRefreshing = false, errorMessage = result.e.localizedMessage,
+                        rooms = if (BuildConfig.USE_DUMMY_DATA && it.rooms.isEmpty()) dummyChatRooms else it.rooms) }
                 }
             }
         }
@@ -176,6 +196,13 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun addReplyRoom(friendId: String, friendName: String) {
+        val roomId = "reply_$friendId"
+        if (_listState.value.rooms.any { it.id == roomId }) return
+        val newRoom = ChatRoom(id = roomId, name = friendName, lastMessage = "답장을 보냈습니다.", timestamp = "방금")
+        _listState.update { state -> state.copy(rooms = listOf(newRoom) + state.rooms) }
+    }
+
     fun updateRoomMute(roomId: String, isMuted: Boolean) {
         _listState.update { state ->
             state.copy(rooms = state.rooms.map {
@@ -208,6 +235,16 @@ class ChatViewModel @Inject constructor(
 
     fun onFolderTabSelect(folderId: String?) {
         _listState.update { it.copy(activeFolderId = folderId) }
+    }
+
+    fun openFolderManage() { _listState.update { it.copy(isFolderManageOpen = true) } }
+    fun closeFolderManage() { _listState.update { it.copy(isFolderManageOpen = false) } }
+
+    fun openFolderCreate(folder: ChatFolder? = null) {
+        _listState.update { it.copy(isFolderCreateOpen = true, editingFolder = folder) }
+    }
+    fun closeFolderCreate() {
+        _listState.update { it.copy(isFolderCreateOpen = false, editingFolder = null) }
     }
 
     val filteredRooms: StateFlow<List<ChatRoomUi>> = listState.map { state ->
