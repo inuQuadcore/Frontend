@@ -52,7 +52,7 @@ class ChatRoomViewModel @Inject constructor(
         if (BuildConfig.USE_DUMMY_DATA && roomId.startsWith("reply_")) {
             val friendId = roomId.removePrefix("reply_")
             val demoRoom = FriendDemoData.chatRooms.find { it.friendId == friendId }
-            val room     = ChatRoom(id = roomId, name = demoRoom?.friendName ?: friendId)
+            val room     = ChatRoomUi(id = roomId, name = demoRoom?.friendName ?: friendId)
             val messages = demoRoom?.messages?.mapIndexed { i, msg ->
                 ChatMessage(
                     id         = "reply_msg_$i",
@@ -70,7 +70,7 @@ class ChatRoomViewModel @Inject constructor(
             return
         }
         val dummyRoom = if (BuildConfig.USE_DUMMY_DATA) dummyChatRooms.find { it.id == roomId } else null
-        val room      = dummyRoom ?: ChatRoom(id = roomId)
+        val room      = dummyRoom ?: ChatRoomUi(id = roomId)
         val messages  = if (BuildConfig.USE_DUMMY_DATA) dummyMessages[roomId] ?: emptyList() else emptyList()
         _uiState.update { it.copy(room = room, messages = messages) }
     }

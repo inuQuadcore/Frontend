@@ -8,6 +8,7 @@ import com.everybuddy.app.data.dto.Friend
 import com.everybuddy.app.data.dto.userMessage
 import com.everybuddy.app.data.repository.FriendRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,6 +68,10 @@ class FriendViewModel @Inject constructor(
     init { loadFriends() }
 
     fun loadFriends() {
+        if (BuildConfig.USE_DUMMY_DATA) {
+            _uiState.update { it.copy(isLoading = false, friends = FriendDemoData.friends) }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             when (val r = friendRepository.getFriends()) {
@@ -165,7 +170,8 @@ class FriendViewModel @Inject constructor(
 
         val statusPreview = target.preview15()
 
-        val existingRoom = state.chatRooms.find { it.friendId == target.authorId }
+        val targetId     = target.authorId.toString()
+        val existingRoom = state.chatRooms.find { it.friendId == targetId }
         if (existingRoom != null) {
             existingRoom.messages.add(
                 FriendDemoData.DemoChatMsg(
@@ -179,7 +185,7 @@ class FriendViewModel @Inject constructor(
             state.chatRooms.add(
                 FriendDemoData.DemoChatRoom(
                     id         = UUID.randomUUID().toString(),
-                    friendId   = target.authorId,
+                    friendId   = targetId,
                     friendName = target.authorName,
                     messages   = mutableListOf(
                         FriendDemoData.DemoChatMsg(

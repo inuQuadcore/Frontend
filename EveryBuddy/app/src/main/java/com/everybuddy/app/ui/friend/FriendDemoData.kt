@@ -8,6 +8,16 @@ object FriendDemoData {
     const val MY_USER_ID = 0L
     const val MY_NAME    = "나"
 
+    val friends: List<FriendProfile> = listOf(
+        FriendProfile(id = 5L,   name = "우원재",  nationality = "KR", nativeLanguages = listOf("KR"), learningLanguages = listOf("EN"), interests = listOf("음악", "랩"), bio = "랩 하는 사람", isOnline = true),
+        FriendProfile(id = 6L,   name = "이예지",  nationality = "KR", nativeLanguages = listOf("KR"), learningLanguages = listOf("JP"), interests = listOf("교회", "독서"), bio = "모범생ㅋ"),
+        FriendProfile(id = 7L,   name = "홍길동",  nationality = "KR", nativeLanguages = listOf("KR"), learningLanguages = listOf("EN", "JP"), interests = listOf("먹방", "여행"), bio = "배고파", isOnline = true),
+        FriendProfile(id = 8L,   name = "はるか", nationality = "JP", nativeLanguages = listOf("JP"), learningLanguages = listOf("KR"), interests = listOf("음악", "시"), bio = "月明かりが好き"),
+        FriendProfile(id = 9L,   name = "김감전",  nationality = "KR", nativeLanguages = listOf("KR"), learningLanguages = listOf("EN"), interests = listOf("랩", "힙합"), bio = "대한민국 최고의 래퍼"),
+        FriendProfile(id = 101L, name = "D8",     nationality = "CN", nativeLanguages = listOf("CN"), learningLanguages = listOf("KR"), interests = listOf("시", "음악"), bio = "海城 静卧在星空"),
+        FriendProfile(id = 102L, name = "황정민",  nationality = "KR", nativeLanguages = listOf("KR"), learningLanguages = listOf("EN"), interests = listOf("영화"), bio = "아이 씹브라더~"),
+    )
+
     val statusMessages = mutableListOf(
         StatusMessage(
             id           = "sm_my",

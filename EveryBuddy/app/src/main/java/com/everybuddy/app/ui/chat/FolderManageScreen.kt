@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.everybuddy.app.R
 import com.everybuddy.app.data.chat.ChatFolder
-import com.everybuddy.app.data.chat.ChatRoom
+import com.everybuddy.app.data.chat.ChatRoomUi
 import com.everybuddy.app.ui.theme.PretendardFamily
 
 private val FmTextPri = Color(0xFF1B1B1B)
@@ -161,7 +161,7 @@ private fun FolderManageRow(
 @Composable
 fun FolderCreateScreen(
     editingFolder : ChatFolder?,
-    allRooms      : List<ChatRoom>,
+    allRooms      : List<ChatRoomUi>,
     onBack        : () -> Unit,
     onSave        : (ChatFolder) -> Unit,
 ) {
@@ -278,7 +278,7 @@ fun FolderCreateScreen(
 
 @Composable
 private fun RoomSelectRow(
-    room      : ChatRoom,
+    room      : ChatRoomUi,
     isChecked : Boolean,
     onToggle  : () -> Unit,
 ) {

@@ -22,8 +22,7 @@ class MainActivity : ComponentActivity() {
             EveryBuddyTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     AppNavGraph(
-                        // startDest = Route.SPLASH
-                        startDest = if (BuildConfig.DEBUG) Route.MAIN else Route.SPLASH,
+                        startDest = Route.SPLASH,
                     )
                 }
             }

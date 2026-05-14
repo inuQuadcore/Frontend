@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -516,7 +517,7 @@ fun ScriptFolderScreen(
         } else {
             LazyColumn(
                 modifier       = Modifier.padding(innerPadding).fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 8.dp, bottom = 16.dp),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
             ) {
                 items(folderItems) { item ->
                     ScriptItemCard(item = item, onClick = { onItemClick(item) }, onAudio = { onItemAudio(item) })

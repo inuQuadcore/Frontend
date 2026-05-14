@@ -4,8 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.dto.ApiResult
-import com.everybuddy.app.data.dto.FriendStatusMessage
+import com.everybuddy.app.data.dto.FriendStatusMessageDto
 import com.everybuddy.app.data.dto.MyStatusMessageResponse
+import com.everybuddy.app.data.dto.toDto
 import com.everybuddy.app.data.dto.userMessage
 import com.everybuddy.app.data.repository.StatusMessageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,11 +20,11 @@ import javax.inject.Inject
 
 data class StatusUiState(
     val myStatus            : MyStatusMessageResponse?     = null,
-    val friendStatuses      : List<FriendStatusMessageDto> = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.demoFriendStatusDtos else emptyList(),
+    val friendStatuses      : List<FriendStatusMessageDto>  = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.demoFriendStatusDtos else emptyList(),
     val isWriteScreenOpen   : Boolean                      = false,
     val isEditMode          : Boolean                      = false,
     val draftText           : String                       = "",
-    val expandedStatus      : FriendStatusMessage?      = null,
+    val expandedStatus      : FriendStatusMessageDto?    = null,
     val isMyStatusMenuOpen  : Boolean                      = false,
     val isDeleteConfirmOpen : Boolean                      = false,
     val isReplying          : Boolean                      = false,
@@ -47,6 +48,10 @@ class StatusMessageViewModel @Inject constructor(
     init { loadAll() }
 
     fun loadAll() {
+        if (BuildConfig.USE_DUMMY_DATA) {
+            _state.update { it.copy(friendStatuses = FriendDemoData.demoFriendStatusDtos, myStatus = null) }
+            return
+        }
         loadMyStatus()
         loadFriendStatuses(reset = true)
     }
@@ -69,8 +74,8 @@ class StatusMessageViewModel @Inject constructor(
             when (val r = statusRepo.getFriendStatusMessages(cursor)) {
                 is ApiResult.Success -> {
                     val data   = r.data
-                    val merged = if (reset) data.statusMessages
-                                 else _state.value.friendStatuses + data.statusMessages
+                    val dtos   = data.statusMessages.map { it.toDto() }
+                    val merged = if (reset) dtos else _state.value.friendStatuses + dtos
                     _state.update { it.copy(friendStatuses = merged, nextCursor = data.nextCursor, hasNext = data.hasNext, isLoading = false) }
                 }
                 is ApiResult.Error, is ApiResult.NetworkError ->
@@ -109,15 +114,15 @@ class StatusMessageViewModel @Inject constructor(
                 }
                 is ApiResult.Error, is ApiResult.NetworkError -> {
                     if (BuildConfig.USE_DUMMY_DATA) {
-                        val demoResp = com.everybuddy.app.data.dto.MyStatusMessageResponse(
+                        val demoResp = MyStatusMessageResponse(
                             statusMessageId = System.currentTimeMillis(),
+                            nickname        = "",
                             content         = text,
-                            timeAgo         = "방금",
+                            updatedAt       = java.time.LocalDateTime.now().toString(),
                         )
                         _state.update { it.copy(myStatus = demoResp, isWriteScreenOpen = false, draftText = "", isEditMode = false, isLoading = false, toastMessage = msg) }
                     } else {
-                        val errMsg = if (r is ApiResult.Error) ApiErrorHandler.toUserMessage(r) else ApiErrorHandler.toUserMessage(r as ApiResult.NetworkError)
-                        _state.update { it.copy(isLoading = false, toastMessage = errMsg) }
+                        _state.update { it.copy(isLoading = false, toastMessage = r.userMessage()) }
                     }
                 }
             }
@@ -140,7 +145,7 @@ class StatusMessageViewModel @Inject constructor(
         }
     }
 
-    fun openFriendStatus(sm: FriendStatusMessage) {
+    fun openFriendStatus(sm: FriendStatusMessageDto) {
         _state.update { it.copy(expandedStatus = sm, isReplying = false, replyText = "", replySent = false) }
     }
 

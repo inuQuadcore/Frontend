@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.everybuddy.app.R
-import com.everybuddy.app.data.dto.FriendStatusMessage
+import com.everybuddy.app.data.dto.FriendStatusMessageDto
 import com.everybuddy.app.ui.theme.PretendardFamily
 import kotlinx.coroutines.delay
 import java.time.Duration
@@ -353,13 +353,13 @@ fun FriendStatusDetailPopup(
                     ) {
                         AsyncImage(
                             model              = sm.profileImageUrl,
-                            contentDescription = sm.nickname,
+                            contentDescription = sm.userName,
                             contentScale       = ContentScale.Crop,
                             modifier           = Modifier.fillMaxSize(),
                         )
                     }
                     Text(
-                        sm.nickname,
+                        sm.userName,
                         style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
                     )
                 }
@@ -378,7 +378,7 @@ fun FriendStatusDetailPopup(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment     = Alignment.CenterVertically,
                 ) {
-                    Text(sm.updatedAt.toRelativeTime(), style = TextStyle(fontSize = 12.sp, color = C.TextSec))
+                    Text(sm.timeAgo, style = TextStyle(fontSize = 12.sp, color = C.TextSec))
 
                     if (!state.isReplying && !state.replySent) {
                         Button(
@@ -472,8 +472,8 @@ fun FriendStatusDetailPopup(
 
 @Composable
 fun FriendStatusPreviewCard(
-    sm      : FriendStatusMessage,
-    onClick : (FriendStatusMessage) -> Unit,
+    sm      : FriendStatusMessageDto,
+    onClick : (FriendStatusMessageDto) -> Unit,
 ) {
     Surface(
         modifier = Modifier
@@ -517,7 +517,7 @@ fun FriendStatusPreviewCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(6.dp))
-            Text(sm.updatedAt.toRelativeTime(), style = TextStyle(fontSize = 10.sp, color = C.TextSec))
+            Text(sm.timeAgo, style = TextStyle(fontSize = 10.sp, color = C.TextSec))
         }
     }
 }
@@ -578,8 +578,8 @@ fun FriendStatusGridCard(
 
 @Composable
 fun FriendStatusFullItem(
-    sm      : FriendStatusMessage,
-    onClick : (FriendStatusMessage) -> Unit,
+    sm      : FriendStatusMessageDto,
+    onClick : (FriendStatusMessageDto) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -599,14 +599,14 @@ fun FriendStatusFullItem(
             ) {
                 AsyncImage(
                     model              = sm.profileImageUrl,
-                    contentDescription = sm.nickname,
+                    contentDescription = sm.userName,
                     contentScale       = ContentScale.Crop,
                     modifier           = Modifier.fillMaxSize(),
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text  = sm.nickname,
+                    text  = sm.userName,
                     style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = C.TextPri),
                 )
                 Spacer(Modifier.height(3.dp))
@@ -615,7 +615,7 @@ fun FriendStatusFullItem(
                     style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 20.sp),
                 )
                 Spacer(Modifier.height(4.dp))
-                Text(sm.updatedAt.toRelativeTime(), style = TextStyle(fontSize = 11.sp, color = C.TextSec))
+                Text(sm.timeAgo, style = TextStyle(fontSize = 11.sp, color = C.TextSec))
             }
         }
     }

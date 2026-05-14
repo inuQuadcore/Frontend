@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,10 +82,9 @@ fun ChatListScreen(
 @Composable
 fun ChatListContent(
     state               : ChatListUiState,
-    allRooms            : List<ChatRoom>       = emptyList(),
+    allRooms            : List<ChatRoomUi>     = emptyList(),
     isRefreshing        : Boolean              = false,
     onRefresh           : () -> Unit           = {},
-    onRoomClick         : (ChatRoom) -> Unit,
     onRoomClick         : (ChatRoomUi) -> Unit,
     onFilterSelect      : (ChatFilter) -> Unit,
     onFolderTabSelect   : (String?) -> Unit    = {},
