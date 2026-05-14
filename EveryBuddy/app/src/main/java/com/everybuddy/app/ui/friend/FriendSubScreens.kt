@@ -48,12 +48,11 @@ fun FriendSearchScreen(
 
     Scaffold(
         topBar = {
-            Column {
+            Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .background(Color.White)
                         .padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -176,12 +175,11 @@ fun StatusMessageAllScreen(
 
     Scaffold(
         topBar = {
-            Column {
+            Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .background(Color.White)
                         .padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,

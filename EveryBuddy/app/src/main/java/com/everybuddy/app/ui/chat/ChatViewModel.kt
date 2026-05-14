@@ -49,7 +49,7 @@ class ChatViewModel @Inject constructor(
                         it.copy(
                             isLoading    = false,
                             errorMessage = result.message,
-                            rooms        = if (BuildConfig.DEBUG) dummyChatRooms else emptyList(),
+                            rooms        = if (BuildConfig.USE_DUMMY_DATA) dummyChatRooms else emptyList(),
                         )
                     }
                 }
@@ -60,9 +60,29 @@ class ChatViewModel @Inject constructor(
                         it.copy(
                             isLoading    = false,
                             errorMessage = result.e.localizedMessage,
-                            rooms        = if (BuildConfig.DEBUG) dummyChatRooms else emptyList(),
+                            rooms        = if (BuildConfig.USE_DUMMY_DATA) dummyChatRooms else emptyList(),
                         )
                     }
+                }
+            }
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _listState.update { it.copy(isRefreshing = true) }
+            when (val result = chatRepository.getChatRooms()) {
+                is AuthResult.Success -> {
+                    val rooms = result.data?.map { it.toChatRoom() } ?: emptyList()
+                    _listState.update { it.copy(isRefreshing = false, errorMessage = null, rooms = rooms) }
+                }
+                is AuthResult.Error -> {
+                    _listState.update { it.copy(isRefreshing = false, errorMessage = result.message,
+                        rooms = if (BuildConfig.USE_DUMMY_DATA && it.rooms.isEmpty()) dummyChatRooms else it.rooms) }
+                }
+                is AuthResult.Exception -> {
+                    _listState.update { it.copy(isRefreshing = false, errorMessage = result.e.localizedMessage,
+                        rooms = if (BuildConfig.USE_DUMMY_DATA && it.rooms.isEmpty()) dummyChatRooms else it.rooms) }
                 }
             }
         }
@@ -174,6 +194,13 @@ class ChatViewModel @Inject constructor(
                 if (it.id == roomId) it.copy(unreadCount = 0) else it
             })
         }
+    }
+
+    fun addReplyRoom(friendId: String, friendName: String) {
+        val roomId = "reply_$friendId"
+        if (_listState.value.rooms.any { it.id == roomId }) return
+        val newRoom = ChatRoom(id = roomId, name = friendName, lastMessage = "답장을 보냈습니다.", timestamp = "방금")
+        _listState.update { state -> state.copy(rooms = listOf(newRoom) + state.rooms) }
     }
 
     fun updateRoomMute(roomId: String, isMuted: Boolean) {

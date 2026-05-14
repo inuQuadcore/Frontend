@@ -1,25 +1,29 @@
 package com.everybuddy.app.ui.script
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.ui.chat.ScriptFolder
 import com.everybuddy.app.ui.chat.ScriptItem
 import com.everybuddy.app.ui.chat.dummyScriptFolders
 import com.everybuddy.app.ui.chat.dummyScriptItems
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
 
 data class ScriptUiState(
-    val folders       : List<ScriptFolder> = if (BuildConfig.DEBUG) dummyScriptFolders else emptyList(),
-    val items         : List<ScriptItem>   = if (BuildConfig.DEBUG) dummyScriptItems   else emptyList(),
+    val folders       : List<ScriptFolder> = if (BuildConfig.USE_DUMMY_DATA) dummyScriptFolders else emptyList(),
+    val items         : List<ScriptItem>   = if (BuildConfig.USE_DUMMY_DATA) dummyScriptItems   else emptyList(),
     val selectedFolderIndex : Int          = 0,   // 0 = 전체, 1~ = 특정 폴더
     val sortOption    : ScriptSortOption   = ScriptSortOption.SAVED_AT_DESC,
     val searchQuery   : String             = "",
+    val isRefreshing  : Boolean            = false,
     val toastMessage  : String?            = null,
 )
 
@@ -104,6 +108,19 @@ class ScriptViewModel @Inject constructor() : ViewModel() {
 
     fun updateSearchQuery(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true) }
+            delay(300)
+            // TODO: real API call
+            _uiState.update { it.copy(
+                isRefreshing = false,
+                folders      = if (BuildConfig.USE_DUMMY_DATA) dummyScriptFolders else emptyList(),
+                items        = if (BuildConfig.USE_DUMMY_DATA) dummyScriptItems   else emptyList(),
+            ) }
+        }
     }
 
     fun consumeToast() {

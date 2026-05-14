@@ -42,12 +42,11 @@ fun StatusWriteScreen(viewModel: StatusMessageViewModel) {
 
     Scaffold(
         topBar = {
-            Column {
+            Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .background(Color.White)
                         .padding(horizontal = 8.dp),
                 ) {
                     IconButton(

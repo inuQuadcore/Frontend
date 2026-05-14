@@ -362,7 +362,7 @@ private fun RandomCardSection(
                     .graphicsLayer {
                         translationX = offsetX.value
                         translationY = offsetY.value
-                        rotationZ    = cardRotations[currentIndex % cardRotations.size] - offsetX.value * 0.06f
+                        rotationZ    = 0f
                         alpha        = (1f - offsetY.value / 700f).coerceAtLeast(0f)
                     },
             ) {

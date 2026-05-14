@@ -33,6 +33,7 @@ data class ChatFolder(
 data class ChatListUiState(
     val rooms              : List<ChatRoom>   = emptyList(),
     val isLoading          : Boolean          = false,
+    val isRefreshing       : Boolean          = false,
     val errorMessage       : String?          = null,
     val searchQuery        : String           = "",
     val activeFilter       : ChatFilter       = ChatFilter.ALL,

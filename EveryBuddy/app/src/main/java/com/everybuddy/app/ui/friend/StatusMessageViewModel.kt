@@ -19,7 +19,7 @@ import javax.inject.Inject
 
 data class StatusUiState(
     val myStatus            : MyStatusMessageResponse?     = null,
-    val friendStatuses      : List<FriendStatusMessageDto> = if (BuildConfig.DEBUG) FriendDemoData.demoFriendStatusDtos else emptyList(),
+    val friendStatuses      : List<FriendStatusMessageDto> = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.demoFriendStatusDtos else emptyList(),
     val isWriteScreenOpen   : Boolean                      = false,
     val isEditMode          : Boolean                      = false,
     val draftText           : String                       = "",
@@ -96,18 +96,30 @@ class StatusMessageViewModel @Inject constructor(
     }
 
     fun submitStatus() {
-        val text = _state.value.draftText.trim().ifBlank { return }
+        val text    = _state.value.draftText.trim().ifBlank { return }
+        val isEdit  = _state.value.isEditMode
+        val msg     = if (isEdit) "상태메시지가 수정되었습니다." else "상태메시지가 등록되었습니다."
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-            val r = if (_state.value.isEditMode) statusRepo.updateStatusMessage(text)
-                    else statusRepo.postStatusMessage(text)
+            val r = if (isEdit) statusRepo.updateStatusMessage(text) else statusRepo.postStatusMessage(text)
             when (r) {
                 is ApiResult.Success -> {
                     loadMyStatus()
-                    _state.update { it.copy(isWriteScreenOpen = false, draftText = "", isLoading = false, toastMessage = "상태메시지가 등록되었습니다.") }
+                    _state.update { it.copy(isWriteScreenOpen = false, draftText = "", isEditMode = false, isLoading = false, toastMessage = msg) }
                 }
-                is ApiResult.Error        -> _state.update { it.copy(isLoading = false, toastMessage = ApiErrorHandler.toUserMessage(r)) }
-                is ApiResult.NetworkError -> _state.update { it.copy(isLoading = false, toastMessage = ApiErrorHandler.toUserMessage(r)) }
+                is ApiResult.Error, is ApiResult.NetworkError -> {
+                    if (BuildConfig.USE_DUMMY_DATA) {
+                        val demoResp = com.everybuddy.app.data.dto.MyStatusMessageResponse(
+                            statusMessageId = System.currentTimeMillis(),
+                            content         = text,
+                            timeAgo         = "방금",
+                        )
+                        _state.update { it.copy(myStatus = demoResp, isWriteScreenOpen = false, draftText = "", isEditMode = false, isLoading = false, toastMessage = msg) }
+                    } else {
+                        val errMsg = if (r is ApiResult.Error) ApiErrorHandler.toUserMessage(r) else ApiErrorHandler.toUserMessage(r as ApiResult.NetworkError)
+                        _state.update { it.copy(isLoading = false, toastMessage = errMsg) }
+                    }
+                }
             }
         }
     }
@@ -147,7 +159,7 @@ class StatusMessageViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isSending = true, replyText = "") }
 
-            if (BuildConfig.DEBUG) {
+            if (BuildConfig.USE_DUMMY_DATA) {
                 val statusPreview = if (target.content.length > 15) target.content.take(15) + "…" else target.content
                 val friendId      = target.userId.toString()
                 val existing      = FriendDemoData.chatRooms.find { it.friendId == friendId }

@@ -39,6 +39,7 @@ private val ClTextSec   = Color(0xFF8F9399)
 private val ClBorder    = Color(0xFFE5E5E5)
 private val ClBadge     = Color(0xFF0167FF)   // unreadCount 배지 색
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
     onRoomClick        : (ChatRoom) -> Unit = {},
@@ -52,6 +53,8 @@ fun ChatListScreen(
     ChatListContent(
         state               = rawState.copy(rooms = filteredRooms),
         allRooms            = rawState.rooms,
+        isRefreshing        = rawState.isRefreshing,
+        onRefresh           = viewModel::refresh,
         onRoomClick         = onRoomClick,
         onFilterSelect      = viewModel::onFilterSelect,
         onFolderTabSelect   = viewModel::onFolderTabSelect,
@@ -74,10 +77,13 @@ fun ChatListScreen(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListContent(
     state               : ChatListUiState,
     allRooms            : List<ChatRoom>       = emptyList(),
+    isRefreshing        : Boolean              = false,
+    onRefresh           : () -> Unit           = {},
     onRoomClick         : (ChatRoom) -> Unit,
     onFilterSelect      : (ChatFilter) -> Unit,
     onFolderTabSelect   : (String?) -> Unit    = {},
@@ -242,7 +248,9 @@ fun ChatListContent(
                 }
             }
 
-            Box(
+            PullToRefreshBox(
+                isRefreshing     = isRefreshing,
+                onRefresh        = onRefresh,
                 modifier         = Modifier.weight(1f).fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {

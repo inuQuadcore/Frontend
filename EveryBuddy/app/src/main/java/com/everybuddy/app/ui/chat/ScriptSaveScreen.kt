@@ -152,6 +152,8 @@ fun ScriptSaveSheet(
     onDismiss                : () -> Unit,
     onAddFolder              : () -> Unit = {},
     externalAutoSelectFolderId : String? = null,
+    currentIdx               : Int = 0,
+    totalCount               : Int = 0,
 ) {
     var editedText     by remember(message.id) { mutableStateOf(message.text) }
     var memo1          by remember(message.id) { mutableStateOf(message.translatedText) }
@@ -183,7 +185,7 @@ fun ScriptSaveSheet(
             Spacer(Modifier.height(16.dp))
 
             Text(
-                text      = "스크립트 저장",
+                text      = if (totalCount > 1) "스크립트 저장  ($currentIdx/$totalCount)" else "스크립트 저장",
                 style     = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SsTextPri),
                 modifier  = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
@@ -424,9 +426,9 @@ fun ConversationSelectScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
-                Column {
+                Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 4.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
                     ) {
                         IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
                             Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = SsTextPri)
@@ -706,8 +708,8 @@ fun NewFolderScreen(
 
     Scaffold(
         topBar = {
-            Column {
-                Box(modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 4.dp)) {
+            Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
+                Box(modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp)) {
                     IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
                         Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = SsTextPri)
                     }
@@ -771,11 +773,11 @@ fun NewFolderScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        Icon(
+                        Image(
                             painter            = painterResource(R.drawable.ic_media_camera),
                             contentDescription = "사진 추가",
                             modifier           = Modifier.size(32.dp),
-                            tint               = Color(0xFFAAAAAA),
+                            colorFilter        = androidx.compose.ui.graphics.ColorFilter.tint(Color(0xFFAAAAAA)),
                         )
                         Spacer(Modifier.height(6.dp))
                         Text("커버사진추가", style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = SsTextSec))
@@ -786,7 +788,7 @@ fun NewFolderScreen(
                     modifier         = Modifier.align(Alignment.BottomEnd).padding(8.dp).size(32.dp).clip(CircleShape).background(Color(0xFF888888)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(painterResource(R.drawable.ic_media_camera), "카메라", Modifier.size(18.dp), tint = Color.White)
+                    Image(painterResource(R.drawable.ic_media_camera), "카메라", Modifier.size(18.dp), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White))
                 }
             }
 

@@ -81,6 +81,8 @@ fun FriendMainScreen(
             onFriendClick  = { viewModel.selectFriend(it) },
             onAddFriend    = onAddFriend,
             onNotification = onNotification,
+            isRefreshing   = uiState.isRefreshing,
+            onRefresh      = viewModel::refresh,
         )
     }
 
@@ -108,6 +110,7 @@ private fun FriendProfile.toDiscoverUser() = DiscoverUser(
     isOnline        = isOnline,
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FriendMainContent(
     viewModel      : FriendViewModel,
@@ -115,6 +118,8 @@ private fun FriendMainContent(
     onFriendClick  : (FriendProfile) -> Unit,
     onAddFriend    : () -> Unit,
     onNotification : () -> Unit = {},
+    isRefreshing   : Boolean    = false,
+    onRefresh      : () -> Unit = {},
 ) {
     val uiState     by viewModel.uiState.collectAsState()
     val statusState by statusVm.state.collectAsState()
@@ -135,6 +140,11 @@ private fun FriendMainContent(
 
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
 
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh    = onRefresh,
+                modifier     = Modifier.fillMaxSize(),
+            ) {
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
 
                 item {
@@ -219,6 +229,7 @@ private fun FriendMainContent(
                         onClick        = onFriendClick,
                     )
                 }
+            }
             }
 
             val toastMsg = uiState.toastMessage ?: statusState.toastMessage

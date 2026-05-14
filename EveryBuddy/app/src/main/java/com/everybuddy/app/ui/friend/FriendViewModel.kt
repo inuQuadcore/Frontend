@@ -12,8 +12,8 @@ import javax.inject.Inject
 
 data class FriendUiState(
     // 전체 데이터
-    val friends             : List<FriendProfile>   = if (BuildConfig.DEBUG) FriendDemoData.friends else emptyList(),
-    val statusMessages      : List<StatusMessage>   = if (BuildConfig.DEBUG) FriendDemoData.statusMessages.toList() else emptyList(),
+    val friends             : List<FriendProfile>   = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.friends else emptyList(),
+    val statusMessages      : List<StatusMessage>   = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.statusMessages.toList() else emptyList(),
     val myStatusMessage     : StatusMessage?        = null,   // 내 상태메시지 (null = 미작성)
 
     // 정렬
@@ -37,7 +37,7 @@ data class FriendUiState(
     val replySent           : Boolean               = false,  // "전송 완료!" 토스트
 
     // 채팅방 목록 (답장 → 채팅방 생성/업데이트)
-    val chatRooms           : MutableList<FriendDemoData.DemoChatRoom> = if (BuildConfig.DEBUG) FriendDemoData.chatRooms else mutableListOf(),
+    val chatRooms           : MutableList<FriendDemoData.DemoChatRoom> = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.chatRooms else mutableListOf(),
 
     // 프로필 화면
     val selectedFriend      : FriendProfile?        = null,
@@ -46,6 +46,7 @@ data class FriendUiState(
     val followedFriendIds   : Set<String>           = emptySet(),
 
     // 토스트
+    val isRefreshing        : Boolean               = false,
     val toastMessage        : String?               = null,
 )
 
@@ -54,6 +55,18 @@ class FriendViewModel @Inject constructor() : ViewModel() {
 
     private val _uiState = MutableStateFlow(FriendUiState())
     val uiState: StateFlow<FriendUiState> = _uiState.asStateFlow()
+
+    fun refresh() {
+        _uiState.update { it.copy(isRefreshing = true) }
+        // TODO: 실제 API 호출 → GET /api/v1/friends + 상태메시지 목록
+        _uiState.update { state ->
+            state.copy(
+                isRefreshing   = false,
+                friends        = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.friends else emptyList(),
+                statusMessages = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.statusMessages.toList() else emptyList(),
+            )
+        }
+    }
 
     fun setSearchActive(active: Boolean) {
         _uiState.update { it.copy(isSearchActive = active, searchQuery = if (!active) "" else it.searchQuery) }

@@ -83,6 +83,7 @@ fun ChatRoomScreen(
     onNavigateToScriptTab : () -> Unit               = {},
     onSaveScriptItem      : (ScriptSaveItem) -> Unit = {},
     onMuteChanged         : (Boolean) -> Unit        = {},
+    onFolderCreated       : (ScriptFolder) -> Unit   = {},
     viewModel             : ChatRoomViewModel         = hiltViewModel(),
 ) {
     LaunchedEffect(roomId) { viewModel.loadRoom(roomId) }
@@ -152,6 +153,7 @@ fun ChatRoomScreen(
                 Manifest.permission.READ_EXTERNAL_STORAGE
             storagePermLauncher.launch(perm)
         },
+        onFolderCreated          = onFolderCreated,
     )
 }
 
@@ -186,6 +188,7 @@ fun ChatRoomContent(
     onSaveScriptItem          : (ScriptSaveItem) -> Unit = {},
     onOpenCamera              : () -> Unit             = {},
     onOpenFile                : () -> Unit             = {},
+    onFolderCreated           : (ScriptFolder) -> Unit = {},
 ) {
     var showNewFolderScreen   by remember { mutableStateOf(false) }
     var newFolderAutoSelectId by remember { mutableStateOf<String?>(null) }
@@ -462,6 +465,8 @@ fun ChatRoomContent(
                     onDismiss                  = onDismissConversationSave,
                     onAddFolder                = { showNewFolderScreen = true },
                     externalAutoSelectFolderId = newFolderAutoSelectId,
+                    currentIdx                 = separateIdx + 1,
+                    totalCount                 = state.conversationSaveMessages.size,
                 )
             }
         } else {
@@ -500,6 +505,7 @@ fun ChatRoomContent(
                     localFolders          = localFolders + newFolder
                     newFolderAutoSelectId = newFolder.id
                     showNewFolderScreen   = false
+                    onFolderCreated(newFolder)
                 },
             )
         }
@@ -514,11 +520,11 @@ fun ChatAppBar(
     onSearch : () -> Unit,
     onMenu   : () -> Unit,
 ) {
+    Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .background(Color.White)
             .padding(horizontal = 4.dp),
     ) {
         IconButton(
@@ -563,6 +569,7 @@ fun ChatAppBar(
                 )
             }
         }
+    }
     }
 }
 
