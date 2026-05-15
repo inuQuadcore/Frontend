@@ -1,6 +1,8 @@
 package com.everybuddy.app.ui.friend
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.everybuddy.app.R
-import com.everybuddy.app.data.dto.FriendStatusMessage
+import com.everybuddy.app.data.dto.FriendStatusMessageDto
 import com.everybuddy.app.ui.theme.PretendardFamily
 import kotlinx.coroutines.delay
 import java.time.Duration
@@ -44,35 +46,33 @@ fun StatusWriteScreen(viewModel: StatusMessageViewModel) {
 
     Scaffold(
         topBar = {
-            Column {
-                Row(
+            Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .background(Color.White)
                         .padding(horizontal = 8.dp),
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Box(Modifier.size(40.dp))
-                    Text(
-                        if (state.isEditMode) "상태메시지 수정" else "상태메시지",
-                        style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        IconButton(onClick = {}) {
-                            Icon(painterResource(R.drawable.ic_search), "검색", Modifier.size(22.dp), tint = C.TextPri)
-                        }
-                        IconButton(onClick = {}) {
-                            Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(22.dp), tint = C.TextPri)
-                        }
+                    IconButton(
+                        onClick  = { viewModel.closeWriteScreen() },
+                        modifier = Modifier.align(Alignment.CenterStart).size(40.dp),
+                    ) {
+                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = C.TextPri)
+                    }
+                    Row(
+                        modifier              = Modifier.align(Alignment.Center),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(painterResource(R.drawable.ic_pencil), null, Modifier.size(16.dp), tint = C.TextPri)
+                        Text(
+                            if (state.isEditMode) "상태메시지 수정" else "상태메시지 작성",
+                            style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                        )
                     }
                 }
                 HorizontalDivider(color = C.Border, thickness = 0.5.dp)
             }
-        },
-        bottomBar = {
-            FriendBottomNavBar(onChat = {}, onFind = {}, onScript = {}, onMy = {})
         },
         containerColor = Color.White,
     ) { innerPadding ->
@@ -196,13 +196,23 @@ fun MyStatusCard(viewModel: StatusMessageViewModel) {
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(4.dp))
-            val preview = myStatus?.content?.let { if (it.length > 80) it.take(80) + "…" else it } ?: "작성하기...○"
-            Text(
-                text     = preview,
-                style    = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = if (myStatus == null) C.TextSec else C.TextPri),
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (myStatus == null) {
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(painterResource(R.drawable.ic_pencil), null, Modifier.size(12.dp), tint = C.TextSec)
+                    Text("나도 작성하기", style = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = C.TextSec))
+                }
+            } else {
+                val preview = myStatus.content.let { if (it.length > 80) it.take(80) + "…" else it }
+                Text(
+                    text     = preview,
+                    style    = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = C.TextPri),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             if (myStatus != null) {
                 Spacer(Modifier.height(6.dp))
                 Text(myStatus.updatedAt.toRelativeTime(), style = TextStyle(fontSize = 10.sp, color = C.TextSec))
@@ -299,16 +309,18 @@ fun DeleteConfirmDialog(viewModel: StatusMessageViewModel) {
 
 @Composable
 fun FriendStatusDetailPopup(
-    sm        : FriendStatusMessage,
-    viewModel : StatusMessageViewModel,
+    sm           : FriendStatusMessageDto,
+    viewModel    : StatusMessageViewModel,
+    onReplySent  : (friendId: String, friendName: String) -> Unit = { _, _ -> },
 ) {
-    val state by viewModel.state.collectAsState()
+    val state      by viewModel.state.collectAsState()
+    val friendId   = remember { sm.userId.toString() }
+    val friendName = remember { sm.userName }
 
     LaunchedEffect(state.replySent) {
         if (state.replySent) {
-            delay(1500)
-            viewModel.consumeReplySent()
-            viewModel.closeFriendStatus()
+            delay(1200)
+            onReplySent(friendId, friendName)
         }
     }
 
@@ -341,13 +353,13 @@ fun FriendStatusDetailPopup(
                     ) {
                         AsyncImage(
                             model              = sm.profileImageUrl,
-                            contentDescription = sm.nickname,
+                            contentDescription = sm.userName,
                             contentScale       = ContentScale.Crop,
                             modifier           = Modifier.fillMaxSize(),
                         )
                     }
                     Text(
-                        sm.nickname,
+                        sm.userName,
                         style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
                     )
                 }
@@ -366,7 +378,7 @@ fun FriendStatusDetailPopup(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment     = Alignment.CenterVertically,
                 ) {
-                    Text(sm.updatedAt.toRelativeTime(), style = TextStyle(fontSize = 12.sp, color = C.TextSec))
+                    Text(sm.timeAgo, style = TextStyle(fontSize = 12.sp, color = C.TextSec))
 
                     if (!state.isReplying && !state.replySent) {
                         Button(
@@ -390,6 +402,7 @@ fun FriendStatusDetailPopup(
 
                 if (state.isReplying && !state.replySent) {
                     Spacer(Modifier.height(10.dp))
+                    val canSend = state.replyText.isNotBlank() && !state.isSending
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -403,6 +416,7 @@ fun FriendStatusDetailPopup(
                             onValueChange = viewModel::updateReplyText,
                             modifier      = Modifier.weight(1f),
                             singleLine    = true,
+                            enabled       = !state.isSending,
                             textStyle     = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri),
                             decorationBox = { inner ->
                                 if (state.replyText.isEmpty()) {
@@ -415,18 +429,32 @@ fun FriendStatusDetailPopup(
                             modifier = Modifier
                                 .size(32.dp)
                                 .clip(CircleShape)
-                                .background(if (state.replyText.isNotBlank()) C.Accent else Color(0xFFCCCCCC))
-                                .clickable(enabled = state.replyText.isNotBlank()) { viewModel.sendReply() },
+                                .background(if (canSend) C.Accent else Color(0xFFCCCCCC))
+                                .clickable(enabled = canSend) { viewModel.sendReply() },
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(painterResource(R.drawable.ic_send), "전송", Modifier.size(16.dp), tint = Color.White)
+                            if (state.isSending) {
+                                CircularProgressIndicator(
+                                    modifier    = Modifier.size(16.dp),
+                                    color       = Color.White,
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Icon(painterResource(R.drawable.ic_send), "전송", Modifier.size(16.dp), tint = Color.White)
+                            }
                         }
                     }
                 }
 
-                if (state.replySent) {
-                    Spacer(Modifier.height(10.dp))
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                AnimatedVisibility(
+                    visible = state.replySent,
+                    enter   = fadeIn(animationSpec = tween(200)) + scaleIn(initialScale = 0.85f, animationSpec = tween(200)),
+                    exit    = fadeOut(animationSpec = tween(150)),
+                ) {
+                    Box(
+                        modifier         = Modifier.fillMaxWidth().padding(top = 10.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
@@ -444,8 +472,8 @@ fun FriendStatusDetailPopup(
 
 @Composable
 fun FriendStatusPreviewCard(
-    sm      : FriendStatusMessage,
-    onClick : (FriendStatusMessage) -> Unit,
+    sm      : FriendStatusMessageDto,
+    onClick : (FriendStatusMessageDto) -> Unit,
 ) {
     Surface(
         modifier = Modifier
@@ -456,27 +484,32 @@ fun FriendStatusPreviewCard(
         border = androidx.compose.foundation.BorderStroke(0.8.dp, C.Border),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFD0D0D0)),
+            Row(
+                verticalAlignment     = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                AsyncImage(
-                    model              = sm.profileImageUrl,
-                    contentDescription = sm.nickname,
-                    contentScale       = ContentScale.Crop,
-                    modifier           = Modifier.fillMaxSize(),
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFD0D0D0)),
+                ) {
+                    AsyncImage(
+                        model              = sm.profileImageUrl,
+                        contentDescription = sm.userName,
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize(),
+                    )
+                }
+                Text(
+                    text     = sm.userName,
+                    style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = C.TextPri),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(top = 6.dp),
                 )
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text     = sm.nickname,
-                style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = C.TextPri),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(6.dp))
             Text(
                 text     = if (sm.content.length > 25) sm.content.take(25) + "…" else sm.content,
                 style    = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = C.TextPri),
@@ -484,15 +517,69 @@ fun FriendStatusPreviewCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(6.dp))
-            Text(sm.updatedAt.toRelativeTime(), style = TextStyle(fontSize = 10.sp, color = C.TextSec))
+            Text(sm.timeAgo, style = TextStyle(fontSize = 10.sp, color = C.TextSec))
+        }
+    }
+}
+
+@Composable
+fun FriendStatusGridCard(
+    sm      : FriendStatusMessageDto,
+    onClick : (FriendStatusMessageDto) -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(4.dp)
+            .clickable { onClick(sm) },
+        shape  = RoundedCornerShape(12.dp),
+        color  = Color.White,
+        border = androidx.compose.foundation.BorderStroke(0.8.dp, C.Border),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                verticalAlignment     = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFD0D0D0)),
+                ) {
+                    AsyncImage(
+                        model              = sm.profileImageUrl,
+                        contentDescription = sm.userName,
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize(),
+                    )
+                }
+                Text(
+                    text     = sm.userName,
+                    style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = C.TextPri),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(top = 4.dp),
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            val content = if (sm.content.length > 80) sm.content.take(80) + "…" else sm.content
+            Text(
+                text     = content,
+                style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 18.sp),
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(sm.timeAgo, style = TextStyle(fontSize = 10.sp, color = C.TextSec))
         }
     }
 }
 
 @Composable
 fun FriendStatusFullItem(
-    sm      : FriendStatusMessage,
-    onClick : (FriendStatusMessage) -> Unit,
+    sm      : FriendStatusMessageDto,
+    onClick : (FriendStatusMessageDto) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -501,7 +588,7 @@ fun FriendStatusFullItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Row(
-            verticalAlignment     = Alignment.CenterVertically,
+            verticalAlignment     = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
@@ -512,14 +599,14 @@ fun FriendStatusFullItem(
             ) {
                 AsyncImage(
                     model              = sm.profileImageUrl,
-                    contentDescription = sm.nickname,
+                    contentDescription = sm.userName,
                     contentScale       = ContentScale.Crop,
                     modifier           = Modifier.fillMaxSize(),
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text  = sm.nickname,
+                    text  = sm.userName,
                     style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = C.TextPri),
                 )
                 Spacer(Modifier.height(3.dp))
@@ -528,7 +615,7 @@ fun FriendStatusFullItem(
                     style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 20.sp),
                 )
                 Spacer(Modifier.height(4.dp))
-                Text(sm.updatedAt.toRelativeTime(), style = TextStyle(fontSize = 11.sp, color = C.TextSec))
+                Text(sm.timeAgo, style = TextStyle(fontSize = 11.sp, color = C.TextSec))
             }
         }
     }

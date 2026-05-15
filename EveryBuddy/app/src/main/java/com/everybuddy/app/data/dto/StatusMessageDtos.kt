@@ -22,8 +22,27 @@ data class FriendStatusMessagesResponse(
 
 data class FriendStatusMessage(
     @SerializedName("statusMessageId") val statusMessageId : Long,
+    @SerializedName("userId")          val userId          : Long   = 0L,
     @SerializedName("profileImageUrl") val profileImageUrl : String? = null,
     @SerializedName("nickname")        val nickname        : String,
     @SerializedName("content")         val content         : String,
     @SerializedName("updatedAt")       val updatedAt       : String,
+)
+
+data class FriendStatusMessageDto(
+    val statusMessageId : Long,
+    val userId          : Long    = 0L,
+    val userName        : String,
+    val profileImageUrl : String? = null,
+    val content         : String,
+    val timeAgo         : String  = "",
+)
+
+fun FriendStatusMessage.toDto(): FriendStatusMessageDto = FriendStatusMessageDto(
+    statusMessageId = statusMessageId,
+    userId          = userId,
+    userName        = nickname,
+    profileImageUrl = profileImageUrl,
+    content         = content,
+    timeAgo         = updatedAt,
 )

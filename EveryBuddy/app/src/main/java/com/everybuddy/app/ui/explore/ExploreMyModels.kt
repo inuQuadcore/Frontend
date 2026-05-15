@@ -29,6 +29,7 @@ data class DiscoverUser(
     val tags            : List<UserTag>      = emptyList(),
     val lastSeenAt      : String      = "",    // ISO 날짜 문자열
     val isOnline        : Boolean     = false, // lastSeenAt 기반 파생
+    val age             : Int         = 25,    // 나이
     val consecutiveDays : Int         = 0,     // 연속 출석일
     val isFollowing     : Boolean     = false,
 ) {
@@ -190,42 +191,42 @@ object ExploreDemo {
             country = "USA", bio = "Hello! I'm from the U.S. 😊",
             languages = listOf(UserLanguage("ENGLISH", 5), UserLanguage("KOREAN", 1)),
             tags = listOf(UserTag("PHOTOGRAPHY","HOBBY","📷","사진찍기"), UserTag("RUNNING","HOBBY","🏃","러닝"), UserTag("TRAVEL","HOBBY","✈️","여행")),
-            isOnline = true, consecutiveDays = 7,
+            isOnline = true, age = 26, consecutiveDays = 7,
         ),
         DiscoverUser(
             userId = 11, name = "홍현준", profileImageUrl = "user_hong",
             country = "USA", bio = "영어 배우고 싶어요",
             languages = listOf(UserLanguage("ENGLISH", 2), UserLanguage("JAPANESE", 1)),
             tags = listOf(UserTag("WORKOUT","HOBBY","🏋️","운동하기"), UserTag("COOKING","HOBBY","🍳","요리"), UserTag("FOOD_TOUR","FOOD","📍","맛집탐방")),
-            isOnline = true, consecutiveDays = 5,
+            isOnline = true, age = 31, consecutiveDays = 5,
         ),
         DiscoverUser(
             userId = 12, name = "손나은", profileImageUrl = "user_son",
             country = "USA", bio = "영어 배우고 싶어요",
             languages = listOf(UserLanguage("ENGLISH", 2), UserLanguage("JAPANESE", 1)),
             tags = listOf(UserTag("HIKING","HOBBY","⛰️","등산"), UserTag("COOKING","HOBBY","🍳","요리"), UserTag("FOOD_TOUR","FOOD","📍","맛집탐방")),
-            isOnline = false, consecutiveDays = 3,
+            isOnline = false, age = 24, consecutiveDays = 3,
         ),
         DiscoverUser(
             userId = 13, name = "Alex", profileImageUrl = "user_alex",
             country = "CS", bio = "Ahoj! 😊",
             languages = listOf(UserLanguage("CZECH", 5), UserLanguage("FRENCH", 3)),
             tags = listOf(UserTag("CAMPING","HOBBY","⛺","캠핑"), UserTag("READING","HOBBY","📚","독서"), UserTag("COFFEE","FOOD","☕","커피러버")),
-            isOnline = false, consecutiveDays = 1,
+            isOnline = false, age = 38, consecutiveDays = 1,
         ),
         DiscoverUser(
             userId = 14, name = "はるか", profileImageUrl = "user_haruka",
             country = "JAPAN", bio = "日本語で話しましょう！",
             languages = listOf(UserLanguage("JAPANESE", 5), UserLanguage("ENGLISH", 2)),
             tags = listOf(UserTag("MUSIC","ENTERTAINMENT","🎵","음악감상"), UserTag("COOKING","HOBBY","🍳","요리")),
-            isOnline = true, consecutiveDays = 12,
+            isOnline = true, age = 27, consecutiveDays = 12,
         ),
         DiscoverUser(
             userId = 15, name = "김민준", profileImageUrl = "user_kim",
             country = "KOREA", bio = "영어 배우고 싶어요",
             languages = listOf(UserLanguage("ENGLISH", 3), UserLanguage("JAPANESE", 1)),
             tags = listOf(UserTag("PHOTOGRAPHY","HOBBY","📷","사진찍기"), UserTag("RUNNING","HOBBY","🏃","러닝"), UserTag("TRAVEL","HOBBY","✈️","여행")),
-            isOnline = true, consecutiveDays = 30,
+            isOnline = true, age = 23, consecutiveDays = 30,
         ),
     )
 

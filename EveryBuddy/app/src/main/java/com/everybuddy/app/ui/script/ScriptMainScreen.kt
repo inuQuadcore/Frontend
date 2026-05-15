@@ -1,5 +1,6 @@
 package com.everybuddy.app.ui.script
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,9 +34,12 @@ private val SmTextPri = Color(0xFF000000)
 private val SmTextSec = Color(0xFF797979)
 private val SmBorder  = Color(0xFFE5E5E5)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScriptMainScreen(
     viewModel      : ScriptViewModel,
+    isRefreshing   : Boolean    = false,
+    onRefresh      : () -> Unit = {},
     onAddFolder    : () -> Unit = {},
     onFolderClick  : (ScriptFolder) -> Unit = {},
     onItemClick    : (ScriptItem) -> Unit = {},
@@ -57,10 +62,13 @@ fun ScriptMainScreen(
         containerColor = Color.White,
     ) { innerPadding ->
 
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh    = onRefresh,
+            modifier     = Modifier.padding(innerPadding).fillMaxSize(),
+        ) {
         LazyColumn(
-            modifier       = Modifier
-                .padding(innerPadding)
-                .fillMaxSize(),
+            modifier       = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 16.dp),
         ) {
 
@@ -163,6 +171,7 @@ fun ScriptMainScreen(
                 )
             }
         }
+        }
     }
 }
 
@@ -172,12 +181,11 @@ private fun ScriptTopBar(
     onNotificationClick : () -> Unit,
     hasNotification     : Boolean = false,
 ) {
-    Column {
+    Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
-                .background(Color.White)
                 .padding(horizontal = 16.dp),
         ) {
             Text(
@@ -410,3 +418,111 @@ fun ScriptItemCard(
 // 임시 BorderStroke import (ScriptItemCard 에서 사용)
 private fun BorderStroke(width: androidx.compose.ui.unit.Dp, color: Color) =
     androidx.compose.foundation.BorderStroke(width, color)
+
+@Composable
+fun ScriptDetailScreen(
+    item    : ScriptItem,
+    onBack  : () -> Unit,
+    onAudio : (ScriptItem) -> Unit = {},
+) {
+    BackHandler(onBack = onBack)
+
+    Scaffold(
+        topBar = {
+            Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                ) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(40.dp).align(Alignment.CenterStart)) {
+                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = SmTextPri)
+                    }
+                    Text(
+                        "스크립트 상세",
+                        modifier = Modifier.align(Alignment.Center),
+                        style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri),
+                    )
+                }
+                HorizontalDivider(color = SmBorder, thickness = 0.5.dp)
+            }
+        },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier.padding(innerPadding).fillMaxSize().padding(horizontal = 20.dp, vertical = 24.dp),
+        ) {
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    item.originalText,
+                    modifier = Modifier.weight(1f),
+                    style    = TextStyle(fontSize = 22.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri, lineHeight = 32.sp),
+                )
+                IconButton(onClick = { onAudio(item) }, modifier = Modifier.size(36.dp)) {
+                    Icon(painterResource(R.drawable.ic_speaker), "발음 듣기", Modifier.size(22.dp), tint = SmAccent)
+                }
+            }
+
+            if (item.translatedText.isNotEmpty()) {
+                Spacer(Modifier.height(20.dp))
+                Text("뜻", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SmTextSec))
+                Spacer(Modifier.height(6.dp))
+                Text(item.translatedText, style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = SmTextPri, lineHeight = 24.sp))
+            }
+
+            if (item.memo1.isNotEmpty()) {
+                Spacer(Modifier.height(20.dp))
+                Text("메모", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SmTextSec))
+                Spacer(Modifier.height(6.dp))
+                Text(item.memo1, style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = SmTextPri, lineHeight = 24.sp))
+            }
+        }
+    }
+}
+
+@Composable
+fun ScriptFolderScreen(
+    folder      : ScriptFolder,
+    allItems    : List<ScriptItem>,
+    onBack      : () -> Unit,
+    onItemClick : (ScriptItem) -> Unit = {},
+    onItemAudio : (ScriptItem) -> Unit = {},
+) {
+    val folderItems = remember(folder.id, allItems) { allItems.filter { it.folderId == folder.id } }
+
+    BackHandler(onBack = onBack)
+
+    Scaffold(
+        topBar = {
+            Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                ) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(40.dp).align(Alignment.CenterStart)) {
+                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = SmTextPri)
+                    }
+                    Text(
+                        folder.name,
+                        modifier = Modifier.align(Alignment.Center),
+                        style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri),
+                    )
+                }
+                HorizontalDivider(color = SmBorder, thickness = 0.5.dp)
+            }
+        },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        if (folderItems.isEmpty()) {
+            Box(Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("저장된 스크립트가 없습니다.", style = TextStyle(fontSize = 14.sp, color = SmTextSec))
+            }
+        } else {
+            LazyColumn(
+                modifier       = Modifier.padding(innerPadding).fillMaxSize(),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
+            ) {
+                items(folderItems) { item ->
+                    ScriptItemCard(item = item, onClick = { onItemClick(item) }, onAudio = { onItemAudio(item) })
+                }
+            }
+        }
+    }
+}

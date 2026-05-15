@@ -32,12 +32,11 @@ fun FriendTopBar(
     onNotification  : () -> Unit,
     onAddFriend     : () -> Unit = {},
 ) {
-    Column {
+    Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
-                .background(Color.White)
                 .padding(horizontal = 16.dp),
         ) {
             if (showAddFriend) {
