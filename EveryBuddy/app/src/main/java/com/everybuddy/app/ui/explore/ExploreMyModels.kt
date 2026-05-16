@@ -51,8 +51,6 @@ data class DiscoverUser(
     val tags            : List<UserTag>      = emptyList(),
     val lastSeenAt      : String      = "",    // ISO 날짜 문자열
     val isOnline        : Boolean     = false, // lastSeenAt 기반 파생
-    val age             : Int         = 25,    // 나이
-    val consecutiveDays : Int         = 0,     // 연속 출석일
 ) {
     /** 한줄소개 15자 제한 */
     fun bioPreview15() = if (bio.length > 15) bio.take(15) + "…" else bio
@@ -105,6 +103,20 @@ data class UserTag(
     val emoji    : String = "",
     val displayName: String = tag, // 한국어 표시명
 )
+
+// 프로필 진입 시 GET /users/{id}로 보강되는 정보. DiscoverUser와 합쳐 UserProfileScreen 표시
+data class UserDetail(
+    val age             : Int,
+    val gender          : String,  // "MALE"/"FEMALE", UI에서 한글 변환
+    val consecutiveDays : Int,
+    val isFriend        : Boolean,
+) {
+    fun genderLabel(): String = when (gender.uppercase()) {
+        "MALE"   -> "남성"
+        "FEMALE" -> "여성"
+        else     -> ""
+    }
+}
 
 enum class GenderFilter(val label: String) {
     FEMALE("여성"), MALE("남성"), ALL("모든 성별");

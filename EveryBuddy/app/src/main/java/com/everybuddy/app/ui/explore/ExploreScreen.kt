@@ -52,9 +52,11 @@ fun ExploreScreen(
     // 프로필 화면 분기
     if (uiState.isProfileOpen && uiState.selectedUser != null) {
         UserProfileScreen(
-            user   = uiState.selectedUser!!,
-            onBack = viewModel::closeProfile,
-            onChat = { onStartChat(it) },
+            user     = uiState.selectedUser!!,
+            detail   = uiState.selectedUserDetail,
+            isFriend = uiState.selectedUserDetail?.isFriend ?: false,
+            onBack   = viewModel::closeProfile,
+            onChat   = { onStartChat(it) },
         )
         return
     }

@@ -26,6 +26,7 @@ import java.io.File
 import javax.inject.Inject
 import com.everybuddy.app.data.dto.DiscoverUser as DiscoverUserDto
 import com.everybuddy.app.data.dto.LanguageLevel as LanguageLevelDto
+import com.everybuddy.app.data.dto.UserPublicProfileResponse
 import com.everybuddy.app.data.dto.UserTag as UserTagDto
 
 // ExploreViewModel — 탐색 탭
@@ -45,6 +46,7 @@ data class ExploreUiState(
     val isFilterLoadingMore: Boolean           = false,
     val isFilterScreenOpen : Boolean           = false,
     val selectedUser       : DiscoverUser?     = null,
+    val selectedUserDetail : UserDetail?       = null,
     val isProfileOpen      : Boolean           = false,
 )
 
@@ -75,9 +77,17 @@ private fun UserTagDto.toUi(): UserTag {
     )
 }
 
+private fun UserPublicProfileResponse.toUserDetail(): UserDetail = UserDetail(
+    age             = age,
+    gender          = gender,
+    consecutiveDays = consecutiveDays,
+    isFriend        = isFriend ?: false,
+)
+
 @HiltViewModel
 class ExploreViewModel @Inject constructor(
     private val discoverRepository : DiscoverRepository,
+    private val userRepository     : UserRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExploreUiState())
@@ -197,9 +207,27 @@ class ExploreViewModel @Inject constructor(
         ) }
     }
 
-    // 상대 프로필 팝업
-    fun openProfile(user: DiscoverUser) { _uiState.update { it.copy(selectedUser = user, isProfileOpen = true) } }
-    fun closeProfile()                  { _uiState.update { it.copy(selectedUser = null, isProfileOpen = false) } }
+    fun openProfile(user: DiscoverUser) {
+        _uiState.update { it.copy(
+            selectedUser       = user,
+            selectedUserDetail = null,
+            isProfileOpen      = true,
+        ) }
+        viewModelScope.launch {
+            val res = userRepository.getUserProfile(user.userId)
+            if (res is ApiResult.Success) {
+                _uiState.update { it.copy(selectedUserDetail = res.data.toUserDetail()) }
+            }
+        }
+    }
+
+    fun closeProfile() {
+        _uiState.update { it.copy(
+            selectedUser       = null,
+            selectedUserDetail = null,
+            isProfileOpen      = false,
+        ) }
+    }
 }
 
 // MyViewModel — 마이페이지
