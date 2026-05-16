@@ -187,6 +187,7 @@ class MyViewModel @Inject constructor(
                                             "MALE" -> "남성"; "FEMALE" -> "여성"; else -> apiProfile.gender
                                         },
                     bio               = apiProfile.bio,
+                    consecutiveDays   = apiProfile.consecutiveDays,
                     tags              = tags,
                     learningLanguages = langs,
                 ))

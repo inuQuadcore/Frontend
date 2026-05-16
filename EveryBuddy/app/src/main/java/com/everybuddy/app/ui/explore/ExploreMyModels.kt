@@ -151,6 +151,7 @@ data class MyProfile(
         UserTag("MOVIE",        "ENTERTAINMENT", "🎬", "영화보기"),
     ),
     val birthday        : String  = "",   // "yyyy.MM.dd" — 로드 전 빈 값
+    val consecutiveDays : Int     = 0,    // 연속 출석일. 1일 이상일 때만 뱃지 표시(0이면 숨김)
 ) {
     fun countryFlag() = countryFlag(country)
     fun countryName() = countryName(country)

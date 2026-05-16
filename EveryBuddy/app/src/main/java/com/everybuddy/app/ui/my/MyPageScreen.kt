@@ -140,6 +140,21 @@ private fun MyPageContent(
                 Spacer(Modifier.height(12.dp))
                 Text(profile.bio, style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 22.sp), modifier = Modifier.padding(horizontal = 16.dp))
 
+                if (profile.consecutiveDays > 0) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(painterResource(R.drawable.ic_calendar), "출석", Modifier.size(14.dp), tint = C.TextSec)
+                        Text(
+                            "연속 ${profile.consecutiveDays}일 출석",
+                            style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily),
+                        )
+                    }
+                }
+
                 Spacer(Modifier.height(12.dp))
                 // [프로필 수정] 버튼
                 OutlinedButton(
