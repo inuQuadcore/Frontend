@@ -12,6 +12,7 @@ data class UserPublicProfileResponse(
     @SerializedName("gender")          val gender          : String  = "",
     @SerializedName("bio")             val bio             : String  = "",
     @SerializedName("consecutiveDays") val consecutiveDays : Int     = 0,
+    @SerializedName("isFriend")        val isFriend        : Boolean? = null,
 )
 
 data class UserProfileResponse(
