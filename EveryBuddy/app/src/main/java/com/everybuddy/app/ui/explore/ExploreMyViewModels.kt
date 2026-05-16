@@ -258,10 +258,27 @@ class MyViewModel @Inject constructor(
         _uiState.update { it.copy(editingTags = current) }
     }
     fun saveTagEdit() {
-        val tags = _uiState.value.editingTags
-        _uiState.update { it.copy(profile = it.profile.copy(tags = tags), isTagEditOpen = false) }
+        val s = _uiState.value
+        if (s.isSaving) return
+        val tags = s.editingTags
+        _uiState.update { it.copy(isSaving = true) }
         viewModelScope.launch {
-            userRepository.updateMyTags(tags.map { it.tag })
+            val res = userRepository.updateMyTags(tags.map { it.tag })
+            when (res) {
+                is ApiResult.Success      -> _uiState.update { it.copy(
+                    profile       = it.profile.copy(tags = tags),
+                    isTagEditOpen = false,
+                    isSaving      = false,
+                ) }
+                is ApiResult.Error        -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = res.message,
+                ) }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = "네트워크 연결을 확인해주세요.",
+                ) }
+            }
         }
     }
 
@@ -270,15 +287,32 @@ class MyViewModel @Inject constructor(
     fun closeLanguage()             { _uiState.update { it.copy(openLanguageCode = null) } }
 
     fun saveLanguageLevel(language: String, level: Int) {
-        _uiState.update { s ->
-            s.copy(
-                profile = s.profile.copy(
-                    learningLanguages = s.profile.learningLanguages.map {
-                        if (it.language.equals(language, ignoreCase = true)) it.copy(level = level) else it
-                    },
-                ),
-                openLanguageCode = null,
-            )
+        val s = _uiState.value
+        if (s.isSaving) return
+        _uiState.update { it.copy(isSaving = true) }
+        viewModelScope.launch {
+            val res = userRepository.updateMyLanguageLevel(language, level)
+            when (res) {
+                is ApiResult.Success      -> _uiState.update { st ->
+                    st.copy(
+                        profile = st.profile.copy(
+                            learningLanguages = st.profile.learningLanguages.map {
+                                if (it.language.equals(language, ignoreCase = true)) it.copy(level = level) else it
+                            },
+                        ),
+                        openLanguageCode = null,
+                        isSaving         = false,
+                    )
+                }
+                is ApiResult.Error        -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = res.message,
+                ) }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = "네트워크 연결을 확인해주세요.",
+                ) }
+            }
         }
     }
 

@@ -52,6 +52,7 @@ fun MyPageScreen(
             currentLevel = uiState.profile.learningLanguages.find {
                 it.language.equals(uiState.openLanguageCode, ignoreCase = true)
             }?.level ?: 1,
+            isSaving = uiState.isSaving,
             onSave   = { level -> viewModel.saveLanguageLevel(uiState.openLanguageCode!!, level) },
             onBack   = viewModel::closeLanguage,
         )
@@ -667,6 +668,7 @@ private fun CountrySelectSubPage(current: String, onSave: (String) -> Unit, onBa
 private fun LanguageEditSubPage(
     language     : String,
     currentLevel : Int,
+    isSaving     : Boolean,
     onSave       : (Int) -> Unit,
     onBack       : () -> Unit,
 ) {
@@ -774,6 +776,7 @@ private fun LanguageEditSubPage(
                 }
                 Button(
                     onClick  = { onSave(selectedLevel) },
+                    enabled  = !isSaving,
                     modifier = Modifier.weight(1f).height(52.dp),
                     shape    = RoundedCornerShape(12.dp),
                     colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
@@ -806,8 +809,13 @@ private fun TagEditScreen(viewModel: MyViewModel) {
                     Text("태그 편집", style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri), modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                     Text(
                         "완료",
-                        style    = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.Accent, fontWeight = FontWeight(600)),
-                        modifier = Modifier.padding(horizontal = 12.dp).clickable { viewModel.saveTagEdit() },
+                        style    = TextStyle(
+                            fontSize   = 15.sp,
+                            fontFamily = PretendardFamily,
+                            color      = if (uiState.isSaving) C.TextSec else C.Accent,
+                            fontWeight = FontWeight(600),
+                        ),
+                        modifier = Modifier.padding(horizontal = 12.dp).clickable(enabled = !uiState.isSaving) { viewModel.saveTagEdit() },
                     )
                 }
                 HorizontalDivider(color = C.Border, thickness = 0.5.dp)
