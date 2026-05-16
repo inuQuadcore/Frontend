@@ -358,8 +358,11 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
                         Triple("이름", uiState.editName,              { editSubPage = "name" }),
                         Triple("생일", uiState.editBirthday,          { editSubPage = "birthday" }),
                         Triple("성별", uiState.editGender,            { editSubPage = "gender" }),
-                        // uiState.editCountry를 사용하도록 변경해야 합니다.
-                        Triple("국적", uiState.editCountry, { editSubPage = "country" }),
+                        Triple(
+                            "국적",
+                            "${countryFlag(uiState.editCountry)} ${countryName(uiState.editCountry)}",
+                            { editSubPage = "country" },
+                        ),
                     ).forEach { (label, value, onTap) ->
                         EditInfoRow(label = label, value = value, onTap = onTap)
                     }
@@ -413,8 +416,7 @@ private fun EditInfoRow(label: String, value: String, onTap: () -> Unit) {
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
         ) {
-            val display = if (label == "국적") "🇺🇸 $value" else value
-            Text(display, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
+            Text(value, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
             Icon(painterResource(R.drawable.ic_chevron_right), "수정", Modifier.size(16.dp), tint = C.TextSec)
         }
     }
@@ -617,7 +619,13 @@ private fun GenderSelectSubPage(current: String, onSave: (String) -> Unit, onBac
 private fun CountrySelectSubPage(current: String, onSave: (String) -> Unit, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     var selected by remember { mutableStateOf(current) }
-    val options = listOf("KR" to "한국", "US" to "미국", "JP" to "일본", "CN" to "중국", "FR" to "프랑스")
+    val options = listOf(
+        "KOREA"  to "한국",
+        "USA"    to "미국",
+        "JAPAN"  to "일본",
+        "CHINA"  to "중국",
+        "FRANCE" to "프랑스",
+    )
     Scaffold(
         topBar = { SubScreenTopBar(title = "국적", onBack = onBack) },
         containerColor = Color.White,

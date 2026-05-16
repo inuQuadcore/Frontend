@@ -4,6 +4,28 @@ import androidx.compose.ui.graphics.Color
 import com.everybuddy.app.ui.onboarding.InterestCategory
 import com.everybuddy.app.ui.onboarding.sampleTags
 
+// 국적 코드(KOREA/USA/JAPAN/CHINA/FRANCE/CZECH) → 표시 변환.
+// 백엔드 enum 값을 그대로 받아 변환. 알 수 없는 값은 🌐 / 코드 그대로 반환.
+fun countryFlag(code: String): String = when (code.uppercase()) {
+    "KOREA"  -> "🇰🇷"
+    "USA"    -> "🇺🇸"
+    "JAPAN"  -> "🇯🇵"
+    "CHINA"  -> "🇨🇳"
+    "FRANCE" -> "🇫🇷"
+    "CZECH"  -> "🇨🇿"
+    else     -> "🌐"
+}
+
+fun countryName(code: String): String = when (code.uppercase()) {
+    "KOREA"  -> "한국"
+    "USA"    -> "미국"
+    "JAPAN"  -> "일본"
+    "CHINA"  -> "중국"
+    "FRANCE" -> "프랑스"
+    "CZECH"  -> "체코"
+    else     -> code
+}
+
 object AppColors {
     val Accent      = Color(0xFF0167FF)
     val TextPri     = Color(0xFF000000)
@@ -46,27 +68,8 @@ data class DiscoverUser(
         return top2 to rest
     }
 
-    /** 국적 → 언어 플래그 이모지 */
-    fun countryFlag() = when (country.uppercase()) {
-        "KOREA", "KR"  -> "🇰🇷"
-        "USA", "US"    -> "🇺🇸"
-        "JAPAN", "JP"  -> "🇯🇵"
-        "CHINA", "CN"  -> "🇨🇳"
-        "FRANCE", "FR" -> "🇫🇷"
-        "CZECH", "CZ", "CS" -> "🇨🇿"
-        else -> "🌐"
-    }
-
-    /** 국적 → 국가 이름 */
-    fun countryName() = when (country.uppercase()) {
-        "KOREA", "KR"        -> "한국"
-        "USA", "US"          -> "미국"
-        "JAPAN", "JP"        -> "일본"
-        "CHINA", "CN"        -> "중국"
-        "FRANCE", "FR"       -> "프랑스"
-        "CZECH", "CZ", "CS"  -> "체코"
-        else                 -> country
-    }
+    fun countryFlag() = countryFlag(country)
+    fun countryName() = countryName(country)
 
     /** 언어 코드 표시 */
     fun languageLabels() = languages.map { it.displayCode() }
@@ -134,7 +137,7 @@ data class MyProfile(
     val profileImageUrl : String? = null,   // TODO: Coil
     val age             : Int     = 23,
     val gender          : String  = "여성",
-    val country         : String  = "US",
+    val country         : String  = "USA",
     val bio             : String  = "일본어 배우는 중이에요.\n가볍게 대화하면서 연습해요 😊",
     val learningLanguages: List<UserLanguage> = listOf(
         UserLanguage("ENGLISH", 2),
@@ -149,18 +152,8 @@ data class MyProfile(
     ),
     val birthday        : String  = "2005.11.30",
 ) {
-    fun countryFlag() = when (country.uppercase()) {
-        "US", "USA" -> "🇺🇸"
-        "KR", "KOREA" -> "🇰🇷"
-        "JP", "JAPAN" -> "🇯🇵"
-        else -> "🌐"
-    }
-    fun countryName() = when (country.uppercase()) {
-        "US", "USA" -> "미국"
-        "KR", "KOREA" -> "한국"
-        "JP", "JAPAN" -> "일본"
-        else -> country
-    }
+    fun countryFlag() = countryFlag(country)
+    fun countryName() = countryName(country)
 }
 
 object ExploreDemo {
@@ -208,7 +201,7 @@ object ExploreDemo {
         ),
         DiscoverUser(
             userId = 13, name = "Alex", profileImageUrl = "user_alex",
-            country = "CS", bio = "Ahoj! 😊",
+            country = "CZECH", bio = "Ahoj! 😊",
             languages = listOf(UserLanguage("CZECH", 5), UserLanguage("FRENCH", 3)),
             tags = listOf(UserTag("CAMPING","HOBBY","⛺","캠핑"), UserTag("READING","HOBBY","📚","독서"), UserTag("COFFEE","FOOD","☕","커피러버")),
             isOnline = false, age = 38, consecutiveDays = 1,
