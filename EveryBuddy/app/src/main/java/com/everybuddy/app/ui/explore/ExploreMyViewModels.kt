@@ -31,10 +31,10 @@ import com.everybuddy.app.data.dto.UserTag as UserTagDto
 // ExploreViewModel — 탐색 탭
 data class ExploreUiState(
     val selectedTab        : Int               = 0,   // 0=추천친구, 1=필터
-    val cardSet            : List<DiscoverUser> = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.randomCards else emptyList(),
+    val cardSet            : List<DiscoverUser> = emptyList(),
     val currentCardIndex   : Int               = 0,
-    val tagMatchUsers      : List<DiscoverUser> = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.tagMatchUsers else emptyList(),
-    val learningLangUsers  : List<DiscoverUser> = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.learningLangUsers else emptyList(),
+    val tagMatchUsers      : List<DiscoverUser> = emptyList(),
+    val learningLangUsers  : List<DiscoverUser> = emptyList(),
     val isRefreshing       : Boolean           = false,
     val filterSettings     : FilterSettings    = FilterSettings(),
     val filterResults      : List<DiscoverUser> = emptyList(),
@@ -124,17 +124,10 @@ class ExploreViewModel @Inject constructor(
     fun openFilterScreen()  { _uiState.update { it.copy(isFilterScreenOpen = true) } }
     fun closeFilterScreen() { _uiState.update { it.copy(isFilterScreenOpen = false) } }
 
-    // TODO: 실제 API 호출 → GET /api/v1/discover/filter
     fun applyFilter(settings: FilterSettings) {
-        val results = ExploreDemo.filterUsers.let { list ->
-            var r = list
-            if (settings.gender != GenderFilter.ALL) r = r.take(4)
-            if (settings.isOnline) r = r.filter { it.isOnline }
-            r.sortedBy { it.name }
-        }
         _uiState.update { it.copy(
             filterSettings     = settings,
-            filterResults      = results,
+            filterResults      = emptyList(),
             isFilterApplied    = !settings.isEmpty(),
             isFilterScreenOpen = false,
             selectedTab        = 1,

@@ -175,63 +175,6 @@ object ExploreDemo {
         )
     }
 
-    // 탐색 카드 랜덤 세트 (6개씩)
-    val randomCards = listOf(
-        DiscoverUser(
-            userId = 10, name = "Olivia", profileImageUrl = "olivia_card",
-            country = "USA", bio = "Hello! I'm from the U.S. 😊",
-            languages = listOf(UserLanguage("ENGLISH", 5), UserLanguage("KOREAN", 1)),
-            tags = listOf(UserTag("PHOTOGRAPHY","HOBBY","📷","사진찍기"), UserTag("RUNNING","HOBBY","🏃","러닝"), UserTag("TRAVEL","HOBBY","✈️","여행")),
-            isOnline = true, age = 26, consecutiveDays = 7,
-        ),
-        DiscoverUser(
-            userId = 11, name = "홍현준", profileImageUrl = "user_hong",
-            country = "USA", bio = "영어 배우고 싶어요",
-            languages = listOf(UserLanguage("ENGLISH", 2), UserLanguage("JAPANESE", 1)),
-            tags = listOf(UserTag("WORKOUT","HOBBY","🏋️","운동하기"), UserTag("COOKING","HOBBY","🍳","요리"), UserTag("FOOD_TOUR","FOOD","📍","맛집탐방")),
-            isOnline = true, age = 31, consecutiveDays = 5,
-        ),
-        DiscoverUser(
-            userId = 12, name = "손나은", profileImageUrl = "user_son",
-            country = "USA", bio = "영어 배우고 싶어요",
-            languages = listOf(UserLanguage("ENGLISH", 2), UserLanguage("JAPANESE", 1)),
-            tags = listOf(UserTag("HIKING","HOBBY","⛰️","등산"), UserTag("COOKING","HOBBY","🍳","요리"), UserTag("FOOD_TOUR","FOOD","📍","맛집탐방")),
-            isOnline = false, age = 24, consecutiveDays = 3,
-        ),
-        DiscoverUser(
-            userId = 13, name = "Alex", profileImageUrl = "user_alex",
-            country = "CZECH", bio = "Ahoj! 😊",
-            languages = listOf(UserLanguage("CZECH", 5), UserLanguage("FRENCH", 3)),
-            tags = listOf(UserTag("CAMPING","HOBBY","⛺","캠핑"), UserTag("READING","HOBBY","📚","독서"), UserTag("COFFEE","FOOD","☕","커피러버")),
-            isOnline = false, age = 38, consecutiveDays = 1,
-        ),
-        DiscoverUser(
-            userId = 14, name = "はるか", profileImageUrl = "user_haruka",
-            country = "JAPAN", bio = "日本語で話しましょう！",
-            languages = listOf(UserLanguage("JAPANESE", 5), UserLanguage("ENGLISH", 2)),
-            tags = listOf(UserTag("MUSIC","ENTERTAINMENT","🎵","음악감상"), UserTag("COOKING","HOBBY","🍳","요리")),
-            isOnline = true, age = 27, consecutiveDays = 12,
-        ),
-        DiscoverUser(
-            userId = 15, name = "김민준", profileImageUrl = "user_kim",
-            country = "KOREA", bio = "영어 배우고 싶어요",
-            languages = listOf(UserLanguage("ENGLISH", 3), UserLanguage("JAPANESE", 1)),
-            tags = listOf(UserTag("PHOTOGRAPHY","HOBBY","📷","사진찍기"), UserTag("RUNNING","HOBBY","🏃","러닝"), UserTag("TRAVEL","HOBBY","✈️","여행")),
-            isOnline = true, age = 23, consecutiveDays = 30,
-        ),
-    )
-
-    // 상위 태그 매칭 사용자 목록 (현활 → 가나다순)
-    val tagMatchUsers = randomCards.sortedWith(
-        compareByDescending<DiscoverUser> { it.isOnline }.thenBy { it.name }
-    )
-
-    // 내가 배우는 언어("ENGLISH") 배우고 싶은 사용자 목록
-    val learningLangUsers = tagMatchUsers
-
-    // 필터 적용 결과 (가나다순)
-    val filterUsers = randomCards.sortedBy { it.name }
-
     // 온보딩 국적 목록
     val countryList = listOf("모든 국적", "한국", "미국", "일본", "중국", "프랑스", "체코")
     val languageList = listOf("모든 언어", "영어", "일본어", "한국어", "중국어", "프랑스어")
