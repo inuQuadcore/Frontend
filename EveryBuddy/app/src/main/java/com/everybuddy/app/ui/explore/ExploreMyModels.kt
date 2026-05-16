@@ -106,7 +106,15 @@ data class UserTag(
     val displayName: String = tag, // 한국어 표시명
 )
 
-enum class GenderFilter(val label: String) { FEMALE("여성"), MALE("남성"), ALL("모든 성별") }
+enum class GenderFilter(val label: String) {
+    FEMALE("여성"), MALE("남성"), ALL("모든 성별");
+
+    fun toApiCode(): String? = when (this) {
+        MALE   -> "MALE"
+        FEMALE -> "FEMALE"
+        ALL    -> null
+    }
+}
 enum class ActivityFilter(val label: String, val desc: String) {
     ONLINE("현재활동중인 친구", "지금 이 앱에서 활발히 활동 중이에요."),
     RECENT("최근 접속한 친구", "최근 24시간 이내에 접속했어요."),

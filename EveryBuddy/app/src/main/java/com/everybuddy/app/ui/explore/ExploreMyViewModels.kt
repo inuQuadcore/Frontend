@@ -40,6 +40,9 @@ data class ExploreUiState(
     val filterResults      : List<DiscoverUser> = emptyList(),
     val isFilterApplied    : Boolean           = false,
     val filterHasNext      : Boolean           = false,
+    val filterNextCursor   : Long?             = null,
+    val isFilterLoading    : Boolean           = false,
+    val isFilterLoadingMore: Boolean           = false,
     val isFilterScreenOpen : Boolean           = false,
     val selectedUser       : DiscoverUser?     = null,
     val isProfileOpen      : Boolean           = false,
@@ -126,19 +129,71 @@ class ExploreViewModel @Inject constructor(
 
     fun applyFilter(settings: FilterSettings) {
         _uiState.update { it.copy(
-            filterSettings     = settings,
-            filterResults      = emptyList(),
-            isFilterApplied    = !settings.isEmpty(),
-            isFilterScreenOpen = false,
-            selectedTab        = 1,
+            filterSettings      = settings,
+            filterResults       = emptyList(),
+            filterNextCursor    = null,
+            filterHasNext       = false,
+            isFilterApplied     = !settings.isEmpty(),
+            isFilterScreenOpen  = false,
+            isFilterLoading     = true,
+            selectedTab         = 1,
         ) }
+        viewModelScope.launch {
+            fetchFilterPage(settings, lastUserId = null, isFirstPage = true)
+        }
+    }
+
+    fun loadMoreFilterResults() {
+        val state = _uiState.value
+        if (state.isFilterLoadingMore || !state.filterHasNext) return
+        val cursor = state.filterNextCursor ?: return
+        _uiState.update { it.copy(isFilterLoadingMore = true) }
+        viewModelScope.launch {
+            fetchFilterPage(state.filterSettings, lastUserId = cursor, isFirstPage = false)
+        }
+    }
+
+    private suspend fun fetchFilterPage(settings: FilterSettings, lastUserId: Long?, isFirstPage: Boolean) {
+        val res = discoverRepository.discoverFilter(
+            gender         = settings.gender.toApiCode(),
+            country        = settings.country,
+            minAge         = settings.minAge.toLong(),
+            maxAge         = settings.maxAge.toLong(),
+            languages      = settings.languages.ifEmpty { null },
+            tags           = settings.selectedTags.map { it.tag }.ifEmpty { null },
+            isOnline       = settings.isOnline.takeIf { it },
+            recentlyActive = settings.recentlyActive.takeIf { it },
+            lastUserId     = lastUserId,
+        )
+        when (res) {
+            is ApiResult.Success -> {
+                val newUsers = res.data.users.map { it.toUi() }
+                _uiState.update { s ->
+                    s.copy(
+                        filterResults       = if (isFirstPage) newUsers else s.filterResults + newUsers,
+                        filterHasNext       = res.data.hasNext,
+                        filterNextCursor    = res.data.nextCursor,
+                        isFilterLoading     = false,
+                        isFilterLoadingMore = false,
+                    )
+                }
+            }
+            is ApiResult.Error, is ApiResult.NetworkError -> {
+                _uiState.update { it.copy(
+                    isFilterLoading     = false,
+                    isFilterLoadingMore = false,
+                ) }
+            }
+        }
     }
 
     fun resetFilter() {
         _uiState.update { it.copy(
-            filterSettings  = FilterSettings(),
-            filterResults   = emptyList(),
-            isFilterApplied = false,
+            filterSettings   = FilterSettings(),
+            filterResults    = emptyList(),
+            filterNextCursor = null,
+            filterHasNext    = false,
+            isFilterApplied  = false,
         ) }
     }
 

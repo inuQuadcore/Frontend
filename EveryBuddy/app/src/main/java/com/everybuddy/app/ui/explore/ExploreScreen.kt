@@ -237,7 +237,9 @@ private fun FilterTab(
             }
             if (uiState.filterHasNext) {
                 item {
-                    // TODO: 다음 페이지 로드 (nextCursor 기반)
+                    LaunchedEffect(uiState.filterNextCursor) {
+                        viewModel.loadMoreFilterResults()
+                    }
                     Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                         LoadingIndicator(modifier = Modifier.size(24.dp))
                     }
