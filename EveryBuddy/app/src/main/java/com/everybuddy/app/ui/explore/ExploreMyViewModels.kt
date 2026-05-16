@@ -125,6 +125,7 @@ data class MyUiState(
     val editingTags     : List<UserTag> = emptyList(),
     val openLanguageCode: String?      = null,
     val openSubMenu     : String?      = null,   // "guide" | "notice" | "settings" | "version"
+    val isSaving        : Boolean      = false,  // 저장/삭제 API 진행 중 — 버튼 중복 클릭 방지용
 )
 
 @HiltViewModel
@@ -209,26 +210,37 @@ class MyViewModel @Inject constructor(
 
     fun saveEdit() {
         val s = _uiState.value
-        val apiGender = when (s.editGender) { "남성" -> "MALE"; "여성" -> "FEMALE"; else -> s.editGender }
-        _uiState.update { it.copy(
-            profile = it.profile.copy(
-                name     = s.editName,
-                bio      = s.editBio,
-                birthday = s.editBirthday,
-                gender   = s.editGender,
-                country  = s.editCountry,
-            ),
-            isEditMode   = false,
-            toastMessage = "프로필이 저장되었습니다.",
-        ) }
+        if (s.isSaving) return   // 응답 대기 중 중복 클릭 방지
+        val apiGender    = when (s.editGender) { "남성" -> "MALE"; "여성" -> "FEMALE"; else -> s.editGender }
+        // UI 입력 "2005.11.30" → API 요구 "2005-11-30". 빈 값은 null로 (PATCH에서 미변경)
+        val apiBirthday  = s.editBirthday.takeIf { it.isNotBlank() }?.replace(".", "-")
+        _uiState.update { it.copy(isSaving = true) }
         viewModelScope.launch {
-            userRepository.updateMyProfile(
+            val res = userRepository.updateMyProfile(
                 name     = s.editName,
                 bio      = s.editBio,
-                birthday = s.editBirthday,
+                birthday = apiBirthday,
                 gender   = apiGender,
                 country  = s.editCountry,
             )
+            when (res) {
+                is ApiResult.Success      -> {
+                    loadMyProfile()   // 서버 응답으로 동기화
+                    _uiState.update { it.copy(
+                        isEditMode   = false,
+                        isSaving     = false,
+                        toastMessage = "프로필이 저장되었습니다.",
+                    ) }
+                }
+                is ApiResult.Error        -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = res.message,
+                ) }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = "네트워크 연결을 확인해주세요.",
+                ) }
+            }
         }
     }
 

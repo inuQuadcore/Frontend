@@ -312,6 +312,7 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
                         HorizontalDivider(color = C.Border, thickness = 0.5.dp)
                         Button(
                             onClick  = { viewModel.saveEdit() },
+                            enabled  = !uiState.isSaving,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).navigationBarsPadding().height(52.dp),
                             shape    = RoundedCornerShape(12.dp),
                             colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
