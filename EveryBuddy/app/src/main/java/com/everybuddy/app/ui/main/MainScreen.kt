@@ -71,8 +71,11 @@ fun MainScreen(onLogout: () -> Unit = {}) {
     var showNotification  by remember { mutableStateOf(false) }
 
     val chatNavController = rememberNavController()
-    val scriptViewModel   : ScriptViewModel = hiltViewModel()
-    val chatVm            : ChatViewModel   = hiltViewModel()
+    val scriptViewModel   : ScriptViewModel     = hiltViewModel()
+    val chatVm            : ChatViewModel       = hiltViewModel()
+    val attendanceVm      : AttendanceViewModel = hiltViewModel()
+
+    LaunchedEffect(Unit) { attendanceVm.markAttendanceIfNeeded() }
 
     var selectedScriptItem    by remember { mutableStateOf<ScriptItem?>(null) }
     var selectedScriptFolder  by remember { mutableStateOf<ScriptFolder?>(null) }
