@@ -8,7 +8,9 @@ import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.AuthRepository
+import com.everybuddy.app.data.repository.DiscoverRepository
 import com.everybuddy.app.data.repository.UserRepository
+import com.everybuddy.app.ui.onboarding.sampleTags
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -22,30 +24,76 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
+import com.everybuddy.app.data.dto.DiscoverUser as DiscoverUserDto
+import com.everybuddy.app.data.dto.LanguageLevel as LanguageLevelDto
+import com.everybuddy.app.data.dto.UserPublicProfileResponse
+import com.everybuddy.app.data.dto.UserTag as UserTagDto
 
 // ExploreViewModel — 탐색 탭
 data class ExploreUiState(
     val selectedTab        : Int               = 0,   // 0=추천친구, 1=필터
-    val cardSet            : List<DiscoverUser> = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.randomCards else emptyList(),
+    val cardSet            : List<DiscoverUser> = emptyList(),
     val currentCardIndex   : Int               = 0,
-    val tagMatchUsers      : List<DiscoverUser> = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.tagMatchUsers else emptyList(),
-    val learningLangUsers  : List<DiscoverUser> = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.learningLangUsers else emptyList(),
+    val tagMatchUsers      : List<DiscoverUser> = emptyList(),
+    val learningLangUsers  : List<DiscoverUser> = emptyList(),
     val isRefreshing       : Boolean           = false,
     val filterSettings     : FilterSettings    = FilterSettings(),
     val filterResults      : List<DiscoverUser> = emptyList(),
     val isFilterApplied    : Boolean           = false,
     val filterHasNext      : Boolean           = false,
+    val filterNextCursor   : Long?             = null,
+    val isFilterLoading    : Boolean           = false,
+    val isFilterLoadingMore: Boolean           = false,
     val isFilterScreenOpen : Boolean           = false,
     val selectedUser       : DiscoverUser?     = null,
+    val selectedUserDetail : UserDetail?       = null,
     val isProfileOpen      : Boolean           = false,
-    val followedUserIds    : Set<Long>         = emptySet(),
+)
+
+// API에 없는 필드: age, consecutiveDays는 기본값. isOnline은 RTDB에서 받음.
+private fun DiscoverUserDto.toUi(): DiscoverUser = DiscoverUser(
+    userId          = userId,
+    name            = name,
+    profileImageUrl = profileImageUrl,
+    country         = country,
+    bio             = bio,
+    languages       = languages.map { it.toUi() },
+    tags            = tags.map { it.toUi() },
+    lastSeenAt      = lastSeenAt.orEmpty(),
+)
+
+private fun LanguageLevelDto.toUi(): UserLanguage = UserLanguage(
+    language = language,
+    level    = level,
+)
+
+private fun UserTagDto.toUi(): UserTag {
+    val sample = sampleTags.firstOrNull { it.apiValue == tag }
+    return UserTag(
+        tag         = tag,
+        category    = category,
+        emoji       = sample?.emoji ?: "",
+        displayName = sample?.label ?: tag,
+    )
+}
+
+private fun UserPublicProfileResponse.toUserDetail(): UserDetail = UserDetail(
+    age             = age,
+    gender          = gender,
+    consecutiveDays = consecutiveDays,
+    isFriend        = isFriend ?: false,
 )
 
 @HiltViewModel
-class ExploreViewModel @Inject constructor() : ViewModel() {
+class ExploreViewModel @Inject constructor(
+    private val discoverRepository : DiscoverRepository,
+    private val userRepository     : UserRepository,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExploreUiState())
     val uiState: StateFlow<ExploreUiState> = _uiState.asStateFlow()
+
+    init { refresh() }
 
     fun selectTab(tab: Int) { _uiState.update { it.copy(selectedTab = tab) } }
 
@@ -67,53 +115,118 @@ class ExploreViewModel @Inject constructor() : ViewModel() {
         }
     }
 
-    // TODO: 실제 API 호출 → GET /api/v1/discover/random
     fun refresh() {
-        _uiState.update { it.copy(
-            cardSet          = it.cardSet.shuffled(),
-            currentCardIndex = 0,
-            isRefreshing     = false,
-        ) }
+        viewModelScope.launch {
+            when (val res = discoverRepository.discoverRandom()) {
+                is ApiResult.Success -> {
+                    val users = res.data.users.map { it.toUi() }
+                    _uiState.update { it.copy(
+                        cardSet          = users,
+                        currentCardIndex = 0,
+                        isRefreshing     = false,
+                    ) }
+                }
+                is ApiResult.Error, is ApiResult.NetworkError -> {
+                    _uiState.update { it.copy(isRefreshing = false) }
+                }
+            }
+        }
     }
 
     // 필터 화면 열기/닫기
     fun openFilterScreen()  { _uiState.update { it.copy(isFilterScreenOpen = true) } }
     fun closeFilterScreen() { _uiState.update { it.copy(isFilterScreenOpen = false) } }
 
-    // TODO: 실제 API 호출 → GET /api/v1/discover/filter
     fun applyFilter(settings: FilterSettings) {
-        val results = ExploreDemo.filterUsers.let { list ->
-            var r = list
-            if (settings.gender != GenderFilter.ALL) r = r.take(4)
-            if (settings.isOnline) r = r.filter { it.isOnline }
-            r.sortedBy { it.name }
-        }
         _uiState.update { it.copy(
-            filterSettings     = settings,
-            filterResults      = results,
-            isFilterApplied    = !settings.isEmpty(),
-            isFilterScreenOpen = false,
-            selectedTab        = 1,
+            filterSettings      = settings,
+            filterResults       = emptyList(),
+            filterNextCursor    = null,
+            filterHasNext       = false,
+            isFilterApplied     = !settings.isEmpty(),
+            isFilterScreenOpen  = false,
+            isFilterLoading     = true,
+            selectedTab         = 1,
         ) }
+        viewModelScope.launch {
+            fetchFilterPage(settings, lastUserId = null, isFirstPage = true)
+        }
+    }
+
+    fun loadMoreFilterResults() {
+        val state = _uiState.value
+        if (state.isFilterLoadingMore || !state.filterHasNext) return
+        val cursor = state.filterNextCursor ?: return
+        _uiState.update { it.copy(isFilterLoadingMore = true) }
+        viewModelScope.launch {
+            fetchFilterPage(state.filterSettings, lastUserId = cursor, isFirstPage = false)
+        }
+    }
+
+    private suspend fun fetchFilterPage(settings: FilterSettings, lastUserId: Long?, isFirstPage: Boolean) {
+        val res = discoverRepository.discoverFilter(
+            gender         = settings.gender.toApiCode(),
+            country        = settings.country,
+            minAge         = settings.minAge.toLong(),
+            maxAge         = settings.maxAge.toLong(),
+            languages      = settings.languages.ifEmpty { null },
+            tags           = settings.selectedTags.map { it.tag }.ifEmpty { null },
+            isOnline       = settings.isOnline.takeIf { it },
+            recentlyActive = settings.recentlyActive.takeIf { it },
+            lastUserId     = lastUserId,
+        )
+        when (res) {
+            is ApiResult.Success -> {
+                val newUsers = res.data.users.map { it.toUi() }
+                _uiState.update { s ->
+                    s.copy(
+                        filterResults       = if (isFirstPage) newUsers else s.filterResults + newUsers,
+                        filterHasNext       = res.data.hasNext,
+                        filterNextCursor    = res.data.nextCursor,
+                        isFilterLoading     = false,
+                        isFilterLoadingMore = false,
+                    )
+                }
+            }
+            is ApiResult.Error, is ApiResult.NetworkError -> {
+                _uiState.update { it.copy(
+                    isFilterLoading     = false,
+                    isFilterLoadingMore = false,
+                ) }
+            }
+        }
     }
 
     fun resetFilter() {
         _uiState.update { it.copy(
-            filterSettings  = FilterSettings(),
-            filterResults   = emptyList(),
-            isFilterApplied = false,
+            filterSettings   = FilterSettings(),
+            filterResults    = emptyList(),
+            filterNextCursor = null,
+            filterHasNext    = false,
+            isFilterApplied  = false,
         ) }
     }
 
-    // 상대 프로필 팝업
-    fun openProfile(user: DiscoverUser) { _uiState.update { it.copy(selectedUser = user, isProfileOpen = true) } }
-    fun closeProfile()                  { _uiState.update { it.copy(selectedUser = null, isProfileOpen = false) } }
-
-    fun onFollowToggle(userId: Long) {
-        _uiState.update { s ->
-            val ids = s.followedUserIds
-            s.copy(followedUserIds = if (ids.contains(userId)) ids - userId else ids + userId)
+    fun openProfile(user: DiscoverUser) {
+        _uiState.update { it.copy(
+            selectedUser       = user,
+            selectedUserDetail = null,
+            isProfileOpen      = true,
+        ) }
+        viewModelScope.launch {
+            val res = userRepository.getUserProfile(user.userId)
+            if (res is ApiResult.Success) {
+                _uiState.update { it.copy(selectedUserDetail = res.data.toUserDetail()) }
+            }
         }
+    }
+
+    fun closeProfile() {
+        _uiState.update { it.copy(
+            selectedUser       = null,
+            selectedUserDetail = null,
+            isProfileOpen      = false,
+        ) }
     }
 }
 

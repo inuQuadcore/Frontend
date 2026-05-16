@@ -31,6 +31,7 @@ private val C = AppColors
 @Composable
 fun UserProfileScreen(
     user            : DiscoverUser,
+    detail          : UserDetail? = null,
     isFriend        : Boolean = false,
     myTags          : List<UserTag> = ExploreDemo.myProfile.tags,
     onBack          : () -> Unit,
@@ -122,7 +123,12 @@ fun UserProfileScreen(
                             }
                         }
                     }
-                    Text("${user.age}세 · 여성", style = TextStyle(fontSize = 13.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                    if (detail != null) {
+                        val genderLabel = detail.genderLabel()
+                        val ageText     = "${detail.age}세"
+                        val combined    = if (genderLabel.isNotEmpty()) "$ageText · $genderLabel" else ageText
+                        Text(combined, style = TextStyle(fontSize = 13.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                    }
                 }
             }
 
@@ -147,11 +153,11 @@ fun UserProfileScreen(
                     Icon(painterResource(R.drawable.ic_location), "국적", Modifier.size(14.dp), tint = C.TextSec)
                     Text(user.countryName(), style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
                 }
-                if (user.consecutiveDays > 0) {
+                if (detail != null && detail.consecutiveDays > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         // ic_calendar.xml
                         Icon(painterResource(R.drawable.ic_calendar), "출석", Modifier.size(14.dp), tint = C.TextSec)
-                        Text("연속 ${user.consecutiveDays}일 출석", style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                        Text("연속 ${detail.consecutiveDays}일 출석", style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
                     }
                 }
                 // 원문보기
