@@ -98,7 +98,13 @@ class UserRepository @Inject constructor(
         imageMimeType : String  = "image/jpeg",
     ): ApiResult<UserProfileResponse> {
         val requestJson = gson.toJson(
-            UpdateProfileRequest(name, birthday, gender, country, bio)
+            UpdateProfileRequest(
+                name     = name,
+                bio      = bio,
+                gender   = gender,
+                country  = country,
+                birthday = birthday,
+            )
         ).toRequestBody("application/json".toMediaType())
 
         val imagePart = profileImage?.let {
