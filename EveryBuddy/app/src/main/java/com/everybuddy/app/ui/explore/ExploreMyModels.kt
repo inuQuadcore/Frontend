@@ -110,7 +110,6 @@ enum class GenderFilter(val label: String) { FEMALE("여성"), MALE("남성"), A
 enum class ActivityFilter(val label: String, val desc: String) {
     ONLINE("현재활동중인 친구", "지금 이 앱에서 활발히 활동 중이에요."),
     RECENT("최근 접속한 친구", "최근 24시간 이내에 접속했어요."),
-    FREQUENT("대화를 자주 하는 친구", "최근에 친구들과 메시지를 주고받았어요."),
 }
 
 data class FilterSettings(

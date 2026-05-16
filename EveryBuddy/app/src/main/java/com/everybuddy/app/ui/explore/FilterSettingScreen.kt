@@ -217,9 +217,8 @@ fun FilterSettingScreen(
                                 Image(
                                     painter            = painterResource(
                                         when (af) {
-                                            ActivityFilter.ONLINE   -> R.drawable.markbtn1
-                                            ActivityFilter.RECENT   -> R.drawable.markbtn3
-                                            ActivityFilter.FREQUENT -> R.drawable.markbtn2
+                                            ActivityFilter.ONLINE -> R.drawable.markbtn1
+                                            ActivityFilter.RECENT -> R.drawable.markbtn3
                                         }
                                     ),
                                     contentDescription = null,
