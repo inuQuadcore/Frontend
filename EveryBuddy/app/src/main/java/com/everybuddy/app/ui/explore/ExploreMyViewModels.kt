@@ -38,7 +38,6 @@ data class ExploreUiState(
     val isFilterScreenOpen : Boolean           = false,
     val selectedUser       : DiscoverUser?     = null,
     val isProfileOpen      : Boolean           = false,
-    val followedUserIds    : Set<Long>         = emptySet(),
 )
 
 @HiltViewModel
@@ -108,13 +107,6 @@ class ExploreViewModel @Inject constructor() : ViewModel() {
     // 상대 프로필 팝업
     fun openProfile(user: DiscoverUser) { _uiState.update { it.copy(selectedUser = user, isProfileOpen = true) } }
     fun closeProfile()                  { _uiState.update { it.copy(selectedUser = null, isProfileOpen = false) } }
-
-    fun onFollowToggle(userId: Long) {
-        _uiState.update { s ->
-            val ids = s.followedUserIds
-            s.copy(followedUserIds = if (ids.contains(userId)) ids - userId else ids + userId)
-        }
-    }
 }
 
 // MyViewModel — 마이페이지

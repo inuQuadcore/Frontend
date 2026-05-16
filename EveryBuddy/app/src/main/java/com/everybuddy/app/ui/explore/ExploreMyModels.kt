@@ -53,7 +53,6 @@ data class DiscoverUser(
     val isOnline        : Boolean     = false, // lastSeenAt 기반 파생
     val age             : Int         = 25,    // 나이
     val consecutiveDays : Int         = 0,     // 연속 출석일
-    val isFollowing     : Boolean     = false,
 ) {
     /** 한줄소개 15자 제한 */
     fun bioPreview15() = if (bio.length > 15) bio.take(15) + "…" else bio

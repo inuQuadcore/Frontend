@@ -163,10 +163,8 @@ private fun RecommendTab(
         }
         items(uiState.tagMatchUsers.take(3)) { user ->
             UserListItem(
-                user           = user,
-                isFollowing    = uiState.followedUserIds.contains(user.userId),
-                onFollowToggle = { viewModel.onFollowToggle(user.userId) },
-                onClick        = { onOpenProfile(user) },
+                user    = user,
+                onClick = { onOpenProfile(user) },
             )
         }
 
@@ -187,10 +185,8 @@ private fun RecommendTab(
         }
         items(uiState.learningLangUsers.take(3)) { user ->
             UserListItem(
-                user           = user,
-                isFollowing    = uiState.followedUserIds.contains(user.userId),
-                onFollowToggle = { viewModel.onFollowToggle(user.userId) },
-                onClick        = { onOpenProfile(user) },
+                user    = user,
+                onClick = { onOpenProfile(user) },
             )
         }
     }
@@ -235,10 +231,8 @@ private fun FilterTab(
             }
             items(uiState.filterResults) { user ->
                 UserListItem(
-                    user           = user,
-                    isFollowing    = uiState.followedUserIds.contains(user.userId),
-                    onFollowToggle = { viewModel.onFollowToggle(user.userId) },
-                    onClick        = { onOpenProfile(user) },
+                    user    = user,
+                    onClick = { onOpenProfile(user) },
                 )
             }
             if (uiState.filterHasNext) {
@@ -398,14 +392,15 @@ private fun ProfileCard(user: DiscoverUser, onClick: () -> Unit) {
             .background(Color(0xFF888888))
             .clickable(onClick = onClick),
     ) {
-        when (user.userId) {
-            10L -> Image(
-                painter            = painterResource(R.drawable.im_woo2),
+        if (user.profileImageUrl != null) {
+            AsyncImage(
+                model              = user.profileImageUrl,
                 contentDescription = user.name,
                 contentScale       = ContentScale.Crop,
                 modifier           = Modifier.fillMaxSize(),
             )
-            else -> Box(
+        } else {
+            Box(
                 modifier         = Modifier.fillMaxSize().background(Color(0xFFF0F0F0)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -575,10 +570,8 @@ fun FilterBanner(subtitle: String = "조건에 맞추어 추천해요", onClick:
 
 @Composable
 fun UserListItem(
-    user           : DiscoverUser,
-    isFollowing    : Boolean     = false,
-    onFollowToggle : () -> Unit  = {},
-    onClick        : () -> Unit,
+    user    : DiscoverUser,
+    onClick : () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -592,14 +585,15 @@ fun UserListItem(
             Box(
                 modifier = Modifier.size(60.dp).clip(CircleShape).background(Color(0xFFF0F0F0)),
             ) {
-                when (user.userId) {
-                    10L -> Image(
-                        painter            = painterResource(R.drawable.im_woo2),
+                if (user.profileImageUrl != null) {
+                    AsyncImage(
+                        model              = user.profileImageUrl,
                         contentDescription = user.name,
                         contentScale       = ContentScale.Crop,
                         modifier           = Modifier.fillMaxSize(),
                     )
-                    else -> Box(
+                } else {
+                    Box(
                         modifier         = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
