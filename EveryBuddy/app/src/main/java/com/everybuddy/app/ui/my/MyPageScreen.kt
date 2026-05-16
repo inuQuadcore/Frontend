@@ -260,7 +260,7 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
     BackHandler { viewModel.closeEdit() }
 
     val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) viewModel.updateProfileImageUrl(uri.toString())
+        if (uri != null) viewModel.setPendingImageUri(uri.toString())
     }
 
     var editSubPage by remember { mutableStateOf<String?>(null) }
@@ -333,7 +333,7 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
                     Box(modifier = Modifier.size(100.dp).clickable { imageLauncher.launch("image/*") }) {
                         Box(Modifier.size(100.dp).clip(CircleShape).background(Color(0xFFD0D0D0))) {
                             AsyncImage(
-                                model              = uiState.profile.profileImageUrl,
+                                model              = uiState.pendingImageUri ?: uiState.profile.profileImageUrl,
                                 contentDescription = uiState.profile.name,
                                 contentScale       = ContentScale.Crop,
                                 modifier           = Modifier.fillMaxSize(),
