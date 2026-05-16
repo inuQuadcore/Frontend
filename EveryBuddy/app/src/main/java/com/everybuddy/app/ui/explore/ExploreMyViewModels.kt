@@ -173,6 +173,8 @@ class MyViewModel @Inject constructor(
                     profileImageUrl   = apiProfile.profileImageUrl,
                     country           = apiProfile.country,
                     age               = apiProfile.age,
+                    // API "yyyy-MM-dd" → UI 표시 "yyyy.MM.dd". null/빈값이면 빈 문자열
+                    birthday          = apiProfile.birthday?.replace("-", ".").orEmpty(),
                     gender            = when (apiProfile.gender.uppercase()) {
                                             "MALE" -> "남성"; "FEMALE" -> "여성"; else -> apiProfile.gender
                                         },

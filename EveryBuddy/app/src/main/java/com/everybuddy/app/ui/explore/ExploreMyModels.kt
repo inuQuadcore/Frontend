@@ -150,7 +150,7 @@ data class MyProfile(
         UserTag("CAFE_TOUR",    "HOBBY",         "☕", "카페탐방"),
         UserTag("MOVIE",        "ENTERTAINMENT", "🎬", "영화보기"),
     ),
-    val birthday        : String  = "2005.11.30",
+    val birthday        : String  = "",   // "yyyy.MM.dd" — 로드 전 빈 값
 ) {
     fun countryFlag() = countryFlag(country)
     fun countryName() = countryName(country)
