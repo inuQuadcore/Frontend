@@ -52,7 +52,7 @@ fun FilterSettingScreen(
     var minAge          by remember { mutableFloatStateOf(current.minAge.toFloat()) }
     var maxAge          by remember { mutableFloatStateOf(current.maxAge.toFloat()) }
     var country         by remember { mutableStateOf(current.country) }
-    var language        by remember { mutableStateOf(current.language) }
+    var languages       by remember { mutableStateOf(current.languages) }
     var activityFilters by remember { mutableStateOf(current.activityFilters) }
     var selectedTags    by remember { mutableStateOf(current.selectedTags) }
     var tagCategoryIdx  by remember { mutableIntStateOf(0) }
@@ -94,7 +94,7 @@ fun FilterSettingScreen(
                     OutlinedButton(
                         onClick        = {
                             gender = GenderFilter.ALL; minAge = AGE_MIN.toFloat()
-                            maxAge = AGE_MAX.toFloat(); country = null; language = null
+                            maxAge = AGE_MAX.toFloat(); country = null; languages = emptyList()
                             activityFilters = emptySet(); selectedTags = emptyList()
                         },
                         modifier       = Modifier.weight(1f).height(52.dp),
@@ -115,7 +115,7 @@ fun FilterSettingScreen(
                                 minAge          = minAge.toInt(),
                                 maxAge          = maxAge.toInt(),
                                 country         = country,
-                                language        = language,
+                                languages       = languages,
                                 activityFilters = activityFilters,
                                 selectedTags    = selectedTags,
                                 isOnline        = activityFilters.contains(ActivityFilter.ONLINE),
@@ -189,9 +189,11 @@ fun FilterSettingScreen(
 
             // ── 언어 ──────────────────────────────────────────────────────
             FilterSection(title = "언어", desc = "내가 학습하고 싶은 언어를 사용하는 친구를 찾아봐요") {
-                SelectionRow(
-                    label = language ?: "모든 언어",
-                    onTap = { /* TODO: 언어 선택 BottomSheet */ },
+                LanguageMultiSelect(
+                    selected = languages,
+                    onToggle = { code ->
+                        languages = if (code in languages) languages - code else languages + code
+                    },
                 )
             }
 
@@ -439,6 +441,41 @@ private fun AgeRangeSlider(
         },
         modifier      = Modifier.fillMaxWidth(),
     )
+}
+
+// 언어 다중 선택 — 서버 enum 코드 기준
+@Composable
+private fun LanguageMultiSelect(
+    selected : List<String>,
+    onToggle : (String) -> Unit,
+) {
+    val options = listOf(
+        "영어"     to "ENGLISH",
+        "일본어"   to "JAPANESE",
+        "한국어"   to "KOREAN",
+        "중국어"   to "CHINESE",
+        "프랑스어" to "FRENCH",
+    )
+    Column(
+        modifier            = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (label, code) ->
+                val isSel = code in selected
+                FilterChip(
+                    selected = isSel,
+                    onClick  = { onToggle(code) },
+                    label    = { Text(label, style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily)) },
+                    shape    = RoundedCornerShape(20.dp),
+                    colors   = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = C.Accent,
+                        selectedLabelColor     = Color.White,
+                    ),
+                )
+            }
+        }
+    }
 }
 
 // 편의 함수

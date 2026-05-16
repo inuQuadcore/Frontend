@@ -117,7 +117,7 @@ data class FilterSettings(
     val minAge         : Int                 = 15,
     val maxAge         : Int                 = 30,
     val country        : String?             = null,   // null = 모든 국적
-    val language       : String?             = null,   // null = 모든 언어
+    val languages      : List<String>        = emptyList(),  // 서버 코드("ENGLISH" 등), 빈 리스트 = 모든 언어
     val activityFilters: Set<ActivityFilter> = emptySet(),
     val selectedTags   : List<UserTag>       = emptyList(),  // 최대 15개
     val isOnline       : Boolean             = false,
@@ -125,7 +125,7 @@ data class FilterSettings(
 ) {
     fun isEmpty() = gender == GenderFilter.ALL &&
             minAge == 15 && maxAge == 30 &&
-            country == null && language == null &&
+            country == null && languages.isEmpty() &&
             activityFilters.isEmpty() && selectedTags.isEmpty()
 }
 
