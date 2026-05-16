@@ -243,6 +243,19 @@ class ExploreViewModel @Inject constructor(
             }
         }
     }
+
+    fun removeFriend(userId: Long) {
+        viewModelScope.launch {
+            when (friendRepository.removeFriend(userId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { s ->
+                        s.copy(selectedUserDetail = s.selectedUserDetail?.copy(isFriend = false))
+                    }
+                }
+                else -> Unit
+            }
+        }
+    }
 }
 
 // MyViewModel — 마이페이지

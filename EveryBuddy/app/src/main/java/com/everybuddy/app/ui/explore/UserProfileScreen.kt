@@ -293,7 +293,7 @@ fun UserProfileScreen(
                 onConfirm = {
                     when (action) {
                         "차단" -> { /* TODO: API - POST /api/v1/users/{userId}/block */ }
-                        "삭제" -> { /* TODO: API - DELETE /api/v1/friends/{userId} */ }
+                        "삭제" -> { isFriendLocal = false; onRemoveFriend(user) }
                         "신고" -> { /* TODO: API - POST /api/v1/users/{userId}/report */ }
                     }
                     pendingAction = null
