@@ -20,7 +20,7 @@ import javax.inject.Inject
 
 data class StatusUiState(
     val myStatus            : MyStatusMessageResponse?     = null,
-    val friendStatuses      : List<FriendStatusMessageDto>  = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.demoFriendStatusDtos else emptyList(),
+    val friendStatuses      : List<FriendStatusMessageDto>  = emptyList(),
     val isWriteScreenOpen   : Boolean                      = false,
     val isEditMode          : Boolean                      = false,
     val draftText           : String                       = "",
@@ -48,10 +48,6 @@ class StatusMessageViewModel @Inject constructor(
     init { loadAll() }
 
     fun loadAll() {
-        if (BuildConfig.USE_DUMMY_DATA) {
-            _state.update { it.copy(friendStatuses = FriendDemoData.demoFriendStatusDtos, myStatus = null) }
-            return
-        }
         loadMyStatus()
         loadFriendStatuses(reset = true)
     }
@@ -112,19 +108,8 @@ class StatusMessageViewModel @Inject constructor(
                     loadMyStatus()
                     _state.update { it.copy(isWriteScreenOpen = false, draftText = "", isEditMode = false, isLoading = false, toastMessage = msg) }
                 }
-                is ApiResult.Error, is ApiResult.NetworkError -> {
-                    if (BuildConfig.USE_DUMMY_DATA) {
-                        val demoResp = MyStatusMessageResponse(
-                            statusMessageId = System.currentTimeMillis(),
-                            nickname        = "",
-                            content         = text,
-                            updatedAt       = java.time.LocalDateTime.now().toString(),
-                        )
-                        _state.update { it.copy(myStatus = demoResp, isWriteScreenOpen = false, draftText = "", isEditMode = false, isLoading = false, toastMessage = msg) }
-                    } else {
-                        _state.update { it.copy(isLoading = false, toastMessage = r.userMessage()) }
-                    }
-                }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _state.update { it.copy(isLoading = false, toastMessage = r.userMessage()) }
             }
         }
     }

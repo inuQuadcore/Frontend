@@ -2,7 +2,6 @@ package com.everybuddy.app.ui.friend
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.Friend
 import com.everybuddy.app.data.dto.userMessage
@@ -18,9 +17,9 @@ import javax.inject.Inject
 
 data class FriendUiState(
     // 전체 데이터
-    val friends             : List<FriendProfile>   = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.friends else emptyList(),
+    val friends             : List<FriendProfile>   = emptyList(),
     val isLoading           : Boolean               = false,
-    val statusMessages      : List<StatusMessage>   = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.statusMessages.toList() else emptyList(),
+    val statusMessages      : List<StatusMessage>   = emptyList(),
     val myStatusMessage     : StatusMessage?        = null,   // 내 상태메시지 (null = 미작성)
 
     // 정렬
@@ -43,8 +42,8 @@ data class FriendUiState(
     val replyText           : String                = "",
     val replySent           : Boolean               = false,  // "전송 완료!" 토스트
 
-    // 채팅방 목록 (답장 → 채팅방 생성/업데이트)
-    val chatRooms           : MutableList<FriendDemoData.DemoChatRoom> = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.chatRooms else mutableListOf(),
+    // 채팅방 목록 (답장 → 채팅방 생성/업데이트). chat 도메인과 결합, chat 브랜치에서 정리 예정.
+    val chatRooms           : MutableList<FriendDemoData.DemoChatRoom> = FriendDemoData.chatRooms,
 
     // 프로필 화면
     val selectedFriend      : FriendProfile?        = null,
@@ -68,10 +67,6 @@ class FriendViewModel @Inject constructor(
     init { loadFriends() }
 
     fun loadFriends() {
-        if (BuildConfig.USE_DUMMY_DATA) {
-            _uiState.update { it.copy(isLoading = false, friends = FriendDemoData.friends) }
-            return
-        }
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             when (val r = friendRepository.getFriends()) {
@@ -86,13 +81,13 @@ class FriendViewModel @Inject constructor(
 
     fun refresh() {
         _uiState.update { it.copy(isRefreshing = true) }
-        // TODO: 실제 API 호출 → GET /api/v1/friends + 상태메시지 목록
-        _uiState.update { state ->
-            state.copy(
-                isRefreshing   = false,
-                friends        = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.friends else emptyList(),
-                statusMessages = if (BuildConfig.USE_DUMMY_DATA) FriendDemoData.statusMessages.toList() else emptyList(),
-            )
+        viewModelScope.launch {
+            when (val r = friendRepository.getFriends()) {
+                is ApiResult.Success ->
+                    _uiState.update { it.copy(friends = r.data.friends.map { f -> f.toFriendProfile() }, isRefreshing = false) }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _uiState.update { it.copy(isRefreshing = false, toastMessage = r.userMessage()) }
+            }
         }
     }
 
