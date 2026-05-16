@@ -9,6 +9,7 @@ import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.AuthRepository
 import com.everybuddy.app.data.repository.DiscoverRepository
+import com.everybuddy.app.data.repository.FriendRepository
 import com.everybuddy.app.data.repository.UserRepository
 import com.everybuddy.app.ui.onboarding.sampleTags
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -88,6 +89,7 @@ private fun UserPublicProfileResponse.toUserDetail(): UserDetail = UserDetail(
 class ExploreViewModel @Inject constructor(
     private val discoverRepository : DiscoverRepository,
     private val userRepository     : UserRepository,
+    private val friendRepository   : FriendRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExploreUiState())
@@ -227,6 +229,32 @@ class ExploreViewModel @Inject constructor(
             selectedUserDetail = null,
             isProfileOpen      = false,
         ) }
+    }
+
+    fun addFriend(userId: Long) {
+        viewModelScope.launch {
+            when (friendRepository.addFriend(userId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { s ->
+                        s.copy(selectedUserDetail = s.selectedUserDetail?.copy(isFriend = true))
+                    }
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    fun removeFriend(userId: Long) {
+        viewModelScope.launch {
+            when (friendRepository.removeFriend(userId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { s ->
+                        s.copy(selectedUserDetail = s.selectedUserDetail?.copy(isFriend = false))
+                    }
+                }
+                else -> Unit
+            }
+        }
     }
 }
 
