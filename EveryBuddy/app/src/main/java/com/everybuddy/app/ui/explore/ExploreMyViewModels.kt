@@ -365,7 +365,7 @@ class MyViewModel @Inject constructor(
             val pendingUri = s.pendingImageUri?.let { runCatching { Uri.parse(it) }.getOrNull() }
             val (imageFile, imageMime) = pendingUri?.let { uri ->
                 val mime = appContext.contentResolver.getType(uri) ?: "image/jpeg"
-                uriToTempFile(uri) to mime
+                uriToTempFile(uri, mime) to mime
             } ?: (null to "image/jpeg")
 
             val res = userRepository.updateMyProfile(
@@ -403,9 +403,17 @@ class MyViewModel @Inject constructor(
     }
 
     // 갤러리 URI를 cache dir의 임시 File로 복사. 실패 시 null.
-    private suspend fun uriToTempFile(uri: Uri): File? = withContext(Dispatchers.IO) {
+    private suspend fun uriToTempFile(uri: Uri, mimeType: String): File? = withContext(Dispatchers.IO) {
         runCatching {
-            val tempFile = File.createTempFile("upload_", ".img", appContext.cacheDir)
+            val ext = when (mimeType.lowercase()) {
+                "image/jpeg" -> ".jpg"
+                "image/png"  -> ".png"
+                "image/gif"  -> ".gif"
+                "image/webp" -> ".webp"
+                "image/heic" -> ".heic"
+                else         -> ".jpg"
+            }
+            val tempFile = File.createTempFile("upload_", ext, appContext.cacheDir)
             appContext.contentResolver.openInputStream(uri)?.use { input ->
                 tempFile.outputStream().use { output -> input.copyTo(output) }
             } ?: return@withContext null
