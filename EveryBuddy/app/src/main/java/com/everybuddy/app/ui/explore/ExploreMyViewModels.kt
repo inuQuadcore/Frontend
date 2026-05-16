@@ -9,6 +9,7 @@ import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.AuthRepository
 import com.everybuddy.app.data.repository.DiscoverRepository
+import com.everybuddy.app.data.repository.FriendRepository
 import com.everybuddy.app.data.repository.UserRepository
 import com.everybuddy.app.ui.onboarding.sampleTags
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -88,6 +89,7 @@ private fun UserPublicProfileResponse.toUserDetail(): UserDetail = UserDetail(
 class ExploreViewModel @Inject constructor(
     private val discoverRepository : DiscoverRepository,
     private val userRepository     : UserRepository,
+    private val friendRepository   : FriendRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExploreUiState())
@@ -228,6 +230,32 @@ class ExploreViewModel @Inject constructor(
             isProfileOpen      = false,
         ) }
     }
+
+    fun addFriend(userId: Long) {
+        viewModelScope.launch {
+            when (friendRepository.addFriend(userId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { s ->
+                        s.copy(selectedUserDetail = s.selectedUserDetail?.copy(isFriend = true))
+                    }
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    fun removeFriend(userId: Long) {
+        viewModelScope.launch {
+            when (friendRepository.removeFriend(userId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { s ->
+                        s.copy(selectedUserDetail = s.selectedUserDetail?.copy(isFriend = false))
+                    }
+                }
+                else -> Unit
+            }
+        }
+    }
 }
 
 // MyViewModel — 마이페이지
@@ -365,7 +393,7 @@ class MyViewModel @Inject constructor(
             val pendingUri = s.pendingImageUri?.let { runCatching { Uri.parse(it) }.getOrNull() }
             val (imageFile, imageMime) = pendingUri?.let { uri ->
                 val mime = appContext.contentResolver.getType(uri) ?: "image/jpeg"
-                uriToTempFile(uri) to mime
+                uriToTempFile(uri, mime) to mime
             } ?: (null to "image/jpeg")
 
             val res = userRepository.updateMyProfile(
@@ -403,9 +431,17 @@ class MyViewModel @Inject constructor(
     }
 
     // 갤러리 URI를 cache dir의 임시 File로 복사. 실패 시 null.
-    private suspend fun uriToTempFile(uri: Uri): File? = withContext(Dispatchers.IO) {
+    private suspend fun uriToTempFile(uri: Uri, mimeType: String): File? = withContext(Dispatchers.IO) {
         runCatching {
-            val tempFile = File.createTempFile("upload_", ".img", appContext.cacheDir)
+            val ext = when (mimeType.lowercase()) {
+                "image/jpeg" -> ".jpg"
+                "image/png"  -> ".png"
+                "image/gif"  -> ".gif"
+                "image/webp" -> ".webp"
+                "image/heic" -> ".heic"
+                else         -> ".jpg"
+            }
+            val tempFile = File.createTempFile("upload_", ext, appContext.cacheDir)
             appContext.contentResolver.openInputStream(uri)?.use { input ->
                 tempFile.outputStream().use { output -> input.copyTo(output) }
             } ?: return@withContext null

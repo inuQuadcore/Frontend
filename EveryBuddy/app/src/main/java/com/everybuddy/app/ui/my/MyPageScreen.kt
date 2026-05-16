@@ -593,7 +593,7 @@ private fun DrumRollPicker(
 private fun GenderSelectSubPage(current: String, onSave: (String) -> Unit, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     var selected by remember { mutableStateOf(current) }
-    val options = listOf("남성", "여성", "선택 안 함")
+    val options = listOf("남성", "여성")
     Scaffold(
         topBar = { SubScreenTopBar(title = "성별", onBack = onBack) },
         containerColor = Color.White,
