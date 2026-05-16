@@ -132,9 +132,6 @@ private fun MyPageContent(
                             Icon(painterResource(R.drawable.ic_location), "국적", Modifier.size(14.dp), tint = C.TextSec)
                             Text(profile.countryName(), style = TextStyle(fontSize = 13.sp, color = C.TextSec, fontFamily = PretendardFamily))
                         }
-                        if (uiState.emailVisible) {
-                            Text(profile.email, style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
-                        }
                         Text("${profile.age}세 · ${profile.gender}", style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
                     }
                 }
@@ -861,10 +858,8 @@ private fun SubMenuScreen(key: String, viewModel: MyViewModel, onBack: () -> Uni
 @Composable
 private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
-    val uiState by viewModel.uiState.collectAsState()
     var soundEnabled     by remember { mutableStateOf(true) }
     var vibrationEnabled by remember { mutableStateOf(true) }
-    val emailVisible = uiState.emailVisible
 
     Scaffold(
         topBar = {
@@ -900,30 +895,6 @@ private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
                 Switch(
                     checked         = vibrationEnabled,
                     onCheckedChange = { vibrationEnabled = it },
-                    colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = C.Accent),
-                )
-            }
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
-
-            Spacer(Modifier.height(16.dp))
-            Text("프로필", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.TextSec), modifier = Modifier.padding(horizontal = 16.dp))
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("이메일 노출", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
-                    Text(
-                        if (emailVisible) "다른 사용자에게 이메일이 표시됩니다" else "이메일이 숨김 처리됩니다",
-                        style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextSec),
-                    )
-                }
-                Switch(
-                    checked         = emailVisible,
-                    onCheckedChange = { viewModel.toggleEmailVisible() },
                     colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = C.Accent),
                 )
             }

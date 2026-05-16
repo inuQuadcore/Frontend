@@ -125,7 +125,6 @@ data class MyUiState(
     val editingTags     : List<UserTag> = emptyList(),
     val openLanguageCode: String?      = null,
     val openSubMenu     : String?      = null,   // "guide" | "notice" | "settings" | "version"
-    val emailVisible    : Boolean      = true,
 )
 
 @HiltViewModel
@@ -251,9 +250,6 @@ class MyViewModel @Inject constructor(
             userRepository.updateMyTags(tags.map { it.tag })
         }
     }
-
-    // 이메일 노출 토글
-    fun toggleEmailVisible() { _uiState.update { it.copy(emailVisible = !it.emailVisible) } }
 
     // 언어 상세
     fun openLanguage(code: String)  { _uiState.update { it.copy(openLanguageCode = code) } }
