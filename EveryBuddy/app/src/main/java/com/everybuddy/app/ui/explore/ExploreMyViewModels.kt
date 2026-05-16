@@ -158,6 +158,29 @@ class MyViewModel @Inject constructor(
         }
     }
 
+    fun deleteMyAccount() {
+        val s = _uiState.value
+        if (s.isSaving) return
+        _uiState.update { it.copy(isSaving = true) }
+        viewModelScope.launch {
+            val res = userRepository.deleteMyAccount()
+            when (res) {
+                is ApiResult.Success      -> {
+                    authRepository.cleanupAfterAccountDeletion()
+                    _logoutComplete.value = true
+                }
+                is ApiResult.Error        -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = res.message,
+                ) }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = "네트워크 연결을 확인해주세요.",
+                ) }
+            }
+        }
+    }
+
     private fun loadMyProfile() {
         viewModelScope.launch {
             val userId = tokenManager.userId.first() ?: return@launch

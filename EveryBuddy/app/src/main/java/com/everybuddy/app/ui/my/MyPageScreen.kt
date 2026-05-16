@@ -39,9 +39,13 @@ fun MyPageScreen(
     onLogout       : () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val logoutComplete by viewModel.logoutComplete.collectAsState()
 
     LaunchedEffect(uiState.toastMessage) {
         if (uiState.toastMessage != null) { delay(2000); viewModel.consumeToast() }
+    }
+    LaunchedEffect(logoutComplete) {
+        if (logoutComplete) onLogout()
     }
 
     when {
@@ -57,7 +61,7 @@ fun MyPageScreen(
             onBack   = viewModel::closeLanguage,
         )
         uiState.openSubMenu != null  -> SubMenuScreen(key = uiState.openSubMenu!!, viewModel = viewModel, onBack = viewModel::closeSubMenu)
-        else -> MyPageContent(viewModel = viewModel, onNotification = onNotification, onLogout = onLogout)
+        else -> MyPageContent(viewModel = viewModel, onNotification = onNotification)
     }
 }
 
@@ -66,16 +70,10 @@ fun MyPageScreen(
 private fun MyPageContent(
     viewModel      : MyViewModel,
     onNotification : () -> Unit = {},
-    onLogout       : () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val logoutComplete by viewModel.logoutComplete.collectAsState()
     val profile = uiState.profile
     var showLogoutDialog by remember { mutableStateOf(false) }
-
-    LaunchedEffect(logoutComplete) {
-        if (logoutComplete) onLogout()
-    }
 
     Scaffold(
         topBar = {
@@ -890,8 +888,10 @@ private fun SubMenuScreen(key: String, viewModel: MyViewModel, onBack: () -> Uni
 @Composable
 private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
+    val uiState by viewModel.uiState.collectAsState()
     var soundEnabled     by remember { mutableStateOf(true) }
     var vibrationEnabled by remember { mutableStateOf(true) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -931,7 +931,55 @@ private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
                 )
             }
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider(color = C.Border, thickness = 8.dp)
+            Text(
+                "회원 탈퇴",
+                style    = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = Color(0xFFE53935)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !uiState.isSaving) { showDeleteDialog = true }
+                    .padding(horizontal = 16.dp, vertical = 18.dp),
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!uiState.isSaving) showDeleteDialog = false },
+            containerColor   = Color.White,
+            shape            = RoundedCornerShape(16.dp),
+            title = {
+                Text(
+                    "회원 탈퇴",
+                    style = TextStyle(fontSize = 17.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                )
+            },
+            text = {
+                Text(
+                    "탈퇴하시겠습니까?\n계정과 데이터는 복구할 수 없습니다.",
+                    style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextSec, lineHeight = 20.sp),
+                )
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteDialog = false },
+                    enabled = !uiState.isSaving,
+                ) {
+                    Text("취소", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextSec))
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.deleteMyAccount() },
+                    enabled = !uiState.isSaving,
+                ) {
+                    Text("탈퇴", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color(0xFFE53935)))
+                }
+            },
+        )
     }
 }
 

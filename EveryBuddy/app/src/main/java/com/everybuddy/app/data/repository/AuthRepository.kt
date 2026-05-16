@@ -145,6 +145,11 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    suspend fun cleanupAfterAccountDeletion() {
+        tokenManager.clearToken()
+        firebaseAuthManager.signOut()
+    }
+
     suspend fun logout(): ApiResult<Unit> {
         val refreshToken = tokenManager.refreshToken.firstOrNull()
         return try {
