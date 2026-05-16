@@ -102,4 +102,12 @@ interface UserApi {
      */
     @DELETE("api/v1/users/me")
     suspend fun deleteMyAccount(): Response<Unit>
+
+    /**
+     * POST /api/v1/users/me/attendance — 출석 기록
+     * KST 자정 기준으로 연속 출석일수 갱신. 같은 날 여러 번 호출해도 no-op.
+     * 204: 성공 | 401: 인증 | 404: 유저 없음 | 410: 탈퇴한 유저
+     */
+    @POST("api/v1/users/me/attendance")
+    suspend fun markAttendance(): Response<Unit>
 }

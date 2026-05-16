@@ -52,6 +52,7 @@ data class LogoutRequest(
 
 data class GoogleRegisterRequest(
     val tempToken         : String,
+    val name              : String,
     val checked           : Boolean,                // 약관 동의 (true가 아니면 400)
     val country           : String,
     val birthday          : String,

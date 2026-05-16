@@ -1,5 +1,7 @@
 package com.everybuddy.app.ui.explore
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
@@ -8,6 +10,8 @@ import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.AuthRepository
 import com.everybuddy.app.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 
 // ExploreViewModel — 탐색 탭
@@ -125,11 +131,13 @@ data class MyUiState(
     val editingTags     : List<UserTag> = emptyList(),
     val openLanguageCode: String?      = null,
     val openSubMenu     : String?      = null,   // "guide" | "notice" | "settings" | "version"
-    val emailVisible    : Boolean      = true,
+    val isSaving        : Boolean      = false,  // 저장/삭제 API 진행 중 — 버튼 중복 클릭 방지용
+    val pendingImageUri : String?      = null,   // 갤러리에서 새로 고른 이미지 URI (저장 시 multipart로 업로드)
 )
 
 @HiltViewModel
 class MyViewModel @Inject constructor(
+    @ApplicationContext private val appContext : Context,
     private val userRepository : UserRepository,
     private val tokenManager   : TokenManager,
     private val authRepository : AuthRepository,
@@ -147,6 +155,29 @@ class MyViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.logout()
             _logoutComplete.value = true
+        }
+    }
+
+    fun deleteMyAccount() {
+        val s = _uiState.value
+        if (s.isSaving) return
+        _uiState.update { it.copy(isSaving = true) }
+        viewModelScope.launch {
+            val res = userRepository.deleteMyAccount()
+            when (res) {
+                is ApiResult.Success      -> {
+                    authRepository.cleanupAfterAccountDeletion()
+                    _logoutComplete.value = true
+                }
+                is ApiResult.Error        -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = res.message,
+                ) }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = "네트워크 연결을 확인해주세요.",
+                ) }
+            }
         }
     }
 
@@ -173,10 +204,13 @@ class MyViewModel @Inject constructor(
                     profileImageUrl   = apiProfile.profileImageUrl,
                     country           = apiProfile.country,
                     age               = apiProfile.age,
+                    // API "yyyy-MM-dd" → UI 표시 "yyyy.MM.dd". null/빈값이면 빈 문자열
+                    birthday          = apiProfile.birthday?.replace("-", ".").orEmpty(),
                     gender            = when (apiProfile.gender.uppercase()) {
                                             "MALE" -> "남성"; "FEMALE" -> "여성"; else -> apiProfile.gender
                                         },
                     bio               = apiProfile.bio,
+                    consecutiveDays   = apiProfile.consecutiveDays,
                     tags              = tags,
                     learningLanguages = langs,
                 ))
@@ -197,40 +231,73 @@ class MyViewModel @Inject constructor(
         ) }
     }
 
-    fun closeEdit() { _uiState.update { it.copy(isEditMode = false) } }
+    fun closeEdit() { _uiState.update { it.copy(isEditMode = false, pendingImageUri = null) } }
 
     fun updateEditName(v: String)     { _uiState.update { it.copy(editName     = v) } }
     fun updateEditBio(v: String)      { if (v.length <= 150) _uiState.update { it.copy(editBio = v) } }
     fun updateEditBirthday(v: String) { _uiState.update { it.copy(editBirthday = v) } }
     fun updateEditGender(v: String)   { _uiState.update { it.copy(editGender   = v) } }
     fun updateEditCountry(v: String)  { _uiState.update { it.copy(editCountry  = v) } }
-    fun updateProfileImageUrl(uri: String) {
-        _uiState.update { it.copy(profile = it.profile.copy(profileImageUrl = uri)) }
-    }
+    fun setPendingImageUri(uri: String?) { _uiState.update { it.copy(pendingImageUri = uri) } }
 
     fun saveEdit() {
         val s = _uiState.value
-        val apiGender = when (s.editGender) { "남성" -> "MALE"; "여성" -> "FEMALE"; else -> s.editGender }
-        _uiState.update { it.copy(
-            profile = it.profile.copy(
-                name     = s.editName,
-                bio      = s.editBio,
-                birthday = s.editBirthday,
-                gender   = s.editGender,
-                country  = s.editCountry,
-            ),
-            isEditMode   = false,
-            toastMessage = "프로필이 저장되었습니다.",
-        ) }
+        if (s.isSaving) return   // 응답 대기 중 중복 클릭 방지
+        val apiGender    = when (s.editGender) { "남성" -> "MALE"; "여성" -> "FEMALE"; else -> s.editGender }
+        // UI 입력 "2005.11.30" → API 요구 "2005-11-30". 빈 값은 null로 (PATCH에서 미변경)
+        val apiBirthday  = s.editBirthday.takeIf { it.isNotBlank() }?.replace(".", "-")
+        _uiState.update { it.copy(isSaving = true) }
         viewModelScope.launch {
-            userRepository.updateMyProfile(
-                name     = s.editName,
-                bio      = s.editBio,
-                birthday = s.editBirthday,
-                gender   = apiGender,
-                country  = s.editCountry,
+            // 갤러리에서 새로 고른 이미지가 있으면 cache dir에 임시 파일로 복사 후 multipart로 전송
+            val pendingUri = s.pendingImageUri?.let { runCatching { Uri.parse(it) }.getOrNull() }
+            val (imageFile, imageMime) = pendingUri?.let { uri ->
+                val mime = appContext.contentResolver.getType(uri) ?: "image/jpeg"
+                uriToTempFile(uri) to mime
+            } ?: (null to "image/jpeg")
+
+            val res = userRepository.updateMyProfile(
+                name          = s.editName,
+                bio           = s.editBio,
+                birthday      = apiBirthday,
+                gender        = apiGender,
+                country       = s.editCountry,
+                profileImage  = imageFile,
+                imageMimeType = imageMime,
             )
+            // 업로드 결과와 무관하게 임시 파일은 즉시 정리
+            imageFile?.delete()
+
+            when (res) {
+                is ApiResult.Success      -> {
+                    loadMyProfile()   // 서버 응답으로 동기화
+                    _uiState.update { it.copy(
+                        isEditMode      = false,
+                        isSaving        = false,
+                        pendingImageUri = null,
+                        toastMessage    = "프로필이 저장되었습니다.",
+                    ) }
+                }
+                is ApiResult.Error        -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = res.message,
+                ) }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = "네트워크 연결을 확인해주세요.",
+                ) }
+            }
         }
+    }
+
+    // 갤러리 URI를 cache dir의 임시 File로 복사. 실패 시 null.
+    private suspend fun uriToTempFile(uri: Uri): File? = withContext(Dispatchers.IO) {
+        runCatching {
+            val tempFile = File.createTempFile("upload_", ".img", appContext.cacheDir)
+            appContext.contentResolver.openInputStream(uri)?.use { input ->
+                tempFile.outputStream().use { output -> input.copyTo(output) }
+            } ?: return@withContext null
+            tempFile
+        }.getOrNull()
     }
 
     // 태그 편집
@@ -245,30 +312,61 @@ class MyViewModel @Inject constructor(
         _uiState.update { it.copy(editingTags = current) }
     }
     fun saveTagEdit() {
-        val tags = _uiState.value.editingTags
-        _uiState.update { it.copy(profile = it.profile.copy(tags = tags), isTagEditOpen = false) }
+        val s = _uiState.value
+        if (s.isSaving) return
+        val tags = s.editingTags
+        _uiState.update { it.copy(isSaving = true) }
         viewModelScope.launch {
-            userRepository.updateMyTags(tags.map { it.tag })
+            val res = userRepository.updateMyTags(tags.map { it.tag })
+            when (res) {
+                is ApiResult.Success      -> _uiState.update { it.copy(
+                    profile       = it.profile.copy(tags = tags),
+                    isTagEditOpen = false,
+                    isSaving      = false,
+                ) }
+                is ApiResult.Error        -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = res.message,
+                ) }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = "네트워크 연결을 확인해주세요.",
+                ) }
+            }
         }
     }
-
-    // 이메일 노출 토글
-    fun toggleEmailVisible() { _uiState.update { it.copy(emailVisible = !it.emailVisible) } }
 
     // 언어 상세
     fun openLanguage(code: String)  { _uiState.update { it.copy(openLanguageCode = code) } }
     fun closeLanguage()             { _uiState.update { it.copy(openLanguageCode = null) } }
 
     fun saveLanguageLevel(language: String, level: Int) {
-        _uiState.update { s ->
-            s.copy(
-                profile = s.profile.copy(
-                    learningLanguages = s.profile.learningLanguages.map {
-                        if (it.language.equals(language, ignoreCase = true)) it.copy(level = level) else it
-                    },
-                ),
-                openLanguageCode = null,
-            )
+        val s = _uiState.value
+        if (s.isSaving) return
+        _uiState.update { it.copy(isSaving = true) }
+        viewModelScope.launch {
+            val res = userRepository.updateMyLanguageLevel(language, level)
+            when (res) {
+                is ApiResult.Success      -> _uiState.update { st ->
+                    st.copy(
+                        profile = st.profile.copy(
+                            learningLanguages = st.profile.learningLanguages.map {
+                                if (it.language.equals(language, ignoreCase = true)) it.copy(level = level) else it
+                            },
+                        ),
+                        openLanguageCode = null,
+                        isSaving         = false,
+                    )
+                }
+                is ApiResult.Error        -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = res.message,
+                ) }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(
+                    isSaving     = false,
+                    toastMessage = "네트워크 연결을 확인해주세요.",
+                ) }
+            }
         }
     }
 
