@@ -8,7 +8,9 @@ import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.AuthRepository
+import com.everybuddy.app.data.repository.DiscoverRepository
 import com.everybuddy.app.data.repository.UserRepository
+import com.everybuddy.app.ui.onboarding.sampleTags
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +24,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
+import com.everybuddy.app.data.dto.DiscoverUser as DiscoverUserDto
+import com.everybuddy.app.data.dto.LanguageLevel as LanguageLevelDto
+import com.everybuddy.app.data.dto.UserTag as UserTagDto
 
 // ExploreViewModel — 탐색 탭
 data class ExploreUiState(
@@ -40,11 +45,42 @@ data class ExploreUiState(
     val isProfileOpen      : Boolean           = false,
 )
 
+// API에 없는 필드: age, consecutiveDays는 기본값. isOnline은 RTDB에서 받음.
+private fun DiscoverUserDto.toUi(): DiscoverUser = DiscoverUser(
+    userId          = userId,
+    name            = name,
+    profileImageUrl = profileImageUrl,
+    country         = country,
+    bio             = bio,
+    languages       = languages.map { it.toUi() },
+    tags            = tags.map { it.toUi() },
+    lastSeenAt      = lastSeenAt.orEmpty(),
+)
+
+private fun LanguageLevelDto.toUi(): UserLanguage = UserLanguage(
+    language = language,
+    level    = level,
+)
+
+private fun UserTagDto.toUi(): UserTag {
+    val sample = sampleTags.firstOrNull { it.apiValue == tag }
+    return UserTag(
+        tag         = tag,
+        category    = category,
+        emoji       = sample?.emoji ?: "",
+        displayName = sample?.label ?: tag,
+    )
+}
+
 @HiltViewModel
-class ExploreViewModel @Inject constructor() : ViewModel() {
+class ExploreViewModel @Inject constructor(
+    private val discoverRepository : DiscoverRepository,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExploreUiState())
     val uiState: StateFlow<ExploreUiState> = _uiState.asStateFlow()
+
+    init { refresh() }
 
     fun selectTab(tab: Int) { _uiState.update { it.copy(selectedTab = tab) } }
 
@@ -66,13 +102,22 @@ class ExploreViewModel @Inject constructor() : ViewModel() {
         }
     }
 
-    // TODO: 실제 API 호출 → GET /api/v1/discover/random
     fun refresh() {
-        _uiState.update { it.copy(
-            cardSet          = it.cardSet.shuffled(),
-            currentCardIndex = 0,
-            isRefreshing     = false,
-        ) }
+        viewModelScope.launch {
+            when (val res = discoverRepository.discoverRandom()) {
+                is ApiResult.Success -> {
+                    val users = res.data.users.map { it.toUi() }
+                    _uiState.update { it.copy(
+                        cardSet          = users,
+                        currentCardIndex = 0,
+                        isRefreshing     = false,
+                    ) }
+                }
+                is ApiResult.Error, is ApiResult.NetworkError -> {
+                    _uiState.update { it.copy(isRefreshing = false) }
+                }
+            }
+        }
     }
 
     // 필터 화면 열기/닫기
