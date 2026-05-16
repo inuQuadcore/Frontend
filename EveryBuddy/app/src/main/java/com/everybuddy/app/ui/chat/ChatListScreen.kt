@@ -3,6 +3,7 @@
 package com.everybuddy.app.ui.chat
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -120,7 +122,7 @@ fun ChatListContent(
                     .padding(horizontal = 16.dp),
             ) {
                 Text(
-                    text     = "채팅",
+                    text     = "대화",
                     modifier = Modifier.align(Alignment.Center),
                     style    = TextStyle(
                         fontSize   = 18.sp,
@@ -168,6 +170,32 @@ fun ChatListContent(
                 }
             }
             HorizontalDivider(color = ClBorder, thickness = 0.5.dp)
+
+            AnimatedVisibility(visible = state.isSearchOpen) {
+                BasicTextField(
+                    value         = state.searchQuery,
+                    onValueChange = onSearchChange,
+                    singleLine    = true,
+                    textStyle     = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = ClTextPri),
+                    modifier      = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFFF2F2F2))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    decorationBox = { innerTextField ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(painterResource(R.drawable.ic_search), null, Modifier.size(16.dp).padding(end = 4.dp), tint = ClTextSec)
+                            Box(Modifier.weight(1f)) {
+                                if (state.searchQuery.isEmpty()) {
+                                    Text("채팅방 검색 (초성 가능)", style = TextStyle(fontSize = 15.sp, color = ClTextSec, fontFamily = PretendardFamily))
+                                }
+                                innerTextField()
+                            }
+                        }
+                    },
+                )
+            }
 
             LazyRow(
                 modifier              = Modifier

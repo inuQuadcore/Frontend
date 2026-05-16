@@ -36,6 +36,7 @@ data class ChatListUiState(
     val isLoading          : Boolean          = false,
     val isRefreshing       : Boolean          = false,
     val errorMessage       : String?          = null,
+    val isSearchOpen       : Boolean          = false,
     val searchQuery        : String           = "",
     val activeFilter       : ChatFilter       = ChatFilter.ALL,
     val contextMenuRoom    : ChatRoomUi?        = null,

@@ -67,26 +67,28 @@ val demoMediaThumbs = listOf(
 
 @Composable
 fun ChatRoomSidebarScreen(
-    roomName        : String           = "홍길동,김길동,박길동,이...",
-    members         : List<ChatMember> = demoMembers,
-    mediaThumbs     : List<MediaThumb> = demoMediaThumbs,
-    onBack          : () -> Unit       = {},
-    onRoomNameEdit  : () -> Unit       = {},
-    onPhotoVideo    : () -> Unit       = {},
-    onLink          : () -> Unit       = {},
-    onFile          : () -> Unit       = {},
-    onInviteMember  : () -> Unit       = {},
-    onDataDelete    : () -> Unit       = {},
-    onLeaveRoom     : () -> Unit       = {},
+    roomName              : String           = "홍길동,김길동,박길동,이...",
+    members               : List<ChatMember> = demoMembers,
+    mediaThumbs           : List<MediaThumb> = demoMediaThumbs,
+    isAutoTranslate       : Boolean          = true,
+    isMuted               : Boolean          = false,
+    onBack                : () -> Unit       = {},
+    onRoomNameEdit        : () -> Unit       = {},
+    onPhotoVideo          : () -> Unit       = {},
+    onLink                : () -> Unit       = {},
+    onFile                : () -> Unit       = {},
+    onInviteMember        : () -> Unit       = {},
+    onToggleAutoTranslate : () -> Unit       = {},
+    onToggleMute          : () -> Unit       = {},
+    onDataDelete          : () -> Unit       = {},
+    onLeaveRoom           : () -> Unit       = {},
 ) {
-    // 토글 상태
-    var translationEnabled by remember { mutableStateOf(true) }
-    var notificationEnabled by remember { mutableStateOf(true) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(SbBg)
+            .systemBarsPadding()
             .verticalScroll(rememberScrollState()),
     ) {
 
@@ -139,8 +141,8 @@ fun ChatRoomSidebarScreen(
 
         SidebarToggleRow(
             label      = "실시간 번역",
-            checked    = translationEnabled,
-            onChecked  = { translationEnabled = it },
+            checked    = isAutoTranslate,
+            onChecked  = { onToggleAutoTranslate() },
         )
 
         HorizontalDivider(color = SbBorder, thickness = 8.dp)
@@ -240,8 +242,8 @@ fun ChatRoomSidebarScreen(
         Spacer(Modifier.height(8.dp))
         SidebarToggleRow(
             label     = "알림",
-            checked   = notificationEnabled,
-            onChecked = { notificationEnabled = it },
+            checked   = !isMuted,
+            onChecked = { onToggleMute() },
         )
         HorizontalDivider(color = SbBorder, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
 

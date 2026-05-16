@@ -82,7 +82,7 @@ private fun MyPageContent(
                     modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 16.dp),
                 ) {
                     Text(
-                        "마이페이지",
+                        "마이",
                         modifier = Modifier.align(Alignment.Center),
                         style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
                     )
@@ -1009,11 +1009,10 @@ private fun VersionScreen(onBack: () -> Unit) {
                 modifier = Modifier.size(96.dp).clip(RoundedCornerShape(20.dp)).background(C.Accent),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    painterResource(R.drawable.ic_logo),
+                Image(
+                    painter = painterResource(R.drawable.ic_logo),
                     contentDescription = "앱 아이콘",
                     modifier = Modifier.size(56.dp),
-                    tint = Color.White,
                 )
             }
 

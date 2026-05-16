@@ -93,16 +93,34 @@ fun ChatRoomScreen(
         ActivityResultContracts.RequestPermission()
     ) { granted -> if (granted) viewModel.onStartRecording() }
 
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicturePreview()
+    ) { /* bitmap captured — TODO: send as image message */ }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { /* uri selected — TODO: display in PhotoPickerSheet */ }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { /* uri selected — TODO: send as file message */ }
+
     val cameraPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) { /* TODO: 카메라 인텐트 실행 */ }
+        if (granted) takePictureLauncher.launch(null)
+    }
+
+    val photoPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) photoPickerLauncher.launch("image/*")
     }
 
     val storagePermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) { /* TODO: 파일 피커 인텐트 실행 */ }
+        if (granted) filePickerLauncher.launch("*/*")
     }
 
     if (state.isConversationSelectOpen) {
@@ -134,7 +152,13 @@ fun ChatRoomScreen(
         onToggleMediaPanel       = viewModel::onToggleMediaPanel,
         onLongPressMessage       = viewModel::onLongPressMessage,
         onDismissContextMenu     = viewModel::onDismissContextMenu,
-        onOpenPhotoPicker        = viewModel::onOpenPhotoPicker,
+        onOpenPhotoPicker        = {
+            val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                Manifest.permission.READ_MEDIA_IMAGES
+            else
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            photoPermLauncher.launch(perm)
+        },
         onClosePhotoPicker       = viewModel::onClosePhotoPicker,
         onTogglePhotoSelection   = viewModel::onTogglePhotoSelection,
         onSendSelectedPhotos     = viewModel::onSendSelectedPhotos,
@@ -418,17 +442,19 @@ fun ChatRoomContent(
 
         AnimatedVisibility(
             visible  = isMenuOpen,
-            modifier = Modifier.align(Alignment.CenterEnd),
+            modifier = Modifier.align(Alignment.CenterEnd).width(300.dp).fillMaxHeight(),
             enter    = androidx.compose.animation.slideInHorizontally(initialOffsetX = { it }),
             exit     = androidx.compose.animation.slideOutHorizontally(targetOffsetX = { it }),
         ) {
-            ChatSideMenu(
+            ChatRoomSidebarScreen(
                 roomName              = state.room.name,
                 isAutoTranslate       = state.isAutoTranslate,
                 isMuted               = state.room.isMuted,
+                onBack                = { isMenuOpen = false },
                 onToggleAutoTranslate = onToggleAutoTranslate,
                 onToggleMute          = onToggleMuteRoom,
-                onDismiss             = { isMenuOpen = false },
+                onDataDelete          = { /* TODO: 데이터 삭제 */ isMenuOpen = false },
+                onLeaveRoom           = { /* TODO: 채팅방 나가기 */ isMenuOpen = false },
             )
         }
     }   // Box 끝
@@ -470,20 +496,13 @@ fun ChatRoomContent(
                 )
             }
         } else {
-            ConversationSaveSheet(
-                messages                   = state.conversationSaveMessages,
-                captureOption              = state.conversationCaptureOption,
+            val combinedText = state.conversationSaveMessages.joinToString("\n") { it.text }
+            ScriptSaveSheet(
+                message                    = ChatMessage(id = "combined_save", text = combinedText),
                 folders                    = localFolders,
                 externalAutoSelectFolderId = newFolderAutoSelectId,
-                onSave                     = { selectedFolder ->
-                    state.conversationSaveMessages.forEach { m ->
-                        onSaveScriptItem(ScriptSaveItem(
-                            messageId      = m.id,
-                            originalText   = m.text,
-                            translatedText = m.translatedText,
-                            selectedFolder = selectedFolder,
-                        ))
-                    }
+                onSave                     = { item ->
+                    onSaveScriptItem(item)
                     onConversationSaved()
                 },
                 onDismiss                  = onDismissConversationSave,
@@ -501,7 +520,7 @@ fun ChatRoomContent(
                 roomName = state.room.name,
                 onBack   = { showNewFolderScreen = false },
                 onSave   = { name, coverUri ->
-                    val newFolder = ScriptFolder(id = name.hashCode().toString(), name = name, coverImage = coverUri ?: "")
+                    val newFolder = ScriptFolder(id = java.util.UUID.randomUUID().toString(), name = name, coverImage = coverUri ?: "")
                     localFolders          = localFolders + newFolder
                     newFolderAutoSelectId = newFolder.id
                     showNewFolderScreen   = false
@@ -886,9 +905,14 @@ fun TextMessageBubble(
         if (isMe) {
             Row(
                 modifier          = Modifier.fillMaxWidth().padding(start = 46.dp),
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.End,
             ) {
+                Text(
+                    text     = message.timestamp.format(timeFormatter),
+                    style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                    modifier = Modifier.padding(end = 4.dp),
+                )
                 Box(
                     modifier = Modifier
                         .widthIn(max = 260.dp)
@@ -933,7 +957,7 @@ fun TextMessageBubble(
                         style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.Bottom) {
                         Box(
                             modifier = Modifier
                                 .widthIn(max = 210.dp)
@@ -954,6 +978,11 @@ fun TextMessageBubble(
                                 )
                             }
                         }
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text  = message.timestamp.format(timeFormatter),
+                            style = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                        )
                         if (!isAutoTranslate) {
                             Spacer(Modifier.width(4.dp))
                             TranslateIconButton(onClick = onToggleTranslation)
@@ -963,14 +992,6 @@ fun TextMessageBubble(
             }
         }
 
-        // 시간 표시
-        Text(
-            text     = message.timestamp.format(timeFormatter),
-            style    = TextStyle(fontSize = 11.sp, color = TextSecondary),
-            modifier = Modifier.padding(start = if (!isMe) 46.dp else 0.dp, top = 2.dp),
-        )
-
-        // 번역 결과 (세로바 + 텍스트 or 로딩 점)
         if (isTranslating || (showTranslation && message.translatedText.isNotEmpty())) {
             Spacer(Modifier.height(4.dp))
             Row(
@@ -1081,9 +1102,14 @@ fun VoiceMessageBubble(
         if (isMe) {
             Row(
                 modifier              = Modifier.fillMaxWidth().padding(start = 46.dp),
-                verticalAlignment     = Alignment.Top,
+                verticalAlignment     = Alignment.Bottom,
                 horizontalArrangement = Arrangement.End,
             ) {
+                Text(
+                    text     = message.timestamp.format(timeFormatter),
+                    style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                    modifier = Modifier.padding(end = 4.dp),
+                )
                 Box(
                     modifier = Modifier
                         .widthIn(min = 200.dp, max = 260.dp)
@@ -1126,7 +1152,7 @@ fun VoiceMessageBubble(
                         style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.Bottom) {
                         Box(
                             modifier = Modifier
                                 .widthIn(min = 180.dp, max = 210.dp)
@@ -1145,6 +1171,11 @@ fun VoiceMessageBubble(
                                 onPlay          = onPlay,
                             )
                         }
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text  = message.timestamp.format(timeFormatter),
+                            style = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                        )
                         if (!isAutoTranslate) {
                             Spacer(Modifier.width(4.dp))
                             TranslateIconButton(onClick = onToggleTranslation)
@@ -1154,11 +1185,6 @@ fun VoiceMessageBubble(
             }
         }
 
-        Text(
-            text     = message.timestamp.format(timeFormatter),
-            style    = TextStyle(fontSize = 11.sp, color = TextSecondary),
-            modifier = Modifier.padding(start = if (!isMe) 46.dp else 0.dp, top = 2.dp),
-        )
     }
 }
 
@@ -1380,10 +1406,10 @@ fun MediaPanel(
     onSaveScript : () -> Unit,
 ) {
     val items = listOf(
-        Triple("사진",    R.drawable.ic_media_photo,  onPhoto),
-        Triple("카메라",  R.drawable.ic_media_camera, onCamera),
-        Triple("파일",    R.drawable.ic_media_file,   onFile),
-        Triple("대화저장", R.drawable.ic_media_link,  onSaveScript),
+        Triple("사진",    R.drawable.ic_option_photo,  onPhoto),
+        Triple("카메라",  R.drawable.ic_option_camera, onCamera),
+        Triple("파일",    R.drawable.ic_option_file,   onFile),
+        Triple("대화저장", R.drawable.ic_option_script, onSaveScript),
     )
 
     Row(
@@ -1406,12 +1432,20 @@ fun MediaPanel(
                         .background(Color(0xFFEEF4FF)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        painter            = painterResource(iconRes),
-                        contentDescription = label,
-                        modifier           = Modifier.size(26.dp),
-                        tint               = AccentBlue,
-                    )
+                    if (iconRes == R.drawable.ic_option_camera) {
+                        Image(
+                            painter            = painterResource(iconRes),
+                            contentDescription = label,
+                            modifier           = Modifier.size(26.dp),
+                        )
+                    } else {
+                        Icon(
+                            painter            = painterResource(iconRes),
+                            contentDescription = label,
+                            modifier           = Modifier.size(26.dp),
+                            tint               = AccentBlue,
+                        )
+                    }
                 }
                 Text(
                     text  = label,

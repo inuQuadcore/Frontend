@@ -768,18 +768,10 @@ fun NewFolderScreen(
                         modifier           = Modifier.fillMaxSize(),
                     )
                 } else {
-                    Column(
-                        modifier            = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
+                    Box(
+                        modifier         = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Image(
-                            painter            = painterResource(R.drawable.ic_media_camera),
-                            contentDescription = "사진 추가",
-                            modifier           = Modifier.size(32.dp),
-                            colorFilter        = androidx.compose.ui.graphics.ColorFilter.tint(Color(0xFFAAAAAA)),
-                        )
-                        Spacer(Modifier.height(6.dp))
                         Text("커버사진추가", style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = SsTextSec))
                     }
                 }

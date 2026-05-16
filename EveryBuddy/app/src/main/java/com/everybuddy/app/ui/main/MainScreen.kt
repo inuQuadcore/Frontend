@@ -55,7 +55,7 @@ private object MainRoute {
 private enum class MainTab(val label: String, val iconRes: Int) {
     CHAT    ("대화",    R.drawable.ic_nav_chat),
     FRIEND  ("친구",    R.drawable.ic_nav_friend),
-    EXPLORE ("찾기",    R.drawable.ic_nav_find),
+    EXPLORE ("탐색",    R.drawable.ic_nav_find),
     SCRIPT  ("스크립트", R.drawable.ic_nav_script),
     MY      ("마이",    R.drawable.ic_nav_my),
 }
@@ -168,7 +168,7 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                                     )
                                 },
                                 onMuteChanged   = { isMuted -> chatVm.updateRoomMute(roomId, isMuted) },
-                                onFolderCreated = { folder -> scriptViewModel.addFolder(folder.name, folder.coverImage.ifEmpty { null }) },
+                                onFolderCreated = { folder -> scriptViewModel.addFolder(folder.name, folder.coverImage.ifEmpty { null }, folder.id) },
                             )
                         }
                     }
@@ -204,8 +204,16 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                     when {
                         selectedScriptItem != null -> {
                             ScriptDetailScreen(
-                                item   = selectedScriptItem!!,
-                                onBack = { selectedScriptItem = null },
+                                item     = selectedScriptItem!!,
+                                onBack   = { selectedScriptItem = null },
+                                onSave   = { updatedItem ->
+                                    scriptViewModel.updateItem(updatedItem)
+                                    selectedScriptItem = updatedItem
+                                },
+                                onDelete = { item ->
+                                    scriptViewModel.deleteItem(item.id)
+                                    selectedScriptItem = null
+                                },
                             )
                         }
                         selectedScriptFolder != null -> {

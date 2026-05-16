@@ -6,6 +6,7 @@ import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.repository.ChatRepository
+import com.everybuddy.app.ui.friend.KoreanChosung
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -149,7 +150,12 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onSearchToggle() {
-        // TODO: 검색창 AnimatedVisibility 토글 + 포커스 처리
+        _listState.update { state ->
+            if (state.isSearchOpen)
+                state.copy(isSearchOpen = false, searchQuery = "")
+            else
+                state.copy(isSearchOpen = true)
+        }
     }
 
     fun onContextMenu(room: ChatRoomUi) {
@@ -255,8 +261,8 @@ class ChatViewModel @Inject constructor(
         state.rooms
             .filter { room ->
                 val matchQuery = state.searchQuery.isEmpty() ||
-                        room.name.contains(state.searchQuery, ignoreCase = true) ||
-                        room.lastMessage.contains(state.searchQuery, ignoreCase = true)
+                        KoreanChosung.matches(state.searchQuery, room.name) ||
+                        KoreanChosung.matches(state.searchQuery, room.lastMessage)
                 val matchFilter = when {
                     state.activeFolderId != null -> {
                         val folder = state.folders.find { it.id == state.activeFolderId }
