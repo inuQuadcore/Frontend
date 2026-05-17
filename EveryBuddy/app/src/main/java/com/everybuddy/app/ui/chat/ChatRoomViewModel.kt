@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.io.File
 import java.time.LocalDateTime
 import java.util.UUID
 import javax.inject.Inject
@@ -192,19 +193,34 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     fun onStopRecording() {
-        val filePath    = voiceRecorder.stopRecording() ?: run { _uiState.update { it.copy(isRecording = false) }; return }
-        val durationSec = _uiState.value.recordingSeconds
-        val msg = ChatMessage(
-            id               = UUID.randomUUID().toString(),
-            roomId           = _uiState.value.room.id,
-            senderId         = "me",
-            senderName       = "나",
-            type             = MessageType.VOICE,
-            voiceUrl         = filePath,
-            voiceDurationSec = durationSec,
-            timestamp        = LocalDateTime.now(),
-        )
-        _uiState.update { state -> state.copy(messages = state.messages + msg, isRecording = false, isRecordingPaused = false) }
+        val filePath = voiceRecorder.stopRecording() ?: run {
+            _uiState.update { it.copy(isRecording = false) }
+            return
+        }
+        _uiState.update { it.copy(isRecording = false, isRecordingPaused = false) }
+
+        val chatRoomId = _uiState.value.room.id.toLongOrNull()
+        if (chatRoomId == null) {
+            // dummy 채팅방: 기존 로컬 메시지 흐름 유지
+            val durationSec = _uiState.value.recordingSeconds
+            val msg = ChatMessage(
+                id               = UUID.randomUUID().toString(),
+                roomId           = _uiState.value.room.id,
+                senderId         = "me",
+                senderName       = "나",
+                type             = MessageType.VOICE,
+                voiceUrl         = filePath,
+                voiceDurationSec = durationSec,
+                timestamp        = LocalDateTime.now(),
+            )
+            _uiState.update { state -> state.copy(messages = state.messages + msg) }
+            return
+        }
+
+        viewModelScope.launch {
+            // VoiceRecorder는 MPEG_4 컨테이너 + AAC 인코딩 (.m4a)
+            fileMessageUploader.upload(chatRoomId, File(filePath), mimeType = "audio/mp4")
+        }
     }
 
     fun onCancelRecording() {
