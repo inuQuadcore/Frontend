@@ -7,6 +7,7 @@ import com.everybuddy.app.data.auth.FirebaseAuthManager
 import com.everybuddy.app.data.auth.GoogleAuthManager
 import com.everybuddy.app.data.auth.GoogleSignInResult
 import com.everybuddy.app.data.firebase.PresenceManager
+import com.everybuddy.app.data.firebase.PresenceRepository
 import com.everybuddy.app.data.dto.ApiErrorResponse
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.GoogleAuthRequest
@@ -30,6 +31,7 @@ class AuthRepository @Inject constructor(
     private val googleAuthManager   : GoogleAuthManager,
     private val firebaseAuthManager : FirebaseAuthManager,
     private val presenceManager     : PresenceManager,
+    private val presenceRepository  : PresenceRepository,
     private val tokenManager        : TokenManager,
     private val authDataHolder      : AuthDataHolder,
 ) {
@@ -164,6 +166,7 @@ class AuthRepository @Inject constructor(
             }
             tokenManager.clearToken()
             presenceManager.stop()
+            presenceRepository.stop()
             firebaseAuthManager.signOut()
             result
         } catch (e: Exception) {
@@ -188,6 +191,7 @@ class AuthRepository @Inject constructor(
             if (ok) {
                 val userId = tokenManager.userId.firstOrNull() ?: return
                 presenceManager.start(userId)
+                presenceRepository.start()
             }
         } catch (e: Exception) {
             Log.w("AuthRepository", "signInToFirebase failed", e)
