@@ -2,24 +2,29 @@ package com.everybuddy.app.ui.friend
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.everybuddy.app.BuildConfig
+import com.everybuddy.app.data.cache.UserSummaryCache
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.FriendStatusMessageDto
 import com.everybuddy.app.data.dto.MyStatusMessageResponse
 import com.everybuddy.app.data.dto.toDto
 import com.everybuddy.app.data.dto.userMessage
+import com.everybuddy.app.data.local.TokenManager
+import com.everybuddy.app.data.repository.ChatRoomRepository
+import com.everybuddy.app.data.repository.MessageRepository
 import com.everybuddy.app.data.repository.StatusMessageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class StatusUiState(
     val myStatus            : MyStatusMessageResponse?     = null,
+    val myProfileImageUrl   : String?                      = null,  // 본인 프로필 — UserSummaryCache lookup 결과
     val friendStatuses      : List<FriendStatusMessageDto>  = emptyList(),
     val isWriteScreenOpen   : Boolean                      = false,
     val isEditMode          : Boolean                      = false,
@@ -39,7 +44,11 @@ data class StatusUiState(
 
 @HiltViewModel
 class StatusMessageViewModel @Inject constructor(
-    private val statusRepo: StatusMessageRepository,
+    private val statusRepo         : StatusMessageRepository,
+    private val chatRoomRepository : ChatRoomRepository,
+    private val messageRepository  : MessageRepository,
+    private val tokenManager       : TokenManager,
+    private val userSummaryCache   : UserSummaryCache,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(StatusUiState())
@@ -49,7 +58,17 @@ class StatusMessageViewModel @Inject constructor(
 
     fun loadAll() {
         loadMyStatus()
+        loadMyProfile()
         loadFriendStatuses(reset = true)
+    }
+
+    /** 본인 프로필 이미지 — UserSummaryCache hit 시 즉시, miss 시 GET /users/{myId}로 채워짐. */
+    private fun loadMyProfile() {
+        viewModelScope.launch {
+            val myUserId = tokenManager.userId.firstOrNull() ?: return@launch
+            val summary  = userSummaryCache.get(myUserId) ?: return@launch
+            _state.update { it.copy(myProfileImageUrl = summary.profileImageUrl) }
+        }
     }
 
     fun loadMyStatus() {
@@ -146,38 +165,23 @@ class StatusMessageViewModel @Inject constructor(
         if (_state.value.replyText.isBlank() || _state.value.isSending) return
         val replyText = _state.value.replyText.trim()
         val target    = _state.value.expandedStatus ?: return
+        val preview   = if (target.content.length > 15) target.content.take(15) + "…" else target.content
+
         viewModelScope.launch {
             _state.update { it.copy(isSending = true, replyText = "") }
 
-            if (BuildConfig.USE_DUMMY_DATA) {
-                val statusPreview = if (target.content.length > 15) target.content.take(15) + "…" else target.content
-                val friendId      = target.userId.toString()
-                val existing      = FriendDemoData.chatRooms.find { it.friendId == friendId }
-                val msg = FriendDemoData.DemoChatMsg(
-                    text                  = replyText,
-                    isMine                = true,
-                    isStatusReply         = true,
-                    originalStatusPreview = statusPreview,
-                )
-                if (existing != null) {
-                    existing.messages.add(msg)
-                } else {
-                    FriendDemoData.chatRooms.add(
-                        FriendDemoData.DemoChatRoom(
-                            id         = java.util.UUID.randomUUID().toString(),
-                            friendId   = friendId,
-                            friendName = target.userName,
-                            messages   = mutableListOf(msg),
-                        )
-                    )
+            val createResult = chatRoomRepository.createChatRoom(target.userName, isGroup = false, listOf(target.userId))
+            if (createResult is ApiResult.Success) {
+                val chatRoomId = createResult.data?.chatRoomId
+                if (chatRoomId != null) {
+                    messageRepository.sendTextMessage(chatRoomId, replyText, statusPreview = preview)
+                    _state.update { it.copy(isSending = false, replySent = true) }
+                    delay(1500)
+                    _state.update { it.copy(replySent = false, expandedStatus = null, isReplying = false) }
+                    return@launch
                 }
             }
-            // TODO: ChatRoomRepository integration — 실제 API 전송
-
-            delay(700)
-            _state.update { it.copy(isSending = false, replySent = true) }
-            delay(1500)
-            _state.update { it.copy(replySent = false, expandedStatus = null, isReplying = false) }
+            _state.update { it.copy(isSending = false, toastMessage = createResult.userMessage()) }
         }
     }
 

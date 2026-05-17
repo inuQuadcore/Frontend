@@ -157,11 +157,14 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                         ) { backStack ->
                             val roomId = backStack.arguments?.getString("roomId") ?: return@composable
                             val chatListState by chatVm.listState.collectAsState()
-                            val roomName = chatListState.rooms.find { it.id == roomId }?.name ?: ""
+                            val room = chatListState.rooms.find { it.id == roomId }
+                            val roomName = room?.name ?: ""
+                            val isGroup  = room?.isGroup ?: false
                             isChatRoomOpen = true
                             ChatRoomScreen(
                                 roomId                = roomId,
                                 roomName              = roomName,
+                                isGroup               = isGroup,
                                 onBack                = { isChatRoomOpen = false; chatNavController.popBackStack() },
                                 onNavigateToScriptTab = {
                                     isChatRoomOpen = false
@@ -221,6 +224,7 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                         onStartChat     = { user ->
                             chatVm.createChatRoom(
                                 roomName       = user.name,
+                                isGroup        = false,                       // 친구 화면에서 시작 = 1:1
                                 participantIds = listOf(user.userId),
                                 onSuccess      = { room ->
                                     isChatRoomOpen = true
@@ -232,12 +236,9 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                             )
                         },
                         onNotification  = { showNotification = true },
-                        onReplyToStatus = { friendId, friendName ->
-                            chatVm.addReplyRoom(friendId, friendName)
-                            isChatRoomOpen = true
-                            chatNavController.navigate(MainRoute.chatRoom("reply_$friendId"))
-                            selectedTab = MainTab.CHAT
-                        },
+                        // 답장 흐름은 FriendViewModel.sendReply가 직접 chat REST 호출 — 채팅방 자동 이동 X.
+                        // 사용자는 토스트 보고 채팅 탭 가서 확인.
+                        onReplyToStatus = { _, _ -> },
                     )
                 }
 

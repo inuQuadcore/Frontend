@@ -10,7 +10,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.network.AuthApi
 import com.everybuddy.app.data.network.BlockApi
-import com.everybuddy.app.data.network.ChatApiService
 import com.everybuddy.app.data.network.ChatRoomApi
 import com.everybuddy.app.data.network.DiscoverApi
 import com.everybuddy.app.data.network.FriendApi
@@ -94,7 +93,7 @@ object NetworkModule {
     fun provideAuthenticator(authenticator: TokenAuthenticator): Authenticator = authenticator
 
     // Main OkHttpClient — JWT 인터셉터 + Authenticator (401 자동 refresh)
-    // 일반 API(도메인별 *Api 인터페이스들, ChatApiService)용
+    // 일반 API(도메인별 *Api 인터페이스들)용
     @Provides
     @Singleton
     fun provideOkHttpClient(
@@ -186,8 +185,4 @@ object NetworkModule {
     @Provides @Singleton
     fun provideStatusMessageApi(retrofit: Retrofit): StatusMessageApi =
         retrofit.create(StatusMessageApi::class.java)
-
-    @Provides @Singleton
-    fun provideChatApiService(retrofit: Retrofit): ChatApiService =
-        retrofit.create(ChatApiService::class.java)
 }

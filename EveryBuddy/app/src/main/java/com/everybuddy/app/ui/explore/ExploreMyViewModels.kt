@@ -4,9 +4,10 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.everybuddy.app.BuildConfig
+import com.everybuddy.app.data.cache.UserSummaryCache
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.userMessage
+import com.everybuddy.app.data.firebase.PresenceRepository
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.AuthRepository
 import com.everybuddy.app.data.repository.BlockRepository
@@ -92,12 +93,36 @@ class ExploreViewModel @Inject constructor(
     private val discoverRepository : DiscoverRepository,
     private val userRepository     : UserRepository,
     private val friendRepository   : FriendRepository,
+    private val presenceRepository : PresenceRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExploreUiState())
     val uiState: StateFlow<ExploreUiState> = _uiState.asStateFlow()
 
-    init { refresh() }
+    init {
+        refresh()
+        observePresence()
+    }
+
+    /** RTDB presence/ 변경 시 모든 user list의 isOnline 일괄 갱신. */
+    private fun observePresence() {
+        viewModelScope.launch {
+            presenceRepository.onlineIds.collect { ids ->
+                _uiState.update { state ->
+                    state.copy(
+                        cardSet           = state.cardSet.applyPresence(ids),
+                        tagMatchUsers     = state.tagMatchUsers.applyPresence(ids),
+                        learningLangUsers = state.learningLangUsers.applyPresence(ids),
+                        filterResults     = state.filterResults.applyPresence(ids),
+                        selectedUser      = state.selectedUser?.let { it.copy(isOnline = it.userId in ids) },
+                    )
+                }
+            }
+        }
+    }
+
+    private fun List<DiscoverUser>.applyPresence(ids: Set<Long>): List<DiscoverUser> =
+        map { it.copy(isOnline = it.userId in ids) }
 
     fun selectTab(tab: Int) { _uiState.update { it.copy(selectedTab = tab) } }
 
@@ -280,7 +305,7 @@ data class RemovedFriendItem(
 )
 
 data class MyUiState(
-    val profile          : MyProfile    = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.myProfile else MyProfile(),
+    val profile          : MyProfile    = MyProfile(),
     val isEditMode       : Boolean      = false,
     val editName         : String       = "",
     val editBio          : String       = "",
@@ -305,11 +330,12 @@ data class MyUiState(
 @HiltViewModel
 class MyViewModel @Inject constructor(
     @ApplicationContext private val appContext    : Context,
-    private val userRepository   : UserRepository,
-    private val tokenManager     : TokenManager,
-    private val authRepository   : AuthRepository,
-    private val blockRepository  : BlockRepository,
-    private val friendRepository : FriendRepository,
+    private val userRepository     : UserRepository,
+    private val tokenManager       : TokenManager,
+    private val authRepository     : AuthRepository,
+    private val blockRepository    : BlockRepository,
+    private val friendRepository   : FriendRepository,
+    private val userSummaryCache   : UserSummaryCache,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MyUiState())
@@ -438,6 +464,8 @@ class MyViewModel @Inject constructor(
 
             when (res) {
                 is ApiResult.Success      -> {
+                    // 본인 이름/프로필 변경 즉시 채팅방 등 모든 화면 반영 — UserSummaryCache invalidate
+                    tokenManager.userId.first()?.let { userSummaryCache.invalidate(it) }
                     loadMyProfile()   // 서버 응답으로 동기화
                     _uiState.update { it.copy(
                         isEditMode      = false,
