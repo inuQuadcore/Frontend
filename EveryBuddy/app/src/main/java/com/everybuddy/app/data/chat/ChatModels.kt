@@ -115,6 +115,7 @@ data class ChatRoomUiState(
     val isAutoTranslate           : Boolean              = false,
     val showTranslation           : Map<String, Boolean> = emptyMap(),
     val translatingMessageIds     : Set<String>          = emptySet(),
+    val translationError          : String?              = null,           // 토스트 1회 노출 후 consume
 
     // 음성 녹음
     val isRecording               : Boolean              = false,

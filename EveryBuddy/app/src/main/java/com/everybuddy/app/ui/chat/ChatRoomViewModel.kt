@@ -14,6 +14,8 @@ import com.everybuddy.app.data.firebase.ViewingManager
 import com.everybuddy.app.data.local.ChatMessageEntity
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.MessageRepository
+import com.everybuddy.app.data.repository.TranslateRepository
+import com.everybuddy.app.data.repository.translateUserMessage
 import com.google.firebase.database.FirebaseDatabase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
@@ -43,6 +45,7 @@ class ChatRoomViewModel @Inject constructor(
     private val fileMessageUploader : FileMessageUploader,
     private val viewingManager      : ViewingManager,
     private val userSummaryCache    : UserSummaryCache,
+    private val translateRepository : TranslateRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatRoomUiState())
@@ -284,21 +287,80 @@ class ChatRoomViewModel @Inject constructor(
     fun onToggleTranslation(messageId: String) {
         val state   = _uiState.value
         val current = state.showTranslation[messageId] ?: state.isAutoTranslate
-        if (!current) {
-            val msg = state.messages.find { it.id == messageId } ?: return
-            if (msg.translatedText.isEmpty()) {
-                _uiState.update { it.copy(translatingMessageIds = it.translatingMessageIds + messageId) }
-                viewModelScope.launch {
-                    delay(1200)
-                    _uiState.update { it.copy(
-                        translatingMessageIds = it.translatingMessageIds - messageId,
-                        showTranslation       = it.showTranslation + (messageId to true),
-                    )}
+        val msg     = state.messages.find { it.id == messageId } ?: return
+
+        // 이미 번역 캐시가 있으면 토글만 (재호출 X)
+        if (msg.translatedText.isNotEmpty()) {
+            _uiState.update { s -> s.copy(showTranslation = s.showTranslation + (messageId to !current)) }
+            return
+        }
+        // 캐시 없는 상태에서 OFF → OFF 토글은 의미 없음. 표시 X.
+        if (current) return
+
+        // 캐시 없음 + ON 전환 → API 호출
+        translateMessage(messageId, autoShow = true)
+    }
+
+    /**
+     * 메시지 번역 API 호출 후 Room 캐시 저장. Room flow가 emit 갱신 → UI translatedText 채워짐.
+     * autoShow=true면 번역 완료 시 showTranslation도 true로.
+     */
+    private fun translateMessage(messageId: String, autoShow: Boolean) {
+        val msg = _uiState.value.messages.find { it.id == messageId } ?: return
+        val msgIdLong = messageId.toLongOrNull() ?: return
+        if (msg.translatedText.isNotEmpty()) return
+        if (messageId in _uiState.value.translatingMessageIds) return
+
+        _uiState.update { it.copy(translatingMessageIds = it.translatingMessageIds + messageId) }
+        viewModelScope.launch {
+            val result: ApiResult<Pair<String, String?>> = when (msg.type) {
+                MessageType.TEXT -> {
+                    val text = msg.text.ifBlank { return@launch finishTranslating(messageId) }
+                    when (val r = translateRepository.translateText(text)) {
+                        is ApiResult.Success      -> ApiResult.Success(r.data.translatedText to null)
+                        is ApiResult.Error        -> r
+                        is ApiResult.NetworkError -> r
+                    }
                 }
-                return
+                MessageType.VOICE -> {
+                    val url = msg.voiceUrl.ifBlank { return@launch finishTranslating(messageId) }
+                    when (val r = translateRepository.translateSpeechFromUrl(url)) {
+                        is ApiResult.Success      -> ApiResult.Success(r.data.translatedText to r.data.sourceText)
+                        is ApiResult.Error        -> r
+                        is ApiResult.NetworkError -> r
+                    }
+                }
+                else -> return@launch finishTranslating(messageId)
+            }
+            when (result) {
+                is ApiResult.Success -> {
+                    val (translated, source) = result.data
+                    messageDao.updateTranslation(msgIdLong, translated, source)
+                    _uiState.update {
+                        it.copy(
+                            translatingMessageIds = it.translatingMessageIds - messageId,
+                            showTranslation = if (autoShow) it.showTranslation + (messageId to true) else it.showTranslation,
+                        )
+                    }
+                }
+                is ApiResult.Error, is ApiResult.NetworkError -> {
+                    _uiState.update {
+                        it.copy(
+                            translatingMessageIds = it.translatingMessageIds - messageId,
+                            translationError      = result.translateUserMessage(),
+                        )
+                    }
+                }
             }
         }
-        _uiState.update { s -> s.copy(showTranslation = s.showTranslation + (messageId to !current)) }
+    }
+
+    private fun finishTranslating(messageId: String) {
+        _uiState.update { it.copy(translatingMessageIds = it.translatingMessageIds - messageId) }
+    }
+
+    fun consumeTranslationError() {
+        _uiState.update { it.copy(translationError = null) }
     }
 
     fun onToggleAutoTranslate() {

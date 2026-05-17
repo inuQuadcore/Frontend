@@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -95,6 +96,14 @@ fun ChatRoomScreen(
 ) {
     LaunchedEffect(roomId) { viewModel.loadRoom(roomId, roomName, isGroup) }
     val state by viewModel.uiState.collectAsState()
+
+    val context = LocalContext.current
+    LaunchedEffect(state.translationError) {
+        state.translationError?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.consumeTranslationError()
+        }
+    }
 
     val micPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
