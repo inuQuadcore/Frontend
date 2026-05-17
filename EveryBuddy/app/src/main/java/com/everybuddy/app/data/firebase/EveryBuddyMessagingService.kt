@@ -26,7 +26,8 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class EveryBuddyMessagingService : FirebaseMessagingService() {
 
-    @Inject lateinit var fcmTokenManager: FcmTokenManager
+    @Inject lateinit var fcmTokenManager   : FcmTokenManager
+    @Inject lateinit var notificationEvents: NotificationEvents
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -35,6 +36,10 @@ class EveryBuddyMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
+        // 친구추가 푸시는 알림함에 들어가므로 has-unread 갱신 이벤트 발행
+        if (!message.data.containsKey("chatRoomId") && message.data.containsKey("fromUserId")) {
+            notificationEvents.emitFriendNotification()
+        }
         val title = message.notification?.title ?: return
         val body  = message.notification?.body.orEmpty()
         showNotification(title, body, message.data)

@@ -3,6 +3,7 @@ package com.everybuddy.app.ui.notification
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.firebase.NotificationEvents
 import com.everybuddy.app.data.repository.NotificationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,12 +19,19 @@ import javax.inject.Inject
 @HiltViewModel
 class HasUnreadViewModel @Inject constructor(
     private val repository: NotificationRepository,
+    private val events    : NotificationEvents,
 ) : ViewModel() {
 
     private val _hasUnread = MutableStateFlow(false)
     val hasUnread: StateFlow<Boolean> = _hasUnread.asStateFlow()
 
-    init { refresh() }
+    init {
+        refresh()
+        // 친구추가 푸시 도착 시 자동 재요청
+        viewModelScope.launch {
+            events.friendNotificationReceived.collect { refresh() }
+        }
+    }
 
     fun refresh() {
         viewModelScope.launch {
