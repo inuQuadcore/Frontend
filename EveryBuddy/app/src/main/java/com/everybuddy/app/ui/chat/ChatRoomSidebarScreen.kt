@@ -510,19 +510,13 @@ private fun MemberRow(member: ChatMember) {
 
 @Composable
 private fun MediaThumbItem(thumb: MediaThumb) {
-    Box(
-        modifier = Modifier
-            // TODO size: 썸네일 크기 80x80dp
+    AsyncImage(
+        model              = thumb.imageUrl,
+        contentDescription = null,
+        contentScale       = ContentScale.Crop,
+        modifier           = Modifier
             .size(80.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFFD0D0D0)),  // 플레이스홀더
-    ) {
-        // TODO: 실제 미디어 썸네일 이미지 (Coil AsyncImage)
-        // AsyncImage(
-        //     model              = thumb.imageUrl,
-        //     contentDescription = null,
-        //     contentScale       = ContentScale.Crop,
-        //     modifier           = Modifier.fillMaxSize(),
-        // )
-    }
+            .background(Color(0xFFD0D0D0)),
+    )
 }
