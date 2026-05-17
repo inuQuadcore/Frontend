@@ -150,26 +150,17 @@ data class FilterSettings(
 }
 
 data class MyProfile(
-    val userId          : Long    = 1L,
+    val userId          : Long    = 0L,
     val name            : String  = "",
-    val profileImageUrl : String? = null,   // TODO: Coil
-    val age             : Int     = 23,
-    val gender          : String  = "여성",
-    val country         : String  = "USA",
-    val bio             : String  = "일본어 배우는 중이에요.\n가볍게 대화하면서 연습해요 😊",
-    val learningLanguages: List<UserLanguage> = listOf(
-        UserLanguage("ENGLISH", 2),
-        UserLanguage("JAPANESE", 3),
-    ),
-    val tags            : List<UserTag> = listOf(
-        UserTag("TRAVEL",       "HOBBY",         "✈️", "여행"),
-        UserTag("PHOTOGRAPHY",  "HOBBY",         "📷", "사진찍기"),
-        UserTag("RUNNING",      "HOBBY",         "🏃", "러닝"),
-        UserTag("CAFE_TOUR",    "HOBBY",         "☕", "카페탐방"),
-        UserTag("MOVIE",        "ENTERTAINMENT", "🎬", "영화보기"),
-    ),
-    val birthday        : String  = "",   // "yyyy.MM.dd" — 로드 전 빈 값
-    val consecutiveDays : Int     = 0,    // 연속 출석일. 1일 이상일 때만 뱃지 표시(0이면 숨김)
+    val profileImageUrl : String? = null,
+    val age             : Int     = 0,
+    val gender          : String  = "",
+    val country         : String  = "",
+    val bio             : String  = "",
+    val learningLanguages: List<UserLanguage> = emptyList(),
+    val tags            : List<UserTag>       = emptyList(),
+    val birthday        : String  = "",
+    val consecutiveDays : Int     = 0,
 ) {
     fun countryFlag() = countryFlag(country)
     fun countryName() = countryName(country)

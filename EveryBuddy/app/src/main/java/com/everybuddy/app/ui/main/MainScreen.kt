@@ -327,14 +327,12 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                         else -> {
                             val scriptUiStateMain by scriptViewModel.uiState.collectAsState()
                             ScriptMainScreen(
-                                viewModel       = scriptViewModel,
-                                isRefreshing    = scriptUiStateMain.isRefreshing,
-                                onRefresh       = scriptViewModel::refresh,
-                                onFolderClick   = { folder -> selectedScriptFolder = folder },
-                                onItemClick     = { item -> selectedScriptItem = item },
-                                onAddFolder     = { showNewFolderInScript = true },
-                                onNotification  = { showNotification = true },
-                                hasNotification = hasUnread,
+                                viewModel     = scriptViewModel,
+                                isRefreshing  = scriptUiStateMain.isRefreshing,
+                                onRefresh     = scriptViewModel::refresh,
+                                onFolderClick = { folder -> selectedScriptFolder = folder },
+                                onItemClick   = { item -> selectedScriptItem = item },
+                                onAddFolder   = { showNewFolderInScript = true },
                             )
                             if (showNewFolderInScript) {
                                 Dialog(

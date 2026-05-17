@@ -180,7 +180,7 @@ private fun RecommendTab(
         }
 
         item {
-            val topTag = ExploreDemo.myProfile.tags.firstOrNull()?.displayName ?: "관심사"
+            val topTag = uiState.tagMatchLabel
             SectionHeader(
                 title    = "나와 같은 '$topTag' 관심사를 가진 추천 친구",
                 subtitle = "관심사가 같으면 대화도 쉬워져요",
@@ -204,8 +204,7 @@ private fun RecommendTab(
         }
 
         item {
-            val lang = ExploreDemo.myProfile.learningLanguages.firstOrNull()
-                ?.let { if (it.language == "ENGLISH") "영어" else it.language } ?: "한국어"
+            val lang = uiState.nativeLangLabel
             SectionHeader(
                 title    = "${lang}를 배우고 싶어해요",
                 subtitle = "편하게 대화 나눠주실래요?",

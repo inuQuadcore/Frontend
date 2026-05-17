@@ -46,8 +46,6 @@ fun ScriptMainScreen(
     onFolderClick   : (ScriptFolder) -> Unit = {},
     onItemClick     : (ScriptItem) -> Unit = {},
     onItemAudio     : (ScriptItem) -> Unit = {},
-    onNotification  : () -> Unit = {},
-    hasNotification : Boolean    = false,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val items = viewModel.filteredItems
@@ -58,15 +56,13 @@ fun ScriptMainScreen(
     Scaffold(
         topBar = {
             ScriptTopBar(
-                isSearchOpen        = isSearchOpen,
-                searchQuery         = uiState.searchQuery,
-                onSearchClick       = {
+                isSearchOpen   = isSearchOpen,
+                searchQuery    = uiState.searchQuery,
+                onSearchClick  = {
                     isSearchOpen = !isSearchOpen
                     if (!isSearchOpen) viewModel.updateSearchQuery("")
                 },
-                onSearchChange      = viewModel::updateSearchQuery,
-                onNotificationClick = onNotification,
-                hasNotification     = hasNotification,
+                onSearchChange = viewModel::updateSearchQuery,
             )
         },
         containerColor = Color.White,

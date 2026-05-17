@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.navigation.Route
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,7 +24,9 @@ class SplashViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val token = tokenManager.accessToken.first()
+            val tokenDeferred = async { tokenManager.accessToken.first() }
+            delay(1_500L)
+            val token = tokenDeferred.await()
             _destination.value = if (!token.isNullOrEmpty()) Route.MAIN else Route.LOGIN
         }
     }

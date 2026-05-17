@@ -39,7 +39,9 @@ data class ExploreUiState(
     val cardSet            : List<DiscoverUser> = emptyList(),
     val currentCardIndex   : Int               = 0,
     val tagMatchUsers      : List<DiscoverUser> = emptyList(),
+    val tagMatchLabel      : String            = "관심사",
     val learningLangUsers  : List<DiscoverUser> = emptyList(),
+    val nativeLangLabel    : String            = "한국어",
     val isRefreshing       : Boolean           = false,
     val filterSettings     : FilterSettings    = FilterSettings(),
     val filterResults      : List<DiscoverUser> = emptyList(),
@@ -94,6 +96,7 @@ class ExploreViewModel @Inject constructor(
     private val userRepository     : UserRepository,
     private val friendRepository   : FriendRepository,
     private val presenceRepository : PresenceRepository,
+    private val tokenManager       : TokenManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExploreUiState())
@@ -150,20 +153,67 @@ class ExploreViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
-            when (val res = discoverRepository.discoverRandom()) {
-                is ApiResult.Success -> {
-                    val users = res.data.users.map { it.toUi() }
-                    _uiState.update { it.copy(
-                        cardSet          = users,
-                        currentCardIndex = 0,
-                        isRefreshing     = false,
-                    ) }
-                }
-                is ApiResult.Error, is ApiResult.NetworkError -> {
+            val userId = tokenManager.userId.first()
+
+            val randomDeferred = async { discoverRepository.discoverRandom() }
+            val langsDeferred  = if (userId != null) async { userRepository.getUserLanguages(userId) } else null
+            val tagsDeferred   = if (userId != null) async { userRepository.getUserTags(userId) } else null
+
+            when (val res = randomDeferred.await()) {
+                is ApiResult.Success -> _uiState.update { it.copy(
+                    cardSet          = res.data.users.map { it.toUi() },
+                    currentCardIndex = 0,
+                    isRefreshing     = false,
+                ) }
+                is ApiResult.Error, is ApiResult.NetworkError ->
                     _uiState.update { it.copy(isRefreshing = false) }
+            }
+
+            val userLangs = (langsDeferred?.await() as? ApiResult.Success)?.data?.languages ?: emptyList()
+            val userTags  = (tagsDeferred?.await() as? ApiResult.Success)?.data ?: emptyList()
+
+            val nativeLang = userLangs.find { it.level == 5 }?.language
+            val firstTag   = userTags.firstOrNull()?.tag
+
+            if (userLangs.isNotEmpty() || userTags.isNotEmpty()) {
+                ExploreDemo.myProfile = ExploreDemo.myProfile.copy(
+                    learningLanguages = userLangs.map { UserLanguage(it.language, it.level) },
+                    tags = if (userTags.isNotEmpty()) userTags.map { dto ->
+                        val sample = sampleTags.firstOrNull { s -> s.apiValue == dto.tag }
+                        UserTag(tag = dto.tag, category = dto.category, emoji = sample?.emoji ?: "", displayName = sample?.label ?: dto.tag)
+                    } else ExploreDemo.myProfile.tags,
+                )
+            }
+
+            val tagLabel  = ExploreDemo.myProfile.tags.firstOrNull()?.displayName ?: "관심사"
+            val langLabel = nativeLang?.let { langDisplayName(it) } ?: "한국어"
+            _uiState.update { it.copy(tagMatchLabel = tagLabel, nativeLangLabel = langLabel) }
+
+            if (firstTag != null) {
+                when (val res = discoverRepository.discoverFilter(tags = listOf(firstTag), size = 10)) {
+                    is ApiResult.Success -> _uiState.update { it.copy(tagMatchUsers = res.data.users.map { it.toUi() }) }
+                    else -> {}
+                }
+            }
+
+            if (nativeLang != null) {
+                when (val res = discoverRepository.discoverFilter(languages = listOf(nativeLang), size = 10)) {
+                    is ApiResult.Success -> _uiState.update { it.copy(learningLangUsers = res.data.users.map { it.toUi() }) }
+                    else -> {}
                 }
             }
         }
+    }
+
+    private fun langDisplayName(code: String): String = when (code.uppercase()) {
+        "ENGLISH"  -> "영어"
+        "JAPANESE" -> "일본어"
+        "KOREAN"   -> "한국어"
+        "CHINESE"  -> "중국어"
+        "FRENCH"   -> "프랑스어"
+        "CZECH"    -> "체코어"
+        "SPANISH"  -> "스페인어"
+        else       -> code
     }
 
     // 필터 화면 열기/닫기
@@ -418,8 +468,7 @@ class MyViewModel @Inject constructor(
                     learningLanguages = langs,
                 ))
             }
-            // 태그 매칭에 실제 내 태그가 사용되도록 전역 캐시 갱신
-            ExploreDemo.myProfile = ExploreDemo.myProfile.copy(tags = tags)
+            ExploreDemo.myProfile = ExploreDemo.myProfile.copy(tags = tags, learningLanguages = langs)
         }
     }
 
