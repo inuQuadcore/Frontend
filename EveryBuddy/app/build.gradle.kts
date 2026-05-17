@@ -116,4 +116,9 @@ dependencies {
 
     // Coil — 이미지 로딩
     implementation(libs.coil.compose)
+
+    // Room — 채팅 메시지/폴더 로컬 캐시
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 }
