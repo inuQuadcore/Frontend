@@ -349,15 +349,37 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     fun onDeleteMessage(messageId: String) {
-        _uiState.update { it.copy(messages = it.messages.filter { m -> m.id != messageId }, contextMenuMessage = null) }
+        _uiState.update { it.copy(contextMenuMessage = null) }
+
+        val msgIdLong = messageId.toLongOrNull()
+        if (msgIdLong == null) {
+            // dummy 메시지: 기존 로컬 제거
+            _uiState.update { it.copy(messages = it.messages.filter { m -> m.id != messageId }) }
+            return
+        }
+
+        viewModelScope.launch {
+            messageRepository.deleteMessage(msgIdLong)
+            // 실제 Room 제거는 RTDB onChildRemoved (C10) 또는 다음 sync에 반영.
+            // 백엔드 에러(403/409)는 C21에서 토스트.
+        }
     }
 
     fun onEditMessage(messageId: String, newText: String) {
-        _uiState.update { state ->
-            state.copy(
-                messages           = state.messages.map { if (it.id == messageId) it.copy(text = newText) else it },
-                contextMenuMessage = null,
-            )
+        _uiState.update { it.copy(contextMenuMessage = null) }
+
+        val msgIdLong = messageId.toLongOrNull()
+        if (msgIdLong == null) {
+            // dummy 메시지: 기존 로컬 갱신
+            _uiState.update { state ->
+                state.copy(messages = state.messages.map { if (it.id == messageId) it.copy(text = newText) else it })
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            messageRepository.editMessage(msgIdLong, newText)
+            // 응답 Message는 editedAt 포함. Room 갱신은 RTDB onChildChanged 또는 다음 sync에 반영.
         }
     }
 
