@@ -43,7 +43,6 @@ import com.everybuddy.app.data.chat.ChatFolder
 import com.everybuddy.app.data.chat.ChatListUiState
 import com.everybuddy.app.data.chat.ChatParticipantUi
 import com.everybuddy.app.data.chat.ChatRoomUi
-import com.everybuddy.app.data.chat.dummyChatRooms
 import com.everybuddy.app.ui.theme.*
 
 private val ClAccent    = Color(0xFF0167FF)
@@ -772,26 +771,6 @@ private fun ParticipantAvatar(
                 modifier           = Modifier.fillMaxSize(),
             )
         }
-    }
-}
-
-@Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "채팅 탭 — 목록")
-@Composable
-private fun PreviewChatListWithRooms() {
-    EveryBuddyTheme {
-        ChatListContent(
-            state          = ChatListUiState(rooms = dummyChatRooms),
-            onRoomClick    = {},
-            onFilterSelect = {},
-            onSearchToggle = {},
-            onSearchChange = {},
-            onFabClick     = {},
-            onRetry        = {},
-            onContextMenu  = {},
-            onDismissMenu  = {},
-            onMenuAction        = { _, _ -> },
-            onDismissRoomInfo   = {},
-        )
     }
 }
 

@@ -4,6 +4,8 @@ package com.everybuddy.app.ui.chat
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -52,6 +54,7 @@ data class MediaThumb(
 @Composable
 fun ChatRoomSidebarScreen(
     roomName              : String           = "",
+    isGroup               : Boolean          = true,   // 1:1방이면 false — 멤버 초대 차단
     members               : List<ChatMember> = emptyList(),
     mediaThumbs           : List<MediaThumb> = emptyList(),
     isAutoTranslate       : Boolean          = true,
@@ -230,36 +233,38 @@ fun ChatRoomSidebarScreen(
             MemberRow(member = member)
         }
 
-        // + 멤버 초대하기
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onInviteMember)
-                // TODO padding: 멤버 초대 행 horizontal 16dp, vertical 12dp
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // + 원형 버튼
-            Box(
-                modifier         = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFF0F4FF)),
-                contentAlignment = Alignment.Center,
+        // + 멤버 초대하기 — 1:1방에서는 백엔드가 CANNOT_INVITE_TO_DIRECT로 거부하므로 진입 자체 차단
+        if (isGroup) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onInviteMember)
+                    // TODO padding: 멤버 초대 행 horizontal 16dp, vertical 12dp
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // ic_plus.xml
-                Icon(
-                    painter            = painterResource(R.drawable.ic_fab_plus),
-                    contentDescription = "멤버 초대",
-                    modifier           = Modifier.size(18.dp),
-                    tint               = SbAccent,
+                // + 원형 버튼
+                Box(
+                    modifier         = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF0F4FF)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // ic_plus.xml
+                    Icon(
+                        painter            = painterResource(R.drawable.ic_fab_plus),
+                        contentDescription = "멤버 초대",
+                        modifier           = Modifier.size(18.dp),
+                        tint               = SbAccent,
+                    )
+                }
+                Text(
+                    "멤버 초대하기",
+                    style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SbAccent, fontWeight = FontWeight(500)),
                 )
             }
-            Text(
-                "멤버 초대하기",
-                style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SbAccent, fontWeight = FontWeight(500)),
-            )
         }
 
         Spacer(Modifier.height(8.dp))
@@ -356,22 +361,15 @@ private fun ProfileCircle(
     size     : androidx.compose.ui.unit.Dp,
     modifier : Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(Color(0xFFCCCCCC)),  // 플레이스홀더 배경
-    ) {
-        if (member.profileImageUrl != null) {
-            // TODO: 실제 프로필 이미지 로딩 (Coil AsyncImage)
-            // AsyncImage(
-            //     model              = member.profileImageUrl,
-            //     contentDescription = member.name,
-            //     contentScale       = ContentScale.Crop,
-            //     modifier           = Modifier.fillMaxSize(),
-            // )
-        }
-        // 이미지 없을 때는 배경색만 (이미지 속 회색 원)
+    if (member.profileImageUrl != null) {
+        AsyncImage(
+            model              = member.profileImageUrl,
+            contentDescription = member.name,
+            contentScale       = ContentScale.Crop,
+            modifier           = modifier.size(size).clip(CircleShape).background(Color(0xFFCCCCCC)),
+        )
+    } else {
+        Box(modifier = modifier.size(size).clip(CircleShape).background(Color(0xFFCCCCCC)))
     }
 }
 
@@ -493,21 +491,15 @@ private fun MemberRow(member: ChatMember) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // 프로필 이미지
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(Color(0xFFCCCCCC)),
-        ) {
-            if (member.profileImageUrl != null) {
-                // TODO: 실제 프로필 이미지 (Coil AsyncImage)
-                // AsyncImage(
-                //     model              = member.profileImageUrl,
-                //     contentDescription = member.name,
-                //     contentScale       = ContentScale.Crop,
-                //     modifier           = Modifier.fillMaxSize(),
-                // )
-            }
+        if (member.profileImageUrl != null) {
+            AsyncImage(
+                model              = member.profileImageUrl,
+                contentDescription = member.name,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFCCCCCC)),
+            )
+        } else {
+            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFCCCCCC)))
         }
         Text(
             text  = member.name,
@@ -518,19 +510,13 @@ private fun MemberRow(member: ChatMember) {
 
 @Composable
 private fun MediaThumbItem(thumb: MediaThumb) {
-    Box(
-        modifier = Modifier
-            // TODO size: 썸네일 크기 80x80dp
+    AsyncImage(
+        model              = thumb.imageUrl,
+        contentDescription = null,
+        contentScale       = ContentScale.Crop,
+        modifier           = Modifier
             .size(80.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFFD0D0D0)),  // 플레이스홀더
-    ) {
-        // TODO: 실제 미디어 썸네일 이미지 (Coil AsyncImage)
-        // AsyncImage(
-        //     model              = thumb.imageUrl,
-        //     contentDescription = null,
-        //     contentScale       = ContentScale.Crop,
-        //     modifier           = Modifier.fillMaxSize(),
-        // )
-    }
+            .background(Color(0xFFD0D0D0)),
+    )
 }

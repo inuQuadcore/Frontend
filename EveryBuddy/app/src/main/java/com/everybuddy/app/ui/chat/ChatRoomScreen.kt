@@ -52,8 +52,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.everybuddy.app.data.cache.UserSummary
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -80,6 +83,7 @@ private val DateBadgeBg    = Color(0xFFDDDDDD)
 fun ChatRoomScreen(
     roomId                : String,
     roomName              : String                   = "",
+    isGroup               : Boolean                  = false,
     onBack                : () -> Unit,
     onNavigateToScriptTab : () -> Unit               = {},
     onSaveScriptItem      : (ScriptSaveItem) -> Unit = {},
@@ -89,7 +93,7 @@ fun ChatRoomScreen(
     onToggleStar          : () -> Unit               = {},
     viewModel             : ChatRoomViewModel         = hiltViewModel(),
 ) {
-    LaunchedEffect(roomId) { viewModel.loadRoom(roomId, roomName) }
+    LaunchedEffect(roomId) { viewModel.loadRoom(roomId, roomName, isGroup) }
     val state by viewModel.uiState.collectAsState()
 
     val micPermLauncher = rememberLauncherForActivityResult(
@@ -110,10 +114,10 @@ fun ChatRoomScreen(
         if (granted) takePictureLauncher.launch(null)
     }
 
-    val photoPermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) viewModel.onOpenPhotoPicker()
+    val multiPhotoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
+    ) { uris ->
+        if (uris.isNotEmpty()) viewModel.onPhotosPicked(uris)
     }
 
     val storagePermLauncher = rememberLauncherForActivityResult(
@@ -124,8 +128,10 @@ fun ChatRoomScreen(
 
     if (state.isConversationSelectOpen) {
         ConversationSelectScreen(
-            messages = state.messages,
-            roomName = state.room.name,
+            messages      = state.messages,
+            myUserId      = state.myUserId,
+            userSummaries = state.userSummaries,
+            roomName      = state.room.name,
             onBack   = viewModel::onDismissConversationSelect,
             onSave   = viewModel::onConversationSelected,
         )
@@ -152,11 +158,12 @@ fun ChatRoomScreen(
         onLongPressMessage       = viewModel::onLongPressMessage,
         onDismissContextMenu     = viewModel::onDismissContextMenu,
         onOpenPhotoPicker        = {
-            val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-                Manifest.permission.READ_MEDIA_IMAGES
-            else
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            photoPermLauncher.launch(perm)
+            // 시스템 PhotoPicker는 자체 권한 처리 — 별도 권한 요청 불필요.
+            multiPhotoLauncher.launch(
+                androidx.activity.result.PickVisualMediaRequest(
+                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                )
+            )
         },
         onClosePhotoPicker       = viewModel::onClosePhotoPicker,
         onTogglePhotoSelection   = viewModel::onTogglePhotoSelection,
@@ -179,6 +186,8 @@ fun ChatRoomScreen(
         onFolderCreated          = onFolderCreated,
         onDeleteMessage          = viewModel::onDeleteMessage,
         onEditMessage            = viewModel::onEditMessage,
+        onInviteMembers          = viewModel::inviteMembers,
+        onRetryMessage           = viewModel::retryMessage,
         isStarred                = isStarred,
         onToggleStar             = onToggleStar,
     )
@@ -218,6 +227,8 @@ fun ChatRoomContent(
     onFolderCreated           : (ScriptFolder) -> Unit = {},
     onDeleteMessage           : (String) -> Unit       = {},
     onEditMessage             : (String, String) -> Unit = { _, _ -> },
+    onInviteMembers           : (List<Long>) -> Unit   = {},
+    onRetryMessage            : (String) -> Unit       = {},
     isStarred                 : Boolean                = false,
     onToggleStar              : () -> Unit             = {},
 ) {
@@ -225,7 +236,7 @@ fun ChatRoomContent(
     var newFolderAutoSelectId by remember { mutableStateOf<String?>(null) }
     var separateIdx           by remember { mutableIntStateOf(0) }
     var pendingScriptItems    by remember { mutableStateOf<List<ScriptSaveItem>>(emptyList()) }
-    var localFolders          by remember { mutableStateOf(dummyScriptFolders) }
+    var localFolders          by remember { mutableStateOf(emptyList<ScriptFolder>()) }
     var editingMessageId      by remember { mutableStateOf<String?>(null) }
     var editingText           by remember { mutableStateOf("") }
     var isMenuOpen            by remember { mutableStateOf(false) }
@@ -235,14 +246,7 @@ fun ChatRoomContent(
     var mediaSubPage          by remember { mutableStateOf<String?>(null) }
     var showInviteScreen      by remember { mutableStateOf(false) }
 
-    val members = remember(state.room) {
-        buildList {
-            add(ChatMember(id = "me", name = "나", isMe = true))
-            if (state.room.name.isNotEmpty()) {
-                add(ChatMember(id = state.room.id, name = state.room.name))
-            }
-        }
-    }
+    val members = remember(state.room) { emptyList<ChatMember>() }
 
     LaunchedEffect(state.conversationSaveMessages) { separateIdx = 0; pendingScriptItems = emptyList() }
 
@@ -356,6 +360,8 @@ fun ChatRoomContent(
 
             MessageList(
                 messages              = state.messages,
+                myUserId              = state.myUserId,
+                userSummaries         = state.userSummaries,
                 isAutoTranslate       = state.isAutoTranslate,
                 showTranslation       = state.showTranslation,
                 translatingMessageIds = state.translatingMessageIds,
@@ -366,6 +372,7 @@ fun ChatRoomContent(
                 onToggleTranslation   = onToggleTranslation,
                 onLongPressMessage    = onLongPressMessage,
                 onSaveScript          = { msg -> onStartScriptSave(msg.id) },
+                onRetryMessage        = onRetryMessage,
                 searchQuery           = if (isSearchMode) searchQuery else "",
                 highlightedMessageId  = highlightedMessageId,
             )
@@ -427,6 +434,7 @@ fun ChatRoomContent(
         }
 
         state.contextMenuMessage?.let { msg ->
+            val isOwn = msg.senderId.toLongOrNull() == state.myUserId
             MessageContextMenu(
                 onDismiss    = onDismissContextMenu,
                 onCopy       = { /* TODO: 클립보드 복사 */ },
@@ -436,7 +444,7 @@ fun ChatRoomContent(
                     onDismissContextMenu()
                     onStartScriptSave(msg.id)
                 },
-                isOwnMessage = msg.senderId == "me",
+                isOwnMessage = isOwn,
                 onEdit       = {
                     editingMessageId = msg.id
                     editingText      = msg.text
@@ -513,6 +521,7 @@ fun ChatRoomContent(
         ) {
             ChatRoomSidebarScreen(
                 roomName              = state.room.name,
+                isGroup               = state.room.isGroup,
                 members               = members,
                 mediaThumbs           = emptyList(),
                 isAutoTranslate       = state.isAutoTranslate,
@@ -545,7 +554,10 @@ fun ChatRoomContent(
                 InviteMemberScreen(
                     roomId    = state.room.id,
                     onBack    = { showInviteScreen = false },
-                    onInvited = { showInviteScreen = false },
+                    onInvited = { ids ->
+                        onInviteMembers(ids)
+                        showInviteScreen = false
+                    },
                 )
             }
         }
@@ -843,6 +855,8 @@ fun TranslationLoadingDots(modifier: Modifier = Modifier) {
 @Composable
 fun MessageList(
     messages              : List<ChatMessage>,
+    myUserId              : Long,
+    userSummaries         : Map<Long, UserSummary>,
     isAutoTranslate       : Boolean,
     showTranslation       : Map<String, Boolean>,
     translatingMessageIds : Set<String>,
@@ -853,6 +867,7 @@ fun MessageList(
     onToggleTranslation   : (String) -> Unit,
     onLongPressMessage    : (ChatMessage) -> Unit = {},
     onSaveScript          : (ChatMessage) -> Unit,
+    onRetryMessage        : (String) -> Unit = {},
     searchQuery           : String  = "",
     highlightedMessageId  : String? = null,
 ) {
@@ -875,21 +890,27 @@ fun MessageList(
             }
 
             items(msgs, key = { it.id }) { msg ->
-                val isMe    = msg.senderId == "me"
+                val isMe    = msg.senderId.toLongOrNull() == myUserId
                 val showTr  = showTranslation[msg.id] ?: isAutoTranslate
                 val playing = playingMessageId == msg.id
+                val summary = msg.senderId.toLongOrNull()?.let { userSummaries[it] }
+                val senderName            = summary?.name.orEmpty()
+                val senderProfileImageUrl = summary?.profileImageUrl
 
                 when (msg.type) {
                     MessageType.TEXT ->
                         TextMessageBubble(
                             message             = msg,
                             isMe                = isMe,
+                            senderName            = senderName,
+                            senderProfileImageUrl = senderProfileImageUrl,
                             isAutoTranslate     = isAutoTranslate,
                             showTranslation     = showTr,
                             isTranslating       = msg.id in translatingMessageIds,
                             onToggleTranslation = { onToggleTranslation(msg.id) },
                             onSaveScript        = { onSaveScript(msg) },
                             onLongPress         = { onLongPressMessage(msg) },
+                            onRetry             = { onRetryMessage(msg.id) },
                             searchQuery         = searchQuery,
                             isHighlighted       = msg.id == highlightedMessageId,
                         )
@@ -898,6 +919,8 @@ fun MessageList(
                         VoiceMessageBubble(
                             message             = msg,
                             isMe                = isMe,
+                            senderName            = senderName,
+                            senderProfileImageUrl = senderProfileImageUrl,
                             isAutoTranslate     = isAutoTranslate,
                             isPlaying           = playing,
                             showTranslation     = showTr,
@@ -913,6 +936,25 @@ fun MessageList(
                 }
             }
         }
+    }
+}
+
+/** 메시지 옆 송신자 아바타. profileImageUrl 있으면 Coil로 로드, 없으면 회색 placeholder. */
+@Composable
+private fun SenderAvatar(
+    profileImageUrl    : String?,
+    contentDescription : String,
+    size               : Dp,
+) {
+    if (profileImageUrl != null) {
+        AsyncImage(
+            model              = profileImageUrl,
+            contentDescription = contentDescription,
+            contentScale       = ContentScale.Crop,
+            modifier           = Modifier.size(size).clip(CircleShape),
+        )
+    } else {
+        Box(modifier = Modifier.size(size).clip(CircleShape).background(Color(0xFFCCCCCC)))
     }
 }
 
@@ -948,16 +990,24 @@ fun DateDivider(label: String) {
 fun TextMessageBubble(
     message             : ChatMessage,
     isMe                : Boolean,
+    senderName            : String  = "",
+    senderProfileImageUrl : String? = null,
     isAutoTranslate     : Boolean,
     showTranslation     : Boolean,
     isTranslating       : Boolean,
     onToggleTranslation : () -> Unit,
     onSaveScript        : () -> Unit,
     onLongPress         : () -> Unit = {},
+    onRetry             : () -> Unit = {},
     searchQuery         : String  = "",
     isHighlighted       : Boolean = false,
 ) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
+    val timeText = remember(message.timestamp, message.editedAt) {
+        val base = message.timestamp.format(timeFormatter)
+        if (message.editedAt != null) "$base · 수정됨" else base
+    }
+    val isFailed = message.status == "FAILED"
 
     val shakeOffset = remember { Animatable(0f) }
     LaunchedEffect(isHighlighted) {
@@ -1004,8 +1054,15 @@ fun TextMessageBubble(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.End,
             ) {
+                if (isFailed) {
+                    Text(
+                        text     = "전송 실패 · 재시도",
+                        style    = TextStyle(fontSize = 9.sp, color = Color(0xFFE53935), fontFamily = PretendardFamily),
+                        modifier = Modifier.clickable { onRetry() }.padding(end = 6.dp),
+                    )
+                }
                 Text(
-                    text     = message.timestamp.format(timeFormatter),
+                    text     = timeText,
                     style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
                     modifier = Modifier.padding(end = 4.dp),
                 )
@@ -1035,21 +1092,16 @@ fun TextMessageBubble(
                 modifier          = Modifier.fillMaxWidth().padding(end = 38.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                if (message.senderId == "u_woowonjai") {
-                    Image(
-                        painter            = painterResource(R.drawable.im_woo),
-                        contentDescription = message.senderName,
-                        contentScale       = ContentScale.Crop,
-                        modifier           = Modifier.size(38.dp).clip(CircleShape),
-                    )
-                } else {
-                    Box(modifier = Modifier.size(38.dp).clip(CircleShape).background(Color(0xFFCCCCCC)))
-                }
+                SenderAvatar(
+                    profileImageUrl    = senderProfileImageUrl,
+                    contentDescription = senderName,
+                    size               = 38.dp,
+                )
                 Spacer(Modifier.width(8.dp))
 
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(
-                        text     = message.senderName,
+                        text     = senderName,
                         style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
@@ -1076,7 +1128,7 @@ fun TextMessageBubble(
                         }
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text  = message.timestamp.format(timeFormatter),
+                            text  = timeText,
                             style = TextStyle(fontSize = 9.sp, color = TextSecondary),
                         )
                         if (!isAutoTranslate) {
@@ -1177,6 +1229,8 @@ fun TranslateIconButton(onClick: () -> Unit) {
 fun VoiceMessageBubble(
     message             : ChatMessage,
     isMe                : Boolean,
+    senderName            : String  = "",
+    senderProfileImageUrl : String? = null,
     isAutoTranslate     : Boolean,
     isPlaying           : Boolean,
     showTranslation     : Boolean,
@@ -1186,6 +1240,10 @@ fun VoiceMessageBubble(
     onLongPress         : () -> Unit = {},
 ) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
+    val timeText = remember(message.timestamp, message.editedAt) {
+        val base = message.timestamp.format(timeFormatter)
+        if (message.editedAt != null) "$base · 수정됨" else base
+    }
     val bubbleBg  = if (isMe) BubbleMyVoice else BubbleWhite
     val textColor = if (isMe) Color.White else TextPrimary
 
@@ -1202,7 +1260,7 @@ fun VoiceMessageBubble(
                 horizontalArrangement = Arrangement.End,
             ) {
                 Text(
-                    text     = message.timestamp.format(timeFormatter),
+                    text     = timeText,
                     style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
                     modifier = Modifier.padding(end = 4.dp),
                 )
@@ -1230,21 +1288,16 @@ fun VoiceMessageBubble(
                 modifier          = Modifier.fillMaxWidth().padding(end = 38.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                if (message.senderId == "u_woowonjai") {
-                    Image(
-                        painter            = painterResource(R.drawable.im_woo),
-                        contentDescription = message.senderName,
-                        contentScale       = ContentScale.Crop,
-                        modifier           = Modifier.size(38.dp).clip(CircleShape),
-                    )
-                } else {
-                    Box(modifier = Modifier.size(38.dp).clip(CircleShape).background(Color(0xFFCCCCCC)))
-                }
+                SenderAvatar(
+                    profileImageUrl    = senderProfileImageUrl,
+                    contentDescription = senderName,
+                    size               = 38.dp,
+                )
                 Spacer(Modifier.width(8.dp))
 
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(
-                        text     = message.senderName,
+                        text     = senderName,
                         style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
@@ -1269,7 +1322,7 @@ fun VoiceMessageBubble(
                         }
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text  = message.timestamp.format(timeFormatter),
+                            text  = timeText,
                             style = TextStyle(fontSize = 9.sp, color = TextSecondary),
                         )
                         if (!isAutoTranslate) {
@@ -2017,42 +2070,3 @@ private fun formatDuration(seconds: Int): String {
     return "%02d:%02d".format(m, s)
 }
 
-@Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "우원재 채팅방")
-@Composable
-private fun PreviewWoowonjai() {
-    val room     = dummyChatRooms.find { it.id == "r_woowonjai" }!!
-    val messages = dummyMessages["r_woowonjai"] ?: emptyList()
-    ChatRoomContent(
-        state                 = ChatRoomUiState(room = room, messages = messages),
-        onBack                = {},
-        onInputChange         = {},
-        onSendText            = {},
-        onStartRecording      = {},
-        onStopRecording       = {},
-        onCancelRecording     = {},
-        onPlayVoice           = {},
-        onToggleTranslation   = {},
-        onToggleAutoTranslate = {},
-        onToggleMediaPanel    = {},
-    )
-}
-
-@Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "우원재 채팅방 자동번역 ON")
-@Composable
-private fun PreviewWoowonajaiAutoTranslate() {
-    val room     = dummyChatRooms.find { it.id == "r_woowonjai" }!!
-    val messages = dummyMessages["r_woowonjai"] ?: emptyList()
-    ChatRoomContent(
-        state                 = ChatRoomUiState(room = room, messages = messages, isAutoTranslate = true),
-        onBack                = {},
-        onInputChange         = {},
-        onSendText            = {},
-        onStartRecording      = {},
-        onStopRecording       = {},
-        onCancelRecording     = {},
-        onPlayVoice           = {},
-        onToggleTranslation   = {},
-        onToggleAutoTranslate = {},
-        onToggleMediaPanel    = {},
-    )
-}
