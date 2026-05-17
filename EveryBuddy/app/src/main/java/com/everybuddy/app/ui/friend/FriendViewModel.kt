@@ -45,9 +45,6 @@ data class FriendUiState(
     val replyText           : String                = "",
     val replySent           : Boolean               = false,  // "전송 완료!" 토스트
 
-    // 채팅방 목록 (답장 → 채팅방 생성/업데이트). chat 도메인과 결합, chat 브랜치에서 정리 예정.
-    val chatRooms           : MutableList<FriendDemoData.DemoChatRoom> = FriendDemoData.chatRooms,
-
     // 프로필 화면
     val selectedFriend      : FriendProfile?        = null,
 

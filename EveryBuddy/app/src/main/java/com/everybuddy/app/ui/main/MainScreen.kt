@@ -232,12 +232,9 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                             )
                         },
                         onNotification  = { showNotification = true },
-                        onReplyToStatus = { friendId, friendName ->
-                            chatVm.addReplyRoom(friendId, friendName)
-                            isChatRoomOpen = true
-                            chatNavController.navigate(MainRoute.chatRoom("reply_$friendId"))
-                            selectedTab = MainTab.CHAT
-                        },
+                        // 답장 흐름은 FriendViewModel.sendReply가 직접 chat REST 호출 — 채팅방 자동 이동 X.
+                        // 사용자는 토스트 보고 채팅 탭 가서 확인.
+                        onReplyToStatus = { _, _ -> },
                     )
                 }
 

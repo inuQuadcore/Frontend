@@ -301,13 +301,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun addReplyRoom(friendId: String, friendName: String) {
-        val roomId = "reply_$friendId"
-        if (_listState.value.rooms.any { it.id == roomId }) return
-        val newRoom = ChatRoomUi(id = roomId, name = friendName, lastMessage = "답장을 보냈습니다.", timestamp = "방금")
-        _listState.update { state -> state.copy(rooms = listOf(newRoom) + state.rooms) }
-    }
-
     fun toggleStar(roomId: String) {
         _listState.update { state ->
             state.copy(rooms = state.rooms.map {

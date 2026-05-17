@@ -12,7 +12,6 @@ import com.everybuddy.app.data.local.formatRestLocalDateTime
 import com.everybuddy.app.data.firebase.ChatMessageListener
 import com.everybuddy.app.data.firebase.ViewingManager
 import com.everybuddy.app.data.repository.MessageRepository
-import com.everybuddy.app.ui.friend.FriendDemoData
 import com.google.firebase.database.FirebaseDatabase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
@@ -79,28 +78,6 @@ class ChatRoomViewModel @Inject constructor(
         // 채팅방 이동/재진입 시 이전 listener 정리
         messageListener?.detach()
         messageListener = null
-
-        // friend dummy 답장 흐름 — C13/C14에서 통째 제거 예정. 일단 호환성 유지.
-        if (BuildConfig.USE_DUMMY_DATA && roomId.startsWith("reply_")) {
-            val friendId = roomId.removePrefix("reply_")
-            val demoRoom = FriendDemoData.chatRooms.find { it.friendId == friendId }
-            val room     = ChatRoomUi(id = roomId, name = demoRoom?.friendName ?: friendId)
-            val messages = demoRoom?.messages?.mapIndexed { i, msg ->
-                ChatMessage(
-                    id         = "reply_msg_$i",
-                    roomId     = roomId,
-                    senderId   = if (msg.isMine) "me" else friendId,
-                    senderName = if (msg.isMine) "나" else (demoRoom.friendName),
-                    type       = MessageType.TEXT,
-                    text       = msg.text,
-                    isStatusReply  = msg.isStatusReply,
-                    statusPreview  = msg.originalStatusPreview,
-                    timestamp  = LocalDateTime.now().minusMinutes((demoRoom.messages.size - i).toLong()),
-                )
-            } ?: emptyList()
-            _uiState.update { it.copy(room = room, messages = messages) }
-            return
-        }
 
         val chatRoomId = roomId.toLongOrNull()
         // toLong 실패 = dummy ID (예: "r01"). USE_DUMMY_DATA 분기 처리.
