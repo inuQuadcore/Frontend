@@ -16,6 +16,7 @@ data class ChatRoomUi(
     val name               : String                  = "",
     val lastMessage        : String                  = "",
     val timestamp          : String                  = "",
+    val lastMessageTime    : Long                    = 0L,   // epoch ms. RTDB 노드 값 보관 (RelativeTimeFormatter로 timestamp 갱신용).
     val createdAt          : String                  = "",
     val unreadCount        : Int                     = 0,
     val isMuted            : Boolean                 = false,

@@ -7,6 +7,8 @@ import com.everybuddy.app.data.cache.UserSummaryCache
 import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.ChatRoom
+import com.everybuddy.app.data.firebase.RoomMeta
+import com.everybuddy.app.data.firebase.UserChatRoomsListener
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.ui.friend.KoreanChosung
@@ -36,7 +38,50 @@ class ChatViewModel @Inject constructor(
     private val _listState = MutableStateFlow(ChatListUiState())
     val listState: StateFlow<ChatListUiState> = _listState.asStateFlow()
 
+    /** RTDB `users/{me}/chatrooms/` 메타 구독. loadChatRooms 후 attach. */
+    private var userChatRoomsListener: UserChatRoomsListener? = null
+
     init { loadChatRooms() }
+
+    override fun onCleared() {
+        super.onCleared()
+        userChatRoomsListener?.detach()
+        userChatRoomsListener = null
+    }
+
+    private fun attachUserChatRoomsListener() {
+        if (userChatRoomsListener != null) return
+        viewModelScope.launch {
+            val myUserId = tokenManager.userId.firstOrNull() ?: return@launch
+            val listener = UserChatRoomsListener(
+                userId         = myUserId,
+                onMetaChange   = ::applyRoomMeta,
+                onRoomRemoved  = ::removeRoom,
+            )
+            listener.attach()
+            userChatRoomsListener = listener
+        }
+    }
+
+    private fun applyRoomMeta(chatRoomId: Long, meta: RoomMeta) {
+        val idStr = chatRoomId.toString()
+        _listState.update { state ->
+            state.copy(rooms = state.rooms.map { room ->
+                if (room.id != idStr) room
+                else room.copy(
+                    lastMessage     = meta.lastMessage,
+                    lastMessageTime = meta.lastMessageTime,
+                    timestamp       = RelativeTimeFormatter.format(meta.lastMessageTime),
+                    unreadCount     = meta.unreadCount,
+                )
+            })
+        }
+    }
+
+    private fun removeRoom(chatRoomId: Long) {
+        val idStr = chatRoomId.toString()
+        _listState.update { state -> state.copy(rooms = state.rooms.filter { it.id != idStr }) }
+    }
 
     /** N개 채팅방의 displayName을 병렬 fetch 후 ChatRoomUi 리스트 반환. */
     private suspend fun toChatRoomUis(rooms: List<ChatRoom>): List<ChatRoomUi> {
@@ -64,6 +109,7 @@ class ChatViewModel @Inject constructor(
                 is ApiResult.Success -> {
                     val rooms = result.data?.let { toChatRoomUis(it) } ?: emptyList()
                     _listState.update { it.copy(isLoading = false, rooms = rooms) }
+                    attachUserChatRoomsListener()
                 }
 
                 is ApiResult.Error -> {
