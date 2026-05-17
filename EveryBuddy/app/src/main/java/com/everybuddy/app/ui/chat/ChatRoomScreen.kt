@@ -80,6 +80,7 @@ private val DateBadgeBg    = Color(0xFFDDDDDD)
 fun ChatRoomScreen(
     roomId                : String,
     roomName              : String                   = "",
+    isGroup               : Boolean                  = false,
     onBack                : () -> Unit,
     onNavigateToScriptTab : () -> Unit               = {},
     onSaveScriptItem      : (ScriptSaveItem) -> Unit = {},
@@ -89,7 +90,7 @@ fun ChatRoomScreen(
     onToggleStar          : () -> Unit               = {},
     viewModel             : ChatRoomViewModel         = hiltViewModel(),
 ) {
-    LaunchedEffect(roomId) { viewModel.loadRoom(roomId, roomName) }
+    LaunchedEffect(roomId) { viewModel.loadRoom(roomId, roomName, isGroup) }
     val state by viewModel.uiState.collectAsState()
 
     val micPermLauncher = rememberLauncherForActivityResult(
@@ -521,6 +522,7 @@ fun ChatRoomContent(
         ) {
             ChatRoomSidebarScreen(
                 roomName              = state.room.name,
+                isGroup               = state.room.isGroup,
                 members               = members,
                 mediaThumbs           = emptyList(),
                 isAutoTranslate       = state.isAutoTranslate,

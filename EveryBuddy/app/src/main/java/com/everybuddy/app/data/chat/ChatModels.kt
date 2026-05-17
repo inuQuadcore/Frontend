@@ -19,6 +19,7 @@ data class ChatRoomUi(
     val lastMessageTime    : Long                    = 0L,   // epoch ms. RTDB 노드 값 보관 (RelativeTimeFormatter로 timestamp 갱신용).
     val createdAt          : String                  = "",
     val unreadCount        : Int                     = 0,
+    val isGroup            : Boolean                 = false,  // false 기본 — isGroup 누락 시 fail-safe로 멤버 초대 차단
     val isMuted            : Boolean                 = false,
     val isPinned           : Boolean                 = false,
     val isStarred          : Boolean                 = false,
@@ -41,6 +42,7 @@ fun com.everybuddy.app.data.dto.ChatRoom.toChatRoomUi(
     name           = displayName.ifEmpty { roomName },
     createdAt      = createdAt,
     unreadCount    = unreadCount ?: 0,
+    isGroup        = isGroup,
     participantIds = participantIds,
 )
 

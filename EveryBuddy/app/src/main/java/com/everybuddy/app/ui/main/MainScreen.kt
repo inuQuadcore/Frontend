@@ -157,11 +157,14 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                         ) { backStack ->
                             val roomId = backStack.arguments?.getString("roomId") ?: return@composable
                             val chatListState by chatVm.listState.collectAsState()
-                            val roomName = chatListState.rooms.find { it.id == roomId }?.name ?: ""
+                            val room = chatListState.rooms.find { it.id == roomId }
+                            val roomName = room?.name ?: ""
+                            val isGroup  = room?.isGroup ?: false
                             isChatRoomOpen = true
                             ChatRoomScreen(
                                 roomId                = roomId,
                                 roomName              = roomName,
+                                isGroup               = isGroup,
                                 onBack                = { isChatRoomOpen = false; chatNavController.popBackStack() },
                                 onNavigateToScriptTab = {
                                     isChatRoomOpen = false

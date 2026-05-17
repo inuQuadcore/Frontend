@@ -52,6 +52,7 @@ data class MediaThumb(
 @Composable
 fun ChatRoomSidebarScreen(
     roomName              : String           = "",
+    isGroup               : Boolean          = true,   // 1:1방이면 false — 멤버 초대 차단
     members               : List<ChatMember> = emptyList(),
     mediaThumbs           : List<MediaThumb> = emptyList(),
     isAutoTranslate       : Boolean          = true,
@@ -230,36 +231,38 @@ fun ChatRoomSidebarScreen(
             MemberRow(member = member)
         }
 
-        // + 멤버 초대하기
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onInviteMember)
-                // TODO padding: 멤버 초대 행 horizontal 16dp, vertical 12dp
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // + 원형 버튼
-            Box(
-                modifier         = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFF0F4FF)),
-                contentAlignment = Alignment.Center,
+        // + 멤버 초대하기 — 1:1방에서는 백엔드가 CANNOT_INVITE_TO_DIRECT로 거부하므로 진입 자체 차단
+        if (isGroup) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onInviteMember)
+                    // TODO padding: 멤버 초대 행 horizontal 16dp, vertical 12dp
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // ic_plus.xml
-                Icon(
-                    painter            = painterResource(R.drawable.ic_fab_plus),
-                    contentDescription = "멤버 초대",
-                    modifier           = Modifier.size(18.dp),
-                    tint               = SbAccent,
+                // + 원형 버튼
+                Box(
+                    modifier         = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF0F4FF)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // ic_plus.xml
+                    Icon(
+                        painter            = painterResource(R.drawable.ic_fab_plus),
+                        contentDescription = "멤버 초대",
+                        modifier           = Modifier.size(18.dp),
+                        tint               = SbAccent,
+                    )
+                }
+                Text(
+                    "멤버 초대하기",
+                    style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SbAccent, fontWeight = FontWeight(500)),
                 )
             }
-            Text(
-                "멤버 초대하기",
-                style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SbAccent, fontWeight = FontWeight(500)),
-            )
         }
 
         Spacer(Modifier.height(8.dp))

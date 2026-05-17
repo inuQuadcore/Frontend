@@ -81,14 +81,14 @@ class ChatRoomViewModel @Inject constructor(
         }
     }
 
-    fun loadRoom(roomId: String, roomName: String = "") {
+    fun loadRoom(roomId: String, roomName: String = "", isGroup: Boolean = false) {
         // 채팅방 이동/재진입 시 이전 listener 정리
         messageListener?.detach()
         messageListener = null
 
         val chatRoomId = roomId.toLongOrNull() ?: return   // 잘못된 ID — 무시
 
-        _uiState.update { it.copy(room = ChatRoomUi(id = roomId, name = roomName)) }
+        _uiState.update { it.copy(room = ChatRoomUi(id = roomId, name = roomName, isGroup = isGroup)) }
 
         // Room flow collect → UI state.messages.
         // RTDB가 limitToLast(50)로 캐시 유입을 제한하니 채팅방당 메시지 수 적음 — 전체 load.
@@ -434,14 +434,15 @@ class ChatRoomViewModel @Inject constructor(
         _uiState.update { it.copy(room = it.room.copy(isMuted = !it.room.isMuted)) }
     }
 
-    /** 멤버 초대 — 그룹방만 동작. 1:1방은 백엔드가 403 CANNOT_INVITE_TO_DIRECT로 거부. */
+    /** 멤버 초대 — 그룹방만. 1:1방은 UI에서 초대 버튼 자체를 숨기므로 호출 경로 없음 + 백엔드 403 거부도 받음. */
     fun inviteMembers(participantIds: List<Long>) {
-        val chatRoomId = _uiState.value.room.id.toLongOrNull() ?: return
+        val room = _uiState.value.room
+        if (!room.isGroup) return
+        val chatRoomId = room.id.toLongOrNull() ?: return
         if (participantIds.isEmpty()) return
         viewModelScope.launch {
             chatRoomRepository.inviteParticipants(chatRoomId, participantIds)
             // 성공 시 새 멤버는 RTDB users/{me}/chatrooms/{roomId} 노드로 자동 노출.
-            // 에러 토스트는 후속 task에서 (1:1방 거부 등).
         }
     }
 
