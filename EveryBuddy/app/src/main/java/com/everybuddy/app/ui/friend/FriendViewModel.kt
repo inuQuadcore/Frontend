@@ -10,6 +10,8 @@ import com.everybuddy.app.data.repository.BlockRepository
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.FriendRepository
 import com.everybuddy.app.data.repository.MessageRepository
+import com.everybuddy.app.data.repository.UserRepository
+import com.everybuddy.app.ui.explore.UserDetail
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +49,7 @@ data class FriendUiState(
 
     // 프로필 화면
     val selectedFriend      : FriendProfile?        = null,
+    val selectedFriendDetail: UserDetail?           = null,
 
     // 팔로우 상태
     val followedFriendIds   : Set<Long>             = emptySet(),
@@ -63,6 +66,7 @@ class FriendViewModel @Inject constructor(
     private val presenceRepository  : PresenceRepository,
     private val chatRoomRepository  : ChatRoomRepository,
     private val messageRepository   : MessageRepository,
+    private val userRepository      : UserRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FriendUiState())
@@ -263,8 +267,25 @@ class FriendViewModel @Inject constructor(
         }
     }
 
-    fun selectFriend(friend: FriendProfile) { _uiState.update { it.copy(selectedFriend = friend) } }
-    fun clearSelectedFriend() { _uiState.update { it.copy(selectedFriend = null) } }
+    fun selectFriend(friend: FriendProfile) {
+        _uiState.update { it.copy(selectedFriend = friend, selectedFriendDetail = null) }
+        viewModelScope.launch {
+            val res = userRepository.getUserProfile(friend.id)
+            if (res is ApiResult.Success) {
+                _uiState.update { s ->
+                    s.copy(
+                        selectedFriendDetail = UserDetail(
+                            age             = res.data.age,
+                            gender          = res.data.gender,
+                            consecutiveDays = res.data.consecutiveDays,
+                            isFriend        = s.selectedFriend?.isFriend ?: true,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+    fun clearSelectedFriend() { _uiState.update { it.copy(selectedFriend = null, selectedFriendDetail = null) } }
 
     fun onFollowToggle(id: Long) {
         _uiState.update { s ->

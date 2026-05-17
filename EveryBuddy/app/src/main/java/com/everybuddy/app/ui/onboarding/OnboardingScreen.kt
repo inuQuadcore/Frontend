@@ -1047,7 +1047,7 @@ fun StepInterests(
             enabled = uiState.selectedTags.isNotEmpty(),
             onClick = onNext,
         )
-        Spacer(Modifier.height(7.dp))
+        Spacer(Modifier.navigationBarsPadding())
     }
 }
 

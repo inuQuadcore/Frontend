@@ -177,8 +177,8 @@ data class MyProfile(
 
 object ExploreDemo {
 
-    // 온보딩에서 설정한 내 정보 (마이페이지 / 필터 기준)
-    val myProfile = MyProfile()
+    // 온보딩에서 설정한 내 정보 (마이페이지 / 필터 기준). MyViewModel 로드 후 갱신됨.
+    var myProfile = MyProfile()
 
     // 온보딩 sampleTags에서 파생 — 항상 동기화 유지
     val allTags: List<UserTag> = sampleTags.map { tag ->

@@ -245,7 +245,20 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                 MainTab.EXPLORE -> {
                     isChatRoomOpen = false
                     ExploreScreen(
-                        onStartChat    = { selectedTab = MainTab.CHAT },
+                        onStartChat    = { user ->
+                            chatVm.createChatRoom(
+                                roomName       = user.name,
+                                isGroup        = false,
+                                participantIds = listOf(user.userId),
+                                onSuccess      = { room ->
+                                    isChatRoomOpen = true
+                                    chatVm.markRoomAsRead(room.id)
+                                    chatNavController.navigate(MainRoute.chatRoom(room.id))
+                                    selectedTab = MainTab.CHAT
+                                },
+                                onError        = {},
+                            )
+                        },
                         onNotification = { showNotification = true },
                     )
                 }
@@ -281,13 +294,12 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                         else -> {
                             val scriptUiStateMain by scriptViewModel.uiState.collectAsState()
                             ScriptMainScreen(
-                                viewModel      = scriptViewModel,
-                                isRefreshing   = scriptUiStateMain.isRefreshing,
-                                onRefresh      = scriptViewModel::refresh,
-                                onFolderClick  = { folder -> selectedScriptFolder = folder },
-                                onItemClick    = { item -> selectedScriptItem = item },
-                                onAddFolder    = { showNewFolderInScript = true },
-                                onNotification = { showNotification = true },
+                                viewModel     = scriptViewModel,
+                                isRefreshing  = scriptUiStateMain.isRefreshing,
+                                onRefresh     = scriptViewModel::refresh,
+                                onFolderClick = { folder -> selectedScriptFolder = folder },
+                                onItemClick   = { item -> selectedScriptItem = item },
+                                onAddFolder   = { showNewFolderInScript = true },
                             )
                             if (showNewFolderInScript) {
                                 Dialog(

@@ -875,14 +875,9 @@ private fun SubMenuScreen(key: String, viewModel: MyViewModel, onBack: () -> Uni
     when (key) {
         "settings" -> SettingsScreen(viewModel = viewModel, onBack = onBack)
         "version"  -> VersionScreen(onBack = onBack)
-        else       -> EmptySubScreen(
-            title = when (key) {
-                "guide"  -> "에브리버디 가이드"
-                "notice" -> "공지사항"
-                else     -> key
-            },
-            onBack = onBack,
-        )
+        "guide"    -> GuideScreen(onBack = onBack)
+        "notice"   -> NoticeScreen(onBack = onBack)
+        else       -> EmptySubScreen(title = key, onBack = onBack)
     }
 }
 
@@ -1200,7 +1195,80 @@ private fun VersionScreen(onBack: () -> Unit) {
     }
 }
 
-// 공통 빈 서브페이지 (가이드, 공지사항 등)
+// 에브리버디 가이드 화면
+@Composable
+private fun GuideScreen(onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    Scaffold(
+        topBar = { SubScreenTopBar(title = "에브리버디 가이드", onBack = onBack) },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+        ) {
+            Text("EveryBuddy란?", style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri))
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "EveryBuddy는 서로 다른 언어를 배우고 싶은 사람들을 연결해주는 언어 교환 앱이에요. 원어민과 자유롭게 대화하며 자연스럽게 언어를 익혀보세요.",
+                style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 22.sp),
+            )
+
+            Spacer(Modifier.height(28.dp))
+            GuideSection(
+                title = "01. 친구 찾기",
+                body  = "탐색 탭에서 관심사와 학습 언어를 기준으로 나와 잘 맞는 친구를 발견해보세요. 필터를 활용하면 원하는 조건의 친구를 더 빠르게 찾을 수 있어요.",
+            )
+            Spacer(Modifier.height(20.dp))
+            GuideSection(
+                title = "02. 대화하기",
+                body  = "친구와 1:1 채팅 또는 그룹 채팅을 시작할 수 있어요. 채팅 중 마음에 드는 표현은 스크립트로 저장해두면 나중에 다시 복습할 수 있어요.",
+            )
+            Spacer(Modifier.height(20.dp))
+            GuideSection(
+                title = "03. 스크립트 저장",
+                body  = "채팅 중 배운 문장, 단어를 스크립트 탭에 저장하고 폴더로 정리해보세요. 원어민 발음을 음성으로 들으며 반복 학습할 수 있어요.",
+            )
+            Spacer(Modifier.height(20.dp))
+            GuideSection(
+                title = "04. 상태메시지",
+                body  = "친구 탭에서 나만의 상태메시지를 작성하고 친구들의 메시지에 가볍게 답장해보세요. 짧은 문장으로도 언어 교환이 시작돼요.",
+            )
+            Spacer(Modifier.height(20.dp))
+            GuideSection(
+                title = "05. 연속 출석",
+                body  = "매일 앱을 방문하면 연속 출석 일수가 쌓여요. 꾸준한 학습 습관을 만들고 프로필에 출석 뱃지를 자랑해보세요.",
+            )
+            Spacer(Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+private fun GuideSection(title: String, body: String) {
+    Column {
+        Text(title, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.Accent))
+        Spacer(Modifier.height(6.dp))
+        Text(body, style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 22.sp))
+    }
+}
+
+// 공지사항 화면 — 빈 페이지
+@Composable
+private fun NoticeScreen(onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    Scaffold(
+        topBar = { SubScreenTopBar(title = "공지사항", onBack = onBack) },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding).fillMaxSize())
+    }
+}
+
+// 공통 빈 서브페이지
 @Composable
 private fun EmptySubScreen(title: String, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
@@ -1208,9 +1276,7 @@ private fun EmptySubScreen(title: String, onBack: () -> Unit) {
         topBar = { SubScreenTopBar(title = title, onBack = onBack) },
         containerColor = Color.White,
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("TODO: $title 내용 추가요망", style = TextStyle(fontSize = 14.sp, color = C.TextSec))
-        }
+        Box(modifier = Modifier.padding(innerPadding).fillMaxSize())
     }
 }
 

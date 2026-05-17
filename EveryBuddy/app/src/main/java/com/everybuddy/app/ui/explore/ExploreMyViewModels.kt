@@ -386,7 +386,15 @@ class MyViewModel @Inject constructor(
 
             val apiProfile = (profileDeferred.await() as? ApiResult.Success)?.data ?: return@launch
             val tags = (tagsDeferred.await() as? ApiResult.Success)?.data
-                ?.map { UserTag(it.tag, it.category) }
+                ?.map { dto ->
+                    val sample = sampleTags.firstOrNull { s -> s.apiValue == dto.tag }
+                    UserTag(
+                        tag         = dto.tag,
+                        category    = dto.category,
+                        emoji       = sample?.emoji ?: "",
+                        displayName = sample?.label ?: dto.tag,
+                    )
+                }
                 ?: _uiState.value.profile.tags
             val langs = (langsDeferred.await() as? ApiResult.Success)?.data?.languages
                 ?.map { UserLanguage(it.language, it.level) }
@@ -410,6 +418,8 @@ class MyViewModel @Inject constructor(
                     learningLanguages = langs,
                 ))
             }
+            // 태그 매칭에 실제 내 태그가 사용되도록 전역 캐시 갱신
+            ExploreDemo.myProfile = ExploreDemo.myProfile.copy(tags = tags)
         }
     }
 

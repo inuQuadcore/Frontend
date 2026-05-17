@@ -73,6 +73,7 @@ fun FriendMainScreen(
     when {
         uiState.selectedFriend != null -> UserProfileScreen(
             user           = uiState.selectedFriend!!.toDiscoverUser(),
+            detail         = uiState.selectedFriendDetail,
             isFriend       = uiState.selectedFriend!!.isFriend,
             onBack         = viewModel::clearSelectedFriend,
             onChat         = { onStartChat(it) },

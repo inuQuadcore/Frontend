@@ -39,13 +39,7 @@ data class AppNotification(
 fun NotificationScreen(onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     // TODO: API - GET /api/v1/notifications 연동 후 실제 알림 목록으로 교체
-    val items = remember {
-        listOf(
-            AppNotification("chat",   "채팅 알림",   "우원재님이 메시지를 보냈습니다.",     "방금",    false),
-            AppNotification("friend", "친구 요청",   "Potter님이 친구 요청을 보냈습니다.",   "5분 전",  false),
-            AppNotification("app",    "앱 업데이트", "EveryBuddy 1.2.0이 출시되었습니다.",   "어제",    true),
-        )
-    }
+    val items = remember { emptyList<AppNotification>() }
 
     Scaffold(
         topBar = {

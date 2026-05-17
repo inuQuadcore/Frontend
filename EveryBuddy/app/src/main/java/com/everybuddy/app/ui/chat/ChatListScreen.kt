@@ -506,8 +506,8 @@ fun ChatRoomItem(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // 아바타 (그룹=겹침 레이아웃, 1:1=프로필 이미지 또는 이니셜)
-        if (room.participants.size >= 2) {
+        // 아바타 (그룹=겹침 레이아웃, 1:1=상대 프로필 이미지 또는 이니셜)
+        if (room.isGroup && room.participants.size >= 2) {
             GroupAvatarLayout(participants = room.participants)
         } else {
             Box(

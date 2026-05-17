@@ -46,7 +46,6 @@ fun ScriptMainScreen(
     onFolderClick  : (ScriptFolder) -> Unit = {},
     onItemClick    : (ScriptItem) -> Unit = {},
     onItemAudio    : (ScriptItem) -> Unit = {},
-    onNotification : () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val items = viewModel.filteredItems
@@ -57,14 +56,13 @@ fun ScriptMainScreen(
     Scaffold(
         topBar = {
             ScriptTopBar(
-                isSearchOpen        = isSearchOpen,
-                searchQuery         = uiState.searchQuery,
-                onSearchClick       = {
+                isSearchOpen   = isSearchOpen,
+                searchQuery    = uiState.searchQuery,
+                onSearchClick  = {
                     isSearchOpen = !isSearchOpen
                     if (!isSearchOpen) viewModel.updateSearchQuery("")
                 },
-                onSearchChange      = viewModel::updateSearchQuery,
-                onNotificationClick = onNotification,
+                onSearchChange = viewModel::updateSearchQuery,
             )
         },
         containerColor = Color.White,
@@ -185,14 +183,12 @@ fun ScriptMainScreen(
 
 @Composable
 private fun ScriptTopBar(
-    isSearchOpen        : Boolean  = false,
-    searchQuery         : String   = "",
-    onSearchClick       : () -> Unit,
-    onSearchChange      : (String) -> Unit = {},
-    onNotificationClick : () -> Unit,
-    hasNotification     : Boolean  = false,
+    isSearchOpen   : Boolean  = false,
+    searchQuery    : String   = "",
+    onSearchClick  : () -> Unit,
+    onSearchChange : (String) -> Unit = {},
 ) {
-    Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
+    Column(modifier = Modifier.background(Color.White)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -204,44 +200,16 @@ private fun ScriptTopBar(
                 modifier = Modifier.align(Alignment.Center),
                 style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri),
             )
-            Row(
-                modifier              = Modifier.align(Alignment.CenterEnd),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            IconButton(
+                onClick  = onSearchClick,
+                modifier = Modifier.size(40.dp).align(Alignment.CenterEnd),
             ) {
-                IconButton(
-                    onClick  = onSearchClick,
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        painter            = painterResource(if (isSearchOpen) R.drawable.ic_back else R.drawable.ic_search),
-                        contentDescription = if (isSearchOpen) "검색 닫기" else "검색",
-                        modifier           = Modifier.size(24.dp),
-                        tint               = SmTextPri,
-                    )
-                }
-                Box {
-                    IconButton(
-                        onClick  = onNotificationClick,
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            painter            = painterResource(R.drawable.ic_alarm),
-                            contentDescription = "알림",
-                            modifier           = Modifier.size(24.dp),
-                            tint               = SmTextPri,
-                        )
-                    }
-                    if (hasNotification) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(SmAccent)
-                                .align(Alignment.TopEnd)
-                                .offset(x = (-6).dp, y = 6.dp),
-                        )
-                    }
-                }
+                Icon(
+                    painter            = painterResource(if (isSearchOpen) R.drawable.ic_back else R.drawable.ic_search),
+                    contentDescription = if (isSearchOpen) "검색 닫기" else "검색",
+                    modifier           = Modifier.size(24.dp),
+                    tint               = SmTextPri,
+                )
             }
         }
 
@@ -471,6 +439,8 @@ fun ScriptDetailScreen(
 ) {
     BackHandler(onBack = onBack)
 
+    var editingOriginal    by remember { mutableStateOf(false) }
+    var editedOriginal     by remember { mutableStateOf(item.originalText) }
     var editingTranslation by remember { mutableStateOf(false) }
     var editedTranslation  by remember { mutableStateOf(item.translatedText) }
     var editingMemo        by remember { mutableStateOf(false) }
@@ -502,14 +472,49 @@ fun ScriptDetailScreen(
             modifier = Modifier.padding(innerPadding).fillMaxSize().padding(horizontal = 20.dp, vertical = 24.dp),
         ) {
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    item.originalText,
-                    modifier = Modifier.weight(1f),
-                    style    = TextStyle(fontSize = 22.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri, lineHeight = 32.sp),
-                )
+                if (editingOriginal) {
+                    Box(
+                        modifier = Modifier.weight(1f).border(1.dp, SmAccent, RoundedCornerShape(8.dp)).padding(12.dp),
+                    ) {
+                        BasicTextField(
+                            value         = editedOriginal,
+                            onValueChange = { editedOriginal = it },
+                            textStyle     = TextStyle(fontSize = 22.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri, lineHeight = 32.sp),
+                            modifier      = Modifier.fillMaxWidth(),
+                        )
+                    }
+                } else {
+                    Text(
+                        item.originalText,
+                        modifier = Modifier.weight(1f),
+                        style    = TextStyle(fontSize = 22.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri, lineHeight = 32.sp),
+                    )
+                }
                 IconButton(onClick = { onAudio(item) }, modifier = Modifier.size(36.dp)) {
                     Icon(painterResource(R.drawable.ic_speaker), "발음 듣기", Modifier.size(22.dp), tint = SmAccent)
                 }
+            }
+            Spacer(Modifier.height(4.dp))
+            if (editingOriginal) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Text(
+                        "취소",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmTextSec),
+                        modifier = Modifier.clickable { editingOriginal = false; editedOriginal = item.originalText },
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "완료",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmAccent, fontWeight = FontWeight(600)),
+                        modifier = Modifier.clickable { onSave(item.copy(originalText = editedOriginal)); editingOriginal = false },
+                    )
+                }
+            } else {
+                Text(
+                    "수정하기",
+                    style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmTextSec),
+                    modifier = Modifier.clickable { editingOriginal = true; editedOriginal = item.originalText },
+                )
             }
 
             Spacer(Modifier.height(20.dp))

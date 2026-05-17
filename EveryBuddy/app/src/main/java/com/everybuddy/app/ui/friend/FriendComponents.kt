@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.everybuddy.app.R
+import com.everybuddy.app.ui.explore.ExploreDemo
+import com.everybuddy.app.ui.explore.countryFlag
 import com.everybuddy.app.ui.theme.PretendardFamily
 
 private val C = FriendColors  // 색상 단축키
@@ -32,7 +34,7 @@ fun FriendTopBar(
     onNotification  : () -> Unit,
     onAddFriend     : () -> Unit = {},
 ) {
-    Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
+    Column(modifier = Modifier.background(Color.White)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -133,9 +135,9 @@ fun FriendListItem(
                     modifier           = Modifier.fillMaxSize(),
                 )
             }
-            // 국기 이모지 뱃지 (우하단)
+            // 국기 이모지 뱃지 (우하단) — 국적(nationality) 기준
             Text(
-                text     = languageFlag(friend.nativeLanguages.firstOrNull() ?: "EN"),
+                text     = countryFlag(friend.nationality),
                 fontSize = 16.sp,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -150,8 +152,9 @@ fun FriendListItem(
             // 관심사 태그 (최대 3개)
             if (friend.interests.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    friend.interests.take(3).forEach { tag ->
-                        InterestTag(label = tag)
+                    friend.interests.take(3).forEach { rawTag ->
+                        val ut = ExploreDemo.allTags.find { it.tag == rawTag }
+                        InterestTag(label = if (ut != null) "${ut.emoji} ${ut.displayName}" else rawTag)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
@@ -182,19 +185,11 @@ fun FriendListItem(
                 )
             }
 
-            // 언어 표시 (모국어 + 배우는 언어)
+            // 언어 표시 (배우는 언어 — chip 스타일)
             Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 friend.learningLanguages.take(4).forEach { lang ->
-                    Text(
-                        text  = languageLabel(lang),
-                        style = TextStyle(
-                            fontSize   = 12.sp,
-                            fontFamily = PretendardFamily,
-                            color      = C.TextSec,
-                            fontWeight = FontWeight(500),
-                        ),
-                    )
+                    LanguageChip(code = lang)
                 }
             }
         }
@@ -231,6 +226,21 @@ fun OnlineBadge() {
                 style = TextStyle(fontSize = 10.sp, fontFamily = PretendardFamily, color = Color(0xFFE65100)),
             )
         }
+    }
+}
+
+@Composable
+fun LanguageChip(code: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(Color(0xFFF0F0F0))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text  = languageLabel(code),
+            style = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = Color(0xFF555555)),
+        )
     }
 }
 

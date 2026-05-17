@@ -242,9 +242,9 @@ fun ScriptSaveSheet(
                     onSave(ScriptSaveItem(
                         messageId      = message.id,
                         originalText   = editedText,
-                        translatedText = message.translatedText,
-                        memo1          = memo1,
-                        memo2          = memo,
+                        translatedText = memo1,
+                        memo1          = memo,
+                        memo2          = "",
                         selectedFolder = selectedFolder,
                     ))
                 },
@@ -351,7 +351,7 @@ fun ScriptFolderThumbnail(folder: ScriptFolder, isSelected: Boolean, onClick: ()
                 modifier         = Modifier.align(Alignment.TopEnd).padding(4.dp).size(20.dp).clip(CircleShape).background(SsAccent),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(painterResource(R.drawable.ic_check), null, Modifier.size(12.dp), tint = Color.White)
+                Image(painterResource(R.drawable.ic_check), null, Modifier.size(12.dp))
             }
         }
     }
