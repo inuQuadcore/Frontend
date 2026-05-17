@@ -36,9 +36,10 @@ private val C = AppColors
 // MyPageScreen 진입점
 @Composable
 fun MyPageScreen(
-    viewModel      : MyViewModel,
-    onNotification : () -> Unit = {},
-    onLogout       : () -> Unit = {},
+    viewModel       : MyViewModel,
+    onNotification  : () -> Unit = {},
+    hasNotification : Boolean    = false,
+    onLogout        : () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val logoutComplete by viewModel.logoutComplete.collectAsState()
@@ -63,15 +64,16 @@ fun MyPageScreen(
             onBack   = viewModel::closeLanguage,
         )
         uiState.openSubMenu != null  -> SubMenuScreen(key = uiState.openSubMenu!!, viewModel = viewModel, onBack = viewModel::closeSubMenu)
-        else -> MyPageContent(viewModel = viewModel, onNotification = onNotification)
+        else -> MyPageContent(viewModel = viewModel, onNotification = onNotification, hasNotification = hasNotification)
     }
 }
 
 // 마이페이지 메인 콘텐츠
 @Composable
 private fun MyPageContent(
-    viewModel      : MyViewModel,
-    onNotification : () -> Unit = {},
+    viewModel       : MyViewModel,
+    onNotification  : () -> Unit = {},
+    hasNotification : Boolean    = false,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val profile = uiState.profile
@@ -95,8 +97,20 @@ private fun MyPageContent(
                         IconButton(onClick = { viewModel.openSubMenu("settings") }, modifier = Modifier.size(40.dp)) {
                             Icon(painterResource(R.drawable.ic_settings), "설정", Modifier.size(24.dp), tint = C.TextPri)
                         }
-                        IconButton(onClick = onNotification, modifier = Modifier.size(40.dp)) {
-                            Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(24.dp), tint = C.TextPri)
+                        Box {
+                            IconButton(onClick = onNotification, modifier = Modifier.size(40.dp)) {
+                                Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(24.dp), tint = C.TextPri)
+                            }
+                            if (hasNotification) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(C.Accent)
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = (-6).dp, y = 6.dp),
+                                )
+                            }
                         }
                     }
                 }

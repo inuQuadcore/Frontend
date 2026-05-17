@@ -59,6 +59,7 @@ fun ChatListScreen(
     onStartDirectChat   : () -> Unit           = {},
     onStartGroupChat    : () -> Unit           = {},
     onNotificationClick : () -> Unit           = {},
+    hasNotification     : Boolean              = false,
     onNavigateToExplore : () -> Unit           = {},
     viewModel           : ChatViewModel        = hiltViewModel(),
 ) {
@@ -91,7 +92,7 @@ fun ChatListScreen(
         onMenuAction        = viewModel::onMenuAction,
         onDismissRoomInfo   = viewModel::dismissRoomInfo,
         onNotificationClick = onNotificationClick,
-        hasNotification     = false,
+        hasNotification     = hasNotification,
     )
 }
 

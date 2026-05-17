@@ -287,6 +287,27 @@ class FriendViewModel @Inject constructor(
     }
     fun clearSelectedFriend() { _uiState.update { it.copy(selectedFriend = null, selectedFriendDetail = null) } }
 
+    /**
+     * fromUserId로 친구 매칭 후 프로필 표시 (푸시 클릭 라우팅용).
+     * friends 비어있으면 한 번 새로 가져옴. 그래도 매칭 실패면 no-op.
+     */
+    fun selectFriendByUserId(userId: Long) {
+        viewModelScope.launch {
+            _uiState.value.friends.find { it.id == userId }?.let {
+                selectFriend(it); return@launch
+            }
+            when (val r = friendRepository.getFriends()) {
+                is ApiResult.Success -> {
+                    val ids = presenceRepository.onlineIds.value
+                    val fresh = r.data.friends.map { it.toFriendProfile(ids) }
+                    _uiState.update { it.copy(friends = fresh) }
+                    fresh.find { it.id == userId }?.let { selectFriend(it) }
+                }
+                is ApiResult.Error, is ApiResult.NetworkError -> Unit
+            }
+        }
+    }
+
     fun onFollowToggle(id: Long) {
         _uiState.update { s ->
             val ids = s.followedFriendIds

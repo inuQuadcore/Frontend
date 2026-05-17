@@ -41,6 +41,7 @@ import com.everybuddy.app.ui.explore.MyViewModel
 import com.everybuddy.app.ui.friend.FriendMainScreen
 import com.everybuddy.app.ui.friend.FriendViewModel
 import com.everybuddy.app.ui.my.MyPageScreen
+import com.everybuddy.app.ui.notification.HasUnreadViewModel
 import com.everybuddy.app.ui.notification.NotificationScreen
 import com.everybuddy.app.ui.script.ScriptDetailScreen
 import com.everybuddy.app.ui.script.ScriptFolderScreen
@@ -78,15 +79,46 @@ fun MainScreen(onLogout: () -> Unit = {}) {
     val scriptViewModel   : ScriptViewModel     = hiltViewModel()
     val chatVm            : ChatViewModel       = hiltViewModel()
     val attendanceVm      : AttendanceViewModel = hiltViewModel()
+    val friendVm          : FriendViewModel     = hiltViewModel()
+    val hasUnreadVm       : HasUnreadViewModel  = hiltViewModel()
+    val hasUnread         by hasUnreadVm.hasUnread.collectAsState()
 
     LaunchedEffect(Unit) { attendanceVm.markAttendanceIfNeeded() }
+
+    // FCM 푸시 클릭으로 들어온 deep link 1회 consume.
+    // chatRoomId가 있으면 채팅방 직접 진입, friendUserId가 있으면 친구 탭 + 프로필 표시.
+    LaunchedEffect(PendingDeepLink.chatRoomId, PendingDeepLink.friendUserId) {
+        PendingDeepLink.chatRoomId?.let { roomId ->
+            selectedTab    = MainTab.CHAT
+            isChatRoomOpen = true
+            chatVm.markRoomAsRead(roomId)
+            chatNavController.navigate(MainRoute.chatRoom(roomId))
+            PendingDeepLink.chatRoomId = null
+        }
+        PendingDeepLink.friendUserId?.let { userId ->
+            selectedTab = MainTab.FRIEND
+            friendVm.selectFriendByUserId(userId)
+            PendingDeepLink.friendUserId = null
+        }
+    }
 
     var selectedScriptItem    by remember { mutableStateOf<ScriptItem?>(null) }
     var selectedScriptFolder  by remember { mutableStateOf<ScriptFolder?>(null) }
     var showNewFolderInScript by remember { mutableStateOf(false) }
 
     if (showNotification) {
-        NotificationScreen(onBack = { showNotification = false })
+        NotificationScreen(
+            onBack         = {
+                showNotification = false
+                hasUnreadVm.refresh()   // 알림 화면에서 읽음 처리한 결과 반영
+            },
+            onFriendClick  = { userId ->
+                showNotification = false
+                selectedTab     = MainTab.FRIEND
+                friendVm.selectFriendByUserId(userId)
+                hasUnreadVm.refresh()
+            },
+        )
         return
     }
 
@@ -148,6 +180,7 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                                 onStartDirectChat   = { showDirectChat = true },
                                 onStartGroupChat    = { showGroupChat = true },
                                 onNotificationClick = { showNotification = true },
+                                hasNotification     = hasUnread,
                                 onNavigateToExplore = { selectedTab = MainTab.EXPLORE },
                             )
                         }
@@ -217,10 +250,10 @@ fun MainScreen(onLogout: () -> Unit = {}) {
 
                 MainTab.FRIEND -> {
                     isChatRoomOpen = false
-                    val friendVm: FriendViewModel = hiltViewModel()
                     FriendMainScreen(
                         viewModel       = friendVm,
                         onAddFriend     = { selectedTab = MainTab.EXPLORE },
+                        hasNotification = hasUnread,
                         onStartChat     = { user ->
                             chatVm.createChatRoom(
                                 roomName       = user.name,
@@ -294,12 +327,14 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                         else -> {
                             val scriptUiStateMain by scriptViewModel.uiState.collectAsState()
                             ScriptMainScreen(
-                                viewModel     = scriptViewModel,
-                                isRefreshing  = scriptUiStateMain.isRefreshing,
-                                onRefresh     = scriptViewModel::refresh,
-                                onFolderClick = { folder -> selectedScriptFolder = folder },
-                                onItemClick   = { item -> selectedScriptItem = item },
-                                onAddFolder   = { showNewFolderInScript = true },
+                                viewModel       = scriptViewModel,
+                                isRefreshing    = scriptUiStateMain.isRefreshing,
+                                onRefresh       = scriptViewModel::refresh,
+                                onFolderClick   = { folder -> selectedScriptFolder = folder },
+                                onItemClick     = { item -> selectedScriptItem = item },
+                                onAddFolder     = { showNewFolderInScript = true },
+                                onNotification  = { showNotification = true },
+                                hasNotification = hasUnread,
                             )
                             if (showNewFolderInScript) {
                                 Dialog(
@@ -324,9 +359,10 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                     isChatRoomOpen = false
                     val myVm: MyViewModel = hiltViewModel()
                     MyPageScreen(
-                        viewModel      = myVm,
-                        onNotification = { showNotification = true },
-                        onLogout       = onLogout,
+                        viewModel       = myVm,
+                        onNotification  = { showNotification = true },
+                        hasNotification = hasUnread,
+                        onLogout        = onLogout,
                     )
                 }
             }
