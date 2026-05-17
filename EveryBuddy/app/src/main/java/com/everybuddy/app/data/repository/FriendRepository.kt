@@ -2,6 +2,7 @@ package com.everybuddy.app.data.repository
 
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.FriendListResponse
+import com.everybuddy.app.data.dto.RemovedFriendsResponse
 import com.everybuddy.app.data.network.FriendApi
 import com.google.gson.Gson
 import javax.inject.Inject
@@ -31,4 +32,7 @@ class FriendRepository @Inject constructor(
      */
     suspend fun getFriends(): ApiResult<FriendListResponse> =
         safeApiCall(gson, { api.getFriends() })
+
+    suspend fun getRemovedFriends(): ApiResult<RemovedFriendsResponse> =
+        safeApiCall(gson, { api.getRemovedFriends() })
 }

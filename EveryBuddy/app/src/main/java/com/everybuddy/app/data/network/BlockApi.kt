@@ -1,11 +1,20 @@
 package com.everybuddy.app.data.network
 
+import com.everybuddy.app.data.dto.BlockedUsersResponse
 import retrofit2.Response
 import retrofit2.http.DELETE
+import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 
 interface BlockApi {
+
+    /**
+     * GET /api/v1/blocks — 내가 차단한 사용자 목록
+     * 200: { blockedUsers: [...] } | 401: 인증 필요
+     */
+    @GET("api/v1/blocks")
+    suspend fun getBlockedUsers(): Response<BlockedUsersResponse>
 
     /**
      * POST /api/v1/blocks/{userId} — 사용자 차단

@@ -2,29 +2,38 @@ package com.everybuddy.app.ui.friend
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.everybuddy.app.data.cache.UserSummaryCache
 import com.everybuddy.app.data.dto.ApiResult
-import com.everybuddy.app.data.dto.FriendStatusMessage
+import com.everybuddy.app.data.dto.FriendStatusMessageDto
 import com.everybuddy.app.data.dto.MyStatusMessageResponse
+import com.everybuddy.app.data.dto.toDto
 import com.everybuddy.app.data.dto.userMessage
+import com.everybuddy.app.data.local.TokenManager
+import com.everybuddy.app.data.repository.ChatRoomRepository
+import com.everybuddy.app.data.repository.MessageRepository
 import com.everybuddy.app.data.repository.StatusMessageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class StatusUiState(
     val myStatus            : MyStatusMessageResponse?     = null,
-    val friendStatuses      : List<FriendStatusMessage> = emptyList(),
+    val myProfileImageUrl   : String?                      = null,  // 본인 프로필 — UserSummaryCache lookup 결과
+    val friendStatuses      : List<FriendStatusMessageDto>  = emptyList(),
     val isWriteScreenOpen   : Boolean                      = false,
     val isEditMode          : Boolean                      = false,
     val draftText           : String                       = "",
-    val expandedStatus      : FriendStatusMessage?      = null,
+    val expandedStatus      : FriendStatusMessageDto?    = null,
     val isMyStatusMenuOpen  : Boolean                      = false,
     val isDeleteConfirmOpen : Boolean                      = false,
     val isReplying          : Boolean                      = false,
+    val isSending           : Boolean                      = false,
     val replyText           : String                       = "",
     val replySent           : Boolean                      = false,
     val isLoading           : Boolean                      = false,
@@ -35,7 +44,11 @@ data class StatusUiState(
 
 @HiltViewModel
 class StatusMessageViewModel @Inject constructor(
-    private val statusRepo: StatusMessageRepository,
+    private val statusRepo         : StatusMessageRepository,
+    private val chatRoomRepository : ChatRoomRepository,
+    private val messageRepository  : MessageRepository,
+    private val tokenManager       : TokenManager,
+    private val userSummaryCache   : UserSummaryCache,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(StatusUiState())
@@ -45,7 +58,17 @@ class StatusMessageViewModel @Inject constructor(
 
     fun loadAll() {
         loadMyStatus()
+        loadMyProfile()
         loadFriendStatuses(reset = true)
+    }
+
+    /** 본인 프로필 이미지 — UserSummaryCache hit 시 즉시, miss 시 GET /users/{myId}로 채워짐. */
+    private fun loadMyProfile() {
+        viewModelScope.launch {
+            val myUserId = tokenManager.userId.firstOrNull() ?: return@launch
+            val summary  = userSummaryCache.get(myUserId) ?: return@launch
+            _state.update { it.copy(myProfileImageUrl = summary.profileImageUrl) }
+        }
     }
 
     fun loadMyStatus() {
@@ -66,8 +89,8 @@ class StatusMessageViewModel @Inject constructor(
             when (val r = statusRepo.getFriendStatusMessages(cursor)) {
                 is ApiResult.Success -> {
                     val data   = r.data
-                    val merged = if (reset) data.statusMessages
-                                 else _state.value.friendStatuses + data.statusMessages
+                    val dtos   = data.statusMessages.map { it.toDto() }
+                    val merged = if (reset) dtos else _state.value.friendStatuses + dtos
                     _state.update { it.copy(friendStatuses = merged, nextCursor = data.nextCursor, hasNext = data.hasNext, isLoading = false) }
                 }
                 is ApiResult.Error, is ApiResult.NetworkError ->
@@ -89,19 +112,20 @@ class StatusMessageViewModel @Inject constructor(
     }
 
     fun updateDraftText(text: String) {
-        if (text.length <= 150) _state.update { it.copy(draftText = text) }
+        if (text.length <= 100) _state.update { it.copy(draftText = text) }
     }
 
     fun submitStatus() {
-        val text = _state.value.draftText.trim().ifBlank { return }
+        val text    = _state.value.draftText.trim().ifBlank { return }
+        val isEdit  = _state.value.isEditMode
+        val msg     = if (isEdit) "상태메시지가 수정되었습니다." else "상태메시지가 등록되었습니다."
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-            val r = if (_state.value.isEditMode) statusRepo.updateStatusMessage(text)
-                    else statusRepo.postStatusMessage(text)
+            val r = if (isEdit) statusRepo.updateStatusMessage(text) else statusRepo.postStatusMessage(text)
             when (r) {
                 is ApiResult.Success -> {
                     loadMyStatus()
-                    _state.update { it.copy(isWriteScreenOpen = false, draftText = "", isLoading = false, toastMessage = "상태메시지가 등록되었습니다.") }
+                    _state.update { it.copy(isWriteScreenOpen = false, draftText = "", isEditMode = false, isLoading = false, toastMessage = msg) }
                 }
                 is ApiResult.Error, is ApiResult.NetworkError ->
                     _state.update { it.copy(isLoading = false, toastMessage = r.userMessage()) }
@@ -125,7 +149,7 @@ class StatusMessageViewModel @Inject constructor(
         }
     }
 
-    fun openFriendStatus(sm: FriendStatusMessage) {
+    fun openFriendStatus(sm: FriendStatusMessageDto) {
         _state.update { it.copy(expandedStatus = sm, isReplying = false, replyText = "", replySent = false) }
     }
 
@@ -138,8 +162,27 @@ class StatusMessageViewModel @Inject constructor(
     fun updateReplyText(text: String) { _state.update { it.copy(replyText = text) } }
 
     fun sendReply() {
-        // TODO: ChatRoomRepository integration
-        _state.update { it.copy(replySent = true, replyText = "") }
+        if (_state.value.replyText.isBlank() || _state.value.isSending) return
+        val replyText = _state.value.replyText.trim()
+        val target    = _state.value.expandedStatus ?: return
+        val preview   = if (target.content.length > 15) target.content.take(15) + "…" else target.content
+
+        viewModelScope.launch {
+            _state.update { it.copy(isSending = true, replyText = "") }
+
+            val createResult = chatRoomRepository.createChatRoom(target.userName, isGroup = false, listOf(target.userId))
+            if (createResult is ApiResult.Success) {
+                val chatRoomId = createResult.data?.chatRoomId
+                if (chatRoomId != null) {
+                    messageRepository.sendTextMessage(chatRoomId, replyText, statusPreview = preview)
+                    _state.update { it.copy(isSending = false, replySent = true) }
+                    delay(1500)
+                    _state.update { it.copy(replySent = false, expandedStatus = null, isReplying = false) }
+                    return@launch
+                }
+            }
+            _state.update { it.copy(isSending = false, toastMessage = createResult.userMessage()) }
+        }
     }
 
     fun consumeReplySent() { _state.update { it.copy(replySent = false) } }

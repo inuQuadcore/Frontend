@@ -1,554 +1,510 @@
-package com.everybuddy.app.ui.chat
+﻿package com.everybuddy.app.ui.chat
 
-import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.R
-import com.everybuddy.app.data.dummy.*
-import com.everybuddy.app.data.dto.ApiResult
-import com.everybuddy.app.data.repository.ChatRepository
-import com.everybuddy.app.ui.explore.ExploreTagChip
-import com.everybuddy.app.ui.theme.*
-import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import com.everybuddy.app.data.chat.ChatRoomUi
+import com.everybuddy.app.ui.friend.FriendProfile
+import com.everybuddy.app.ui.friend.FriendViewModel
+import com.everybuddy.app.ui.theme.PretendardFamily
+import kotlinx.coroutines.delay
 
-// UiState
-data class StartChatUiState(
-    val friends     : List<DummyUser> = friendUsers,
-    val selectedIds : Set<String>     = emptySet(),
-    val searchQuery : String          = "",
-)
+private val ScAccent  = Color(0xFF0167FF)
+private val ScTextPri = Color(0xFF1B1B1B)
+private val ScTextSec = Color(0xFF8F9399)
+private val ScBorder  = Color(0xFFE5E5E5)
 
-val StartChatUiState.filteredFriends: List<DummyUser>
-    get() = if (searchQuery.isEmpty()) friends
-    else friends.filter { it.name.contains(searchQuery, ignoreCase = true) }
+@Composable
+fun DirectChatScreen(
+    onBack        : () -> Unit,
+    onRoomCreated : (ChatRoomUi) -> Unit,
+    chatVm        : ChatViewModel   = hiltViewModel(),
+    friendVm      : FriendViewModel = hiltViewModel(),
+) {
+    BackHandler(onBack = onBack)
 
-val StartChatUiState.selectedUsers: List<DummyUser>
-    get() = friends.filter { it.id in selectedIds }
+    val uiState     by friendVm.uiState.collectAsState()
+    var searchQuery  by remember { mutableStateOf("") }
+    var toastMsg     by remember { mutableStateOf<String?>(null) }
+    var isCreating   by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) { friendVm.loadFriends() }
 
-// ViewModel
-/**
- * StartChatViewModel
- *
- * 채팅 시작 화면의 친구 선택 상태를 관리.
- * 완료 버튼 클릭 시 ChatViewModel.createChatRoom()을 호출.
- * TODO: POST /api/v1/채팅방 API 연동
- */
-@dagger.hilt.android.lifecycle.HiltViewModel
-class StartChatViewModel @Inject constructor(
-    private val sharedRepo     : SharedUserRepository,
-    private val chatRepository : ChatRepository,
-) : androidx.lifecycle.ViewModel() {
-
-    private val _uiState = MutableStateFlow(StartChatUiState(friends = sharedRepo.friends))
-    val uiState: StateFlow<StartChatUiState> = _uiState.asStateFlow()
-
-    fun onFriendSelect(userId: String) {
-        _uiState.update { state ->
-            val newSelected = if (userId in state.selectedIds)
-                state.selectedIds - userId
-            else
-                state.selectedIds + userId
-            state.copy(selectedIds = newSelected)
+    LaunchedEffect(toastMsg) {
+        if (toastMsg != null) {
+            delay(2000)
+            toastMsg = null
         }
     }
 
-    fun onSearchChange(query: String) {
-        _uiState.update { it.copy(searchQuery = query) }
-    }
+    val friends = if (searchQuery.isBlank()) uiState.friends
+    else uiState.friends.filter { it.name.contains(searchQuery, ignoreCase = true) }
 
-    fun onConfirm(onSuccess: (String) -> Unit) {
-        val selected = _uiState.value.selectedUsers
-        if (selected.isEmpty()) return
-
-        val roomName       = if (selected.size == 1) selected.first().name
-        else selected.joinToString(", ") { it.name }
-        val participantIds = selected.map { it.id.filter(Char::isDigit).toLongOrNull() ?: 1L }
-
-        viewModelScope.launch {
-            val result = chatRepository.createChatRoom(roomName, participantIds)
-            if (result is ApiResult.Success) {
-                result.data?.let { room -> onSuccess(room.chatRoomId.toString()) }
-            }
-        }
-    }
-}
-
-// 진입점
-@Composable
-fun StartChatScreen(
-    onBack    : () -> Unit,
-    onSuccess : (String) -> Unit,
-    viewModel : StartChatViewModel = hiltViewModel(),
-) {
-    val state by viewModel.uiState.collectAsState()
-    StartChatContent(
-        state          = state,
-        onBack         = onBack,
-        onFriendSelect = viewModel::onFriendSelect,
-        onSearchChange = viewModel::onSearchChange,
-        onConfirm      = { viewModel.onConfirm(onSuccess) },
-    )
-}
-
-// Content
-@Composable
-fun StartChatContent(
-    state          : StartChatUiState,
-    onBack         : () -> Unit,
-    onFriendSelect : (String) -> Unit,
-    onSearchChange : (String) -> Unit,
-    onConfirm      : () -> Unit,
-) {
-    val filtered   = state.filteredFriends
-    val selected   = state.selectedUsers
-    val canConfirm = selected.isNotEmpty()
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White),
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-
-            StartChatTopBar(onBack = onBack)
-
-            // 선택된 친구 칩 (1명 이상 선택 시)
-            if (selected.isNotEmpty()) {
-                LazyRow(
-                    modifier              = Modifier
+    Scaffold(
+        topBar = {
+            Column {
+                Box(
+                    modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        .height(56.dp)
+                        .background(Color.White)
+                        .padding(horizontal = 8.dp),
                 ) {
-                    items(selected, key = { "sel_${it.id}" }) { user ->
-                        SelectedFriendChip(
-                            user     = user,
-                            onRemove = { onFriendSelect(user.id) },
-                        )
+                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).size(40.dp)) {
+                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = ScTextPri)
                     }
-                }
-            }
-
-            StartChatSearchBar(
-                query         = state.searchQuery,
-                onValueChange = onSearchChange,
-            )
-
-            // 친구 목록 — 완료 버튼 등장 시 마지막 아이템 가려짐 방지
-            LazyColumn(
-                modifier       = Modifier.weight(1f),
-                contentPadding = PaddingValues(bottom = if (canConfirm) 140.dp else 20.dp),
-            ) {
-                if (filtered.isEmpty()) {
-                    item { EmptySearchResult() }
-                } else {
-                    items(filtered, key = { "sc_${it.id}" }) { user ->
-                        StartChatFriendItem(
-                            user       = user,
-                            isSelected = user.id in state.selectedIds,
-                            onSelect   = { onFriendSelect(user.id) },
-                        )
-                    }
-                }
-            }
-        }
-
-        // 완료 버튼 오버레이 (1명 이상 선택 시)
-        if (canConfirm) {
-            // 흰색 그라디언트 스크림!!
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(178.dp)
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color.White.copy(alpha = 0f), Color.White),
-                        ),
+                    Text(
+                        "일반채팅",
+                        modifier = Modifier.align(Alignment.Center),
+                        style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = ScTextPri),
                     )
-                    .pointerInput(Unit) { detectTapGestures { /* 터치 전파 방지 */ } },
-            )
-
-            // 완료 버튼 — 높이 60dp, 하단 여백 51dp
-            Button(
-                onClick  = onConfirm,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 51.dp)
-                    .height(60.dp),
-                shape  = RoundedCornerShape(15.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF0167FF),
-                    contentColor   = Color.White,
-                ),
-            ) {
-                Text(
-                    text  = "완료",
-                    style = TextStyle(
-                        fontSize   = 20.sp,
-                        fontFamily = PretendardFamily,
-                        fontWeight = FontWeight(600),
-                        color      = Color.White,
-                    ),
+                }
+                BasicTextField(
+                    value         = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    singleLine    = true,
+                    textStyle     = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = ScTextPri),
+                    modifier      = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFFF2F2F2))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    decorationBox = { innerTextField ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(painterResource(R.drawable.ic_search), null, Modifier.size(16.dp), tint = ScTextSec)
+                            Spacer(Modifier.width(6.dp))
+                            Box(Modifier.weight(1f)) {
+                                if (searchQuery.isEmpty()) {
+                                    Text("친구 검색", style = TextStyle(fontSize = 15.sp, color = ScTextSec, fontFamily = PretendardFamily))
+                                }
+                                innerTextField()
+                            }
+                        }
+                    },
                 )
+                HorizontalDivider(color = ScBorder, thickness = 0.5.dp)
             }
-        }
-
-    }
-}
-
-// 서브 컴포넌트
-@Composable
-fun StartChatTopBar(onBack: () -> Unit) {
-    Row(
-        modifier          = Modifier
-            .fillMaxWidth()
-            .height(65.dp)
-            .padding(start = 27.dp, end = 27.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-            Icon(
-                painter            = painterResource(R.drawable.ic_back),
-                contentDescription = "뒤로가기",
-                modifier           = Modifier.size(width = 15.dp, height = 8.dp),
-                tint               = Color.Black,
-            )
-        }
-        Text(
-            text      = "채팅시작",
-            style     = TextStyle(
-                fontSize   = 20.sp,
-                fontFamily = PretendardFamily,
-                fontWeight = FontWeight(600),
-                color      = Color(0xFF000000),
-            ),
-            modifier  = Modifier.weight(1f),
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.size(40.dp))
-    }
-}
-
-@Composable
-fun StartChatSearchBar(query: String, onValueChange: (String) -> Unit) {
-    OutlinedTextField(
-        value         = query,
-        onValueChange = onValueChange,
-        placeholder   = {
-            Text(
-                text  = "친구를 검색해보세요",
-                style = TextStyle(
-                    fontSize   = 15.sp,
-                    fontFamily = PretendardFamily,
-                    color      = Color(0xFFA9A9A9),
-                ),
-            )
         },
-        leadingIcon = {
-            Icon(
-                painter            = painterResource(R.drawable.ic_search),
-                contentDescription = null,
-                modifier           = Modifier.size(16.dp),
-                tint               = Color(0xFFA9A9A9),
-            )
-        },
-        singleLine = true,
-        modifier   = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 23.dp, vertical = 14.dp)
-            .height(48.dp),
-        shape  = RoundedCornerShape(24.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            unfocusedContainerColor = Color(0xFFF0F0F0),
-            focusedContainerColor   = Color(0xFFF0F0F0),
-            unfocusedBorderColor    = Color.Transparent,
-            focusedBorderColor      = Color.Transparent,
-            cursorColor             = Color(0xFF0167FF),
-        ),
-        textStyle = TextStyle(
-            fontSize   = 15.sp,
-            fontFamily = PretendardFamily,
-            color      = Color(0xFF1B1B1B),
-        ),
-    )
-}
-
-@Composable
-fun EmptySearchResult() {
-    Box(
-        modifier         = Modifier
-            .fillMaxWidth()
-            .padding(top = 60.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text  = "검색 결과가 없습니다.",
-            style = TextStyle(
-                fontSize   = 15.sp,
-                fontFamily = PretendardFamily,
-                color      = Color(0xFF8F9399),
-            ),
-        )
-    }
-}
-
-/**
- * 선택된 친구 칩
- * 프로필 45dp + 우상단 ic_cancel.xml(18dp, offset x=3 y=-2) + 이름 12sp
- */
-@Composable
-fun SelectedFriendChip(user: DummyUser, onRemove: () -> Unit) {
-    Column(
-        modifier            = Modifier.width(58.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box {
-            Box(
-                modifier         = Modifier
-                    .size(45.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE8EEF7)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Image(
-                    painter            = painterResource(R.drawable.ic_profile_default),
-                    contentDescription = user.name,
-                    contentScale       = ContentScale.Crop,
-                    modifier           = Modifier.size(45.dp),
-                )
-            }
-            Box(
-                modifier         = Modifier
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF1B1B1B))
-                    .align(Alignment.TopEnd)
-                    .offset(x = 3.dp, y = (-2).dp)
-                    .clickable { onRemove() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    painter            = painterResource(R.drawable.ic_fab_plus),
-                    contentDescription = "선택 취소",
-                    modifier           = Modifier.size(10.dp),
-                    tint               = Color.White,
-                )
-            }
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text      = user.name,
-            style     = TextStyle(
-                fontSize   = 12.sp,
-                fontFamily = PretendardFamily,
-                color      = Color(0xFF1B1B1B),
-            ),
-            maxLines  = 1,
-            overflow  = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-/**
- * 친구 선택 리스트 아이템
- * 프로필 69dp / 국적 아이콘 28dp (offset x=7 y=7)
- * 미선택: ic_check_empty.xml 회색 / 선택: ic_check.xml 파란색
- */
-@Composable
-fun StartChatFriendItem(
-    user       : DummyUser,
-    isSelected : Boolean,
-    onSelect   : () -> Unit,
-) {
-    Row(
-        modifier          = Modifier
-            .fillMaxWidth()
-            .clickable { onSelect() }
-            .padding(start = 26.dp, end = 14.dp, top = 25.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // 프로필 이미지 + 국적 아이콘
-        Box(modifier = Modifier.size(67.dp)) {
-            Box(
-                modifier         = Modifier
-                    .size(67.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE8EEF7))
-                    .align(Alignment.TopStart),
-                contentAlignment = Alignment.Center,
-            ) {
-                Image(
-                    painter            = painterResource(R.drawable.ic_profile_default),
-                    contentDescription = null,
-                    contentScale       = ContentScale.Crop,
-                    modifier           = Modifier.size(67.dp),
-                )
-            }
-            Box(
-                modifier         = Modifier
-                    .size(22.dp)
-                    .clip(CircleShape)
-                    .background(Color.White)
-                    .align(Alignment.BottomEnd),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(nationFlagEmoji(user.nationCode), fontSize = 21.sp)
-            }
-        }
-
-        Spacer(Modifier.width(15.dp))
-
-        // 텍스트 블록
-        Column(modifier = Modifier.weight(1f)) {  // Column 명시적 시작
-            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                user.topTags().forEach { tag ->
-                    ExploreTagChip(label = tag.replace("_", " "))
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(friends) { friend ->
+                    FriendSelectRow(
+                        friend     = friend,
+                        isGroup    = false,
+                        isSelected = false,
+                        onClick    = {
+                            if (!isCreating) {
+                                isCreating = true
+                                chatVm.createChatRoom(
+                                    roomName       = friend.name,             // 1:1방: 상대 이름을 박아 전송 (표시 시점엔 무시되고 자체 렌더)
+                                    isGroup        = false,
+                                    participantIds = listOf(friend.id),
+                                    onSuccess      = { room -> onRoomCreated(room) },
+                                    onError        = { msg -> toastMsg = msg; isCreating = false },
+                                )
+                            }
+                        },
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = ScBorder, thickness = 0.5.dp)
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text  = user.name,
-                style = TextStyle(
-                    fontSize   = 16.sp,
-                    fontFamily = PretendardFamily,
-                    fontWeight = FontWeight(600),
-                    color      = Color(0xFF000000),
-                ),
-            )
-            Spacer(Modifier.height(3.dp))
-            Text(
-                text     = user.bio.take(15),
-                style    = TextStyle(
-                    fontSize   = 13.sp,
-                    fontFamily = PretendardFamily,
-                    fontWeight = FontWeight(400),
-                    color      = Color(0xFF434343),
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(3.dp))
-            // 사용 언어 + 레벨 점
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                user.myLangs.forEach { (langCode, level) ->
-                    Row(
-                        verticalAlignment     = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+
+            toastMsg?.let { msg ->
+                Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF444444))
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
                     ) {
-                        Text(
-                            text  = langCode,
-                            style = TextStyle(
-                                fontSize   = 13.sp,
-                                fontFamily = PretendardFamily,
-                                fontWeight = FontWeight(500),
-                                color      = Color(0xFF9A9A9A),
-                            ),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        repeat(5) { i ->
-                            Icon(
-                                painter            = painterResource(
-                                    if (i < level) R.drawable.ic_dot_filled
-                                    else           R.drawable.ic_dot_empty
-                                ),
-                                contentDescription = null,
-                                modifier           = Modifier
-                                    .padding(1.dp)
-                                    .size(6.dp),
-                                tint               = if (i < level) Color(0xFF0167FF)
-                                else           Color(0xFFDEDEDE),
+                        Text(msg, style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = Color.White))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GroupChatScreen(
+    onBack        : () -> Unit,
+    onRoomCreated : (ChatRoomUi) -> Unit,
+    chatVm        : ChatViewModel   = hiltViewModel(),
+    friendVm      : FriendViewModel = hiltViewModel(),
+) {
+    BackHandler(onBack = onBack)
+
+    val uiState       by friendVm.uiState.collectAsState()
+    var searchQuery    by remember { mutableStateOf("") }
+    var selectedIds    by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var showNameDialog by remember { mutableStateOf(false) }
+    var toastMsg       by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) { friendVm.loadFriends() }
+
+    LaunchedEffect(toastMsg) {
+        if (toastMsg != null) {
+            delay(2000)
+            toastMsg = null
+        }
+    }
+
+    val friends = if (searchQuery.isBlank()) uiState.friends
+    else uiState.friends.filter { it.name.contains(searchQuery, ignoreCase = true) }
+
+    Scaffold(
+        topBar = {
+            Column {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .background(Color.White)
+                        .padding(horizontal = 8.dp),
+                ) {
+                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).size(40.dp)) {
+                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = ScTextPri)
+                    }
+                    Text(
+                        "그룹채팅",
+                        modifier = Modifier.align(Alignment.Center),
+                        style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = ScTextPri),
+                    )
+                    if (selectedIds.isNotEmpty()) {
+                        TextButton(
+                            onClick  = { showNameDialog = true },
+                            modifier = Modifier.align(Alignment.CenterEnd),
+                        ) {
+                            Text(
+                                "완료 (${selectedIds.size})",
+                                style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = ScAccent),
                             )
                         }
                     }
                 }
+                BasicTextField(
+                    value         = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    singleLine    = true,
+                    textStyle     = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = ScTextPri),
+                    modifier      = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFFF2F2F2))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    decorationBox = { innerTextField ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(painterResource(R.drawable.ic_search), null, Modifier.size(16.dp), tint = ScTextSec)
+                            Spacer(Modifier.width(6.dp))
+                            Box(Modifier.weight(1f)) {
+                                if (searchQuery.isEmpty()) {
+                                    Text("친구 검색", style = TextStyle(fontSize = 15.sp, color = ScTextSec, fontFamily = PretendardFamily))
+                                }
+                                innerTextField()
+                            }
+                        }
+                    },
+                )
+                HorizontalDivider(color = ScBorder, thickness = 0.5.dp)
+            }
+        },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(friends) { friend ->
+                    val selected = selectedIds.contains(friend.id)
+                    FriendSelectRow(
+                        friend     = friend,
+                        isGroup    = true,
+                        isSelected = selected,
+                        onClick    = {
+                            selectedIds = if (selected) selectedIds - friend.id else selectedIds + friend.id
+                        },
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = ScBorder, thickness = 0.5.dp)
+                }
+            }
+
+            toastMsg?.let { msg ->
+                Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF444444))
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                    ) {
+                        Text(msg, style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = Color.White))
+                    }
+                }
             }
         }
+    }
 
-        Spacer(Modifier.width(12.dp))
-
-        // 체크 아이콘
-        Icon(
-            painter            = painterResource(
-                if (isSelected) R.drawable.ic_check else R.drawable.ic_check_empty
-            ),
-            contentDescription = if (isSelected) "선택됨" else "미선택",
-            modifier           = Modifier.size(20.dp),
-            tint               = if (isSelected) Color(0xFF0167FF) else Color(0xFFDCDCDC),
+    if (showNameDialog) {
+        GroupNameDialog(
+            onDismiss = { showNameDialog = false },
+            onConfirm = { roomName ->
+                showNameDialog = false
+                val participantIds = uiState.friends
+                    .filter { selectedIds.contains(it.id) }
+                    .map { it.id }
+                chatVm.createChatRoom(
+                    roomName       = roomName,
+                    isGroup        = true,
+                    participantIds = participantIds,
+                    onSuccess      = { room -> onRoomCreated(room) },
+                    onError        = { msg -> toastMsg = msg },
+                )
+            },
         )
     }
 }
 
-// Preview
-@Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "미선택")
 @Composable
-private fun PreviewEmpty() {
-    EveryBuddyTheme {
-        StartChatContent(
-            state          = StartChatUiState(),
-            onBack         = {},
-            onFriendSelect = {},
-            onSearchChange = {},
-            onConfirm      = {},
+private fun FriendSelectRow(
+    friend     : FriendProfile,
+    isGroup    : Boolean,
+    isSelected : Boolean,
+    onClick    : () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier         = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFDDDDDD)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text  = friend.name.take(1),
+                style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color(0xFF888888)),
+            )
+        }
+        Text(
+            text     = friend.name,
+            style    = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = ScTextPri),
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
+        if (isGroup) {
+            if (isSelected) {
+                Image(
+                    painter            = painterResource(R.drawable.ic_check),
+                    contentDescription = null,
+                    modifier           = Modifier.size(22.dp),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .border(1.dp, ScBorder, CircleShape),
+                )
+            }
+        }
     }
 }
 
-@Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "1명 선택")
 @Composable
-private fun PreviewSelected() {
-    EveryBuddyTheme {
-        StartChatContent(
-            state          = StartChatUiState(selectedIds = setOf("u01")),
-            onBack         = {},
-            onFriendSelect = {},
-            onSearchChange = {},
-            onConfirm      = {},
-        )
+fun InviteMemberScreen(
+    roomId    : String,
+    onBack    : () -> Unit,
+    onInvited : (List<Long>) -> Unit = {},
+    friendVm  : FriendViewModel = hiltViewModel(),
+) {
+    val uiState       by friendVm.uiState.collectAsState()
+    var searchQuery    by remember { mutableStateOf("") }
+    var selectedIds    by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var toastMsg       by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) { friendVm.loadFriends() }
+
+    LaunchedEffect(toastMsg) {
+        if (toastMsg != null) {
+            delay(2000)
+            toastMsg = null
+        }
+    }
+
+    val friends = if (searchQuery.isBlank()) uiState.friends
+    else uiState.friends.filter { it.name.contains(searchQuery, ignoreCase = true) }
+
+    Scaffold(
+        topBar = {
+            Column {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .background(Color.White)
+                        .padding(horizontal = 8.dp),
+                ) {
+                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).size(40.dp)) {
+                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = ScTextPri)
+                    }
+                    Text(
+                        "멤버 초대",
+                        modifier = Modifier.align(Alignment.Center),
+                        style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = ScTextPri),
+                    )
+                    if (selectedIds.isNotEmpty()) {
+                        TextButton(
+                            onClick  = {
+                                // TODO: API - POST /api/v1/chat/rooms/{roomId}/members 로 selectedIds 전송
+                                onInvited(selectedIds.toList())
+                            },
+                            modifier = Modifier.align(Alignment.CenterEnd),
+                        ) {
+                            Text(
+                                "초대 (${selectedIds.size})",
+                                style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = ScAccent),
+                            )
+                        }
+                    }
+                }
+                BasicTextField(
+                    value         = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    singleLine    = true,
+                    textStyle     = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = ScTextPri),
+                    modifier      = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFFF2F2F2))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    decorationBox = { innerTextField ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(painterResource(R.drawable.ic_search), null, Modifier.size(16.dp), tint = ScTextSec)
+                            Spacer(Modifier.width(6.dp))
+                            Box(Modifier.weight(1f)) {
+                                if (searchQuery.isEmpty()) {
+                                    Text("친구 검색", style = TextStyle(fontSize = 15.sp, color = ScTextSec, fontFamily = PretendardFamily))
+                                }
+                                innerTextField()
+                            }
+                        }
+                    },
+                )
+                HorizontalDivider(color = ScBorder, thickness = 0.5.dp)
+            }
+        },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(friends) { friend ->
+                    val selected = selectedIds.contains(friend.id)
+                    FriendSelectRow(
+                        friend     = friend,
+                        isGroup    = true,
+                        isSelected = selected,
+                        onClick    = {
+                            selectedIds = if (selected) selectedIds - friend.id else selectedIds + friend.id
+                        },
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = ScBorder, thickness = 0.5.dp)
+                }
+            }
+
+            toastMsg?.let { msg ->
+                Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF444444))
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                    ) {
+                        Text(msg, style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = Color.White))
+                    }
+                }
+            }
+        }
     }
 }
 
-@Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "검색 중")
 @Composable
-private fun PreviewSearch() {
-    EveryBuddyTheme {
-        StartChatContent(
-            state          = StartChatUiState(searchQuery = "Potter"),
-            onBack         = {},
-            onFriendSelect = {},
-            onSearchChange = {},
-            onConfirm      = {},
-        )
-    }
+private fun GroupNameDialog(
+    onDismiss : () -> Unit,
+    onConfirm : (String) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Color.White,
+        title = {
+            Text(
+                "방 이름 입력",
+                style = TextStyle(fontSize = 17.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = ScTextPri),
+            )
+        },
+        text = {
+            BasicTextField(
+                value         = name,
+                onValueChange = { name = it },
+                singleLine    = true,
+                textStyle     = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = ScTextPri),
+                modifier      = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFF2F2F2))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                decorationBox = { innerTextField ->
+                    Box {
+                        if (name.isEmpty()) {
+                            Text("채팅방 이름", style = TextStyle(fontSize = 15.sp, color = ScTextSec, fontFamily = PretendardFamily))
+                        }
+                        innerTextField()
+                    }
+                },
+            )
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("취소", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = ScTextSec))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { if (name.isNotBlank()) onConfirm(name.trim()) }) {
+                Text(
+                    "확인",
+                    style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = ScAccent),
+                )
+            }
+        },
+    )
 }

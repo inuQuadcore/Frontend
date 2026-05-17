@@ -46,8 +46,8 @@ android {
         jvmTarget = "11"
     }
     buildFeatures {
-        compose     = true
-        buildConfig = true   // BuildConfig.DEBUG 사용 (NetworkModule의 Release 분기용)
+        compose = true
+        buildConfig = true
     }
 }
 
@@ -71,6 +71,7 @@ dependencies {
     // Androidx Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.activity.compose)
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
@@ -87,6 +88,8 @@ dependencies {
     // Hilt (DI)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    // Hilt 2.57+ unshaded kotlin-metadata-jvm — Kotlin 2.2.0 metadata 처리용
+    ksp("org.jetbrains.kotlin:kotlin-metadata-jvm:2.2.0")
     implementation(libs.androidx.hilt.navigation.compose)
 
     // Test
@@ -112,4 +115,9 @@ dependencies {
 
     // Coil — 이미지 로딩
     implementation(libs.coil.compose)
+
+    // Room — 채팅 메시지/폴더 로컬 캐시
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 }

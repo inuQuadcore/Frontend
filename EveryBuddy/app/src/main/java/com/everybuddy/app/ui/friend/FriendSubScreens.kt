@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -20,27 +24,35 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.everybuddy.app.R
 import com.everybuddy.app.ui.theme.PretendardFamily
 
 private val C = FriendColors
 
 @Composable
-fun FriendSearchScreen(viewModel: FriendViewModel) {
-    val uiState by viewModel.uiState.collectAsState()
+fun FriendSearchScreen(
+    viewModel : FriendViewModel,
+    statusVm  : StatusMessageViewModel = hiltViewModel(),
+) {
+    val uiState     by viewModel.uiState.collectAsState()
+    val statusState by statusVm.state.collectAsState()
     val friendResults = viewModel.filteredFriends()
-    val statusResults = viewModel.filteredStatusMessages()
+    val statusResults = if (uiState.searchQuery.isBlank()) emptyList()
+        else statusState.friendStatuses.filter { sm ->
+            KoreanChosung.matches(uiState.searchQuery, sm.userName) ||
+            KoreanChosung.matches(uiState.searchQuery, sm.content)
+        }
 
     BackHandler { viewModel.setSearchActive(false) }
 
     Scaffold(
         topBar = {
-            Column {
+            Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .background(Color.White)
                         .padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -60,9 +72,6 @@ fun FriendSearchScreen(viewModel: FriendViewModel) {
                 }
                 HorizontalDivider(color = C.Border, thickness = 0.5.dp)
             }
-        },
-        bottomBar = {
-            FriendBottomNavBar(onChat = {}, onFind = {}, onScript = {}, onMy = {})
         },
         containerColor = Color.White,
     ) { innerPadding ->
@@ -120,7 +129,7 @@ fun FriendSearchScreen(viewModel: FriendViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             items(statusResults) { sm ->
-                                StatusMessagePreviewCard(sm = sm, onClick = { viewModel.openStatusDetail(sm) })
+                                FriendStatusPreviewCard(sm = sm, onClick = { statusVm.openFriendStatus(sm) })
                             }
                         }
                         Spacer(Modifier.height(8.dp))
@@ -166,12 +175,11 @@ fun StatusMessageAllScreen(
 
     Scaffold(
         topBar = {
-            Column {
+            Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .background(Color.White)
                         .padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -187,11 +195,8 @@ fun StatusMessageAllScreen(
                         IconButton(onClick = {}, modifier = Modifier.size(40.dp)) {
                             Icon(painterResource(R.drawable.ic_search), "검색", Modifier.size(22.dp), tint = C.TextPri)
                         }
-                        Box {
-                            IconButton(onClick = {}, modifier = Modifier.size(40.dp)) {
-                                Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(22.dp), tint = C.TextPri)
-                            }
-                            Box(Modifier.size(8.dp).clip(CircleShape).background(C.Accent).align(Alignment.TopEnd).offset(x = (-6).dp, y = 6.dp))
+                        IconButton(onClick = {}, modifier = Modifier.size(40.dp)) {
+                            Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(22.dp), tint = C.TextPri)
                         }
                     }
                 }
@@ -201,38 +206,41 @@ fun StatusMessageAllScreen(
         containerColor = Color.White,
     ) { innerPadding ->
 
-        LazyColumn(
+        LazyVerticalGrid(
+            columns        = GridCells.Fixed(2),
             modifier       = Modifier.padding(innerPadding).fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 24.dp),
+            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 24.dp),
         ) {
-            item {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "나도 작성하기",
-                    style    = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-                Spacer(Modifier.height(8.dp))
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "나도 작성하기",
+                        style    = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
+                    Spacer(Modifier.height(8.dp))
 
-                LazyRow(
-                    contentPadding        = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    item {
-                        MyStatusCard(viewModel = statusVm)
+                    LazyRow(
+                        contentPadding        = PaddingValues(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        item {
+                            MyStatusCard(viewModel = statusVm)
+                        }
+                        items(friendStatuses) { sm ->
+                            FriendStatusPreviewCard(sm = sm, onClick = { statusVm.openFriendStatus(sm) })
+                        }
                     }
-                    items(friendStatuses) { sm ->
-                        FriendStatusPreviewCard(sm = sm, onClick = { statusVm.openFriendStatus(sm) })
-                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = C.Border, thickness = 8.dp)
+                    Spacer(Modifier.height(8.dp))
                 }
-
-                Spacer(Modifier.height(16.dp))
-                HorizontalDivider(color = C.Border, thickness = 8.dp)
-                Spacer(Modifier.height(8.dp))
             }
 
-            items(friendStatuses) { sm ->
-                FriendStatusFullItem(sm = sm, onClick = { statusVm.openFriendStatus(sm) })
+            gridItems(friendStatuses) { sm ->
+                FriendStatusGridCard(sm = sm, onClick = { statusVm.openFriendStatus(sm) })
             }
         }
     }

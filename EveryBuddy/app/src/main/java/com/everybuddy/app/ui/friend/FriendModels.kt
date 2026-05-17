@@ -18,22 +18,22 @@ object FriendColors {
 }
 
 data class FriendProfile(
-    val id              : String,
+    val id              : Long,
     val name            : String,
     val profileImageUrl : String?   = null,   // TODO: Coil AsyncImage
     val nationality     : String    = "KR",   // 국적 플래그 이모지 코드
     val nativeLanguages : List<String> = listOf("KR"),  // 모국어 (예: KR, EN, JP)
     val learningLanguages: List<String> = listOf("EN"), // 배우는 언어
-    val statusMessage   : String    = "",     // 현재 상태 메시지 (최신 1개)
     val interests       : List<String> = emptyList(), // 관심사 태그 (온보딩 설정)
     val bio             : String    = "",     // 자기소개
     val isOnline        : Boolean   = false,  // 현재활동중
     val isFriend        : Boolean   = true,
+    val isFollowing     : Boolean   = false,
 )
 
 data class StatusMessage(
     val id          : String = UUID.randomUUID().toString(),
-    val authorId    : String,
+    val authorId    : Long,
     val authorName  : String,
     val profileImageUrl: String? = null,  // TODO: Coil
     val content     : String,             // 최대 150자

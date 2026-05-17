@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.everybuddy.app.ui.chat
 
 // ChatRoomScreen          — Hilt 진입점
@@ -11,8 +13,15 @@ package com.everybuddy.app.ui.chat
 // ScriptSaveSheet         — 스크립트 저장 바텀시트 (1/2, 2/2)
 // SaveOptionDialog        — 통합/따로 저장 다이얼로그
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -33,14 +42,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.everybuddy.app.data.cache.UserSummary
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.everybuddy.app.R
 import com.everybuddy.app.data.chat.*
@@ -63,67 +81,210 @@ private val DateBadgeBg    = Color(0xFFDDDDDD)
 // ChatRoomScreen — Hilt 진입점
 @Composable
 fun ChatRoomScreen(
-    roomId                   : String,
-    onBack                   : () -> Unit,
-    onNavigateToScriptSave   : (String) -> Unit = {},  // messageId 전달
-    onNavigateToConversation : () -> Unit       = {},  // 대화 선택 화면
-    viewModel                : ChatRoomViewModel = hiltViewModel(),
+    roomId                : String,
+    roomName              : String                   = "",
+    isGroup               : Boolean                  = false,
+    onBack                : () -> Unit,
+    onNavigateToScriptTab : () -> Unit               = {},
+    onSaveScriptItem      : (ScriptSaveItem) -> Unit = {},
+    onMuteChanged         : (Boolean) -> Unit        = {},
+    onFolderCreated       : (ScriptFolder) -> Unit   = {},
+    isStarred             : Boolean                  = false,
+    onToggleStar          : () -> Unit               = {},
+    viewModel             : ChatRoomViewModel         = hiltViewModel(),
 ) {
-    LaunchedEffect(roomId) { viewModel.loadRoom(roomId) }
+    LaunchedEffect(roomId) { viewModel.loadRoom(roomId, roomName, isGroup) }
     val state by viewModel.uiState.collectAsState()
 
+    val micPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) viewModel.onStartRecording() }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicturePreview()
+    ) { bitmap -> if (bitmap != null) viewModel.onCameraCapture() }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri -> if (uri != null) viewModel.onFilePicked(uri.toString()) }
+
+    val cameraPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) takePictureLauncher.launch(null)
+    }
+
+    val multiPhotoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
+    ) { uris ->
+        if (uris.isNotEmpty()) viewModel.onPhotosPicked(uris)
+    }
+
+    val storagePermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) filePickerLauncher.launch("*/*")
+    }
+
+    if (state.isConversationSelectOpen) {
+        ConversationSelectScreen(
+            messages      = state.messages,
+            myUserId      = state.myUserId,
+            userSummaries = state.userSummaries,
+            roomName      = state.room.name,
+            onBack   = viewModel::onDismissConversationSelect,
+            onSave   = viewModel::onConversationSelected,
+        )
+        return
+    }
+
     ChatRoomContent(
-        state                  = state,
-        onBack                 = onBack,
-        onInputChange          = viewModel::onInputChange,
-        onSendText             = viewModel::onSendText,
-        onStartRecording       = viewModel::onStartRecording,
-        onStopRecording        = viewModel::onStopRecording,
-        onCancelRecording      = viewModel::onCancelRecording,
-        onPlayVoice            = viewModel::onPlayVoice,
-        onToggleTranslation    = viewModel::onToggleTranslation,
-        onToggleAutoTranslate  = viewModel::onToggleAutoTranslate,
-        onToggleMediaPanel     = viewModel::onToggleMediaPanel,
-        onLongPressMessage     = viewModel::onLongPressMessage,
-        onDismissContextMenu   = viewModel::onDismissContextMenu,
-        onConversationSelect   = onNavigateToConversation,
-        onSaveScriptComplete   = viewModel::onScriptSaved,
-        onNavigateToScriptSave = onNavigateToScriptSave,
+        state                    = state,
+        onBack                   = onBack,
+        onInputChange            = viewModel::onInputChange,
+        onSendText               = viewModel::onSendText,
+        onStartRecording         = { micPermLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+        onStopRecording          = viewModel::onStopRecording,
+        onCancelRecording        = viewModel::onCancelRecording,
+        onPauseRecording         = viewModel::onPauseRecording,
+        onPlayVoice              = viewModel::onPlayVoice,
+        onToggleTranslation      = viewModel::onToggleTranslation,
+        onToggleAutoTranslate    = viewModel::onToggleAutoTranslate,
+        onToggleMuteRoom         = {
+            viewModel.onToggleMuteRoom()
+            onMuteChanged(!state.room.isMuted)
+        },
+        onToggleMediaPanel       = viewModel::onToggleMediaPanel,
+        onLongPressMessage       = viewModel::onLongPressMessage,
+        onDismissContextMenu     = viewModel::onDismissContextMenu,
+        onOpenPhotoPicker        = {
+            // 시스템 PhotoPicker는 자체 권한 처리 — 별도 권한 요청 불필요.
+            multiPhotoLauncher.launch(
+                androidx.activity.result.PickVisualMediaRequest(
+                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                )
+            )
+        },
+        onClosePhotoPicker       = viewModel::onClosePhotoPicker,
+        onTogglePhotoSelection   = viewModel::onTogglePhotoSelection,
+        onSendSelectedPhotos     = viewModel::onSendSelectedPhotos,
+        onOpenConversationSelect = viewModel::onOpenConversationSelect,
+        onStartScriptSave         = viewModel::onStartScriptSave,
+        onDismissScriptSave       = viewModel::onDismissScriptSave,
+        onDismissConversationSave = viewModel::onDismissConversationSave,
+        onConversationSaved       = viewModel::onConversationSaved,
+        onScriptSaved             = viewModel::onScriptSaved,
+        onSaveScriptItem          = onSaveScriptItem,
+        onOpenCamera             = { cameraPermLauncher.launch(Manifest.permission.CAMERA) },
+        onOpenFile               = {
+            val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                Manifest.permission.READ_MEDIA_IMAGES
+            else
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            storagePermLauncher.launch(perm)
+        },
+        onFolderCreated          = onFolderCreated,
+        onDeleteMessage          = viewModel::onDeleteMessage,
+        onEditMessage            = viewModel::onEditMessage,
+        onInviteMembers          = viewModel::inviteMembers,
+        onRetryMessage           = viewModel::retryMessage,
+        isStarred                = isStarred,
+        onToggleStar             = onToggleStar,
     )
 }
 
 // ChatRoomContent — 전체 레이아웃
 @Composable
 fun ChatRoomContent(
-    state                  : ChatRoomUiState,
-    onBack                 : () -> Unit,
-    onInputChange          : (String) -> Unit,
-    onSendText             : () -> Unit,
-    onStartRecording       : () -> Unit,
-    onStopRecording        : () -> Unit,
-    onCancelRecording      : () -> Unit,
-    onPlayVoice            : (String) -> Unit,
-    onToggleTranslation    : (String) -> Unit,
-    onToggleAutoTranslate  : () -> Unit,
-    onToggleMediaPanel     : () -> Unit,
-    onLongPressMessage     : (ChatMessage) -> Unit  = {},
-    onDismissContextMenu   : () -> Unit             = {},
-    onConversationSelect   : () -> Unit             = {},
-    onSaveScriptComplete   : () -> Unit             = {},
-    onNavigateToScriptSave : (String) -> Unit       = {},
+    state                     : ChatRoomUiState,
+    onBack                    : () -> Unit,
+    onInputChange             : (String) -> Unit,
+    onSendText                : () -> Unit,
+    onStartRecording          : () -> Unit,
+    onStopRecording           : () -> Unit,
+    onCancelRecording         : () -> Unit,
+    onPauseRecording          : () -> Unit            = {},
+    onPlayVoice               : (String) -> Unit,
+    onToggleTranslation       : (String) -> Unit,
+    onToggleAutoTranslate     : () -> Unit,
+    onToggleMuteRoom          : () -> Unit            = {},
+    onToggleMediaPanel        : () -> Unit,
+    onLongPressMessage        : (ChatMessage) -> Unit  = {},
+    onDismissContextMenu      : () -> Unit             = {},
+    onOpenPhotoPicker         : () -> Unit             = {},
+    onClosePhotoPicker        : () -> Unit             = {},
+    onTogglePhotoSelection    : (Int) -> Unit          = {},
+    onSendSelectedPhotos      : () -> Unit             = {},
+    onOpenConversationSelect  : () -> Unit             = {},
+    onStartScriptSave         : (String) -> Unit       = {},
+    onDismissScriptSave       : () -> Unit             = {},
+    onDismissConversationSave : () -> Unit             = {},
+    onConversationSaved       : () -> Unit             = {},
+    onScriptSaved             : () -> Unit              = {},
+    onSaveScriptItem          : (ScriptSaveItem) -> Unit = {},
+    onOpenCamera              : () -> Unit             = {},
+    onOpenFile                : () -> Unit             = {},
+    onFolderCreated           : (ScriptFolder) -> Unit = {},
+    onDeleteMessage           : (String) -> Unit       = {},
+    onEditMessage             : (String, String) -> Unit = { _, _ -> },
+    onInviteMembers           : (List<Long>) -> Unit   = {},
+    onRetryMessage            : (String) -> Unit       = {},
+    isStarred                 : Boolean                = false,
+    onToggleStar              : () -> Unit             = {},
 ) {
-    // 스크립트 저장 바텀시트 상태
-    var scriptSaveMessage by remember { mutableStateOf<ChatMessage?>(null) }
-    var scriptSaveStep    by remember { mutableStateOf(1) }   // 1 or 2
-    var saveOptionOpen    by remember { mutableStateOf(false) }
-    var isMenuOpen        by remember { mutableStateOf(false) }
+    var showNewFolderScreen   by remember { mutableStateOf(false) }
+    var newFolderAutoSelectId by remember { mutableStateOf<String?>(null) }
+    var separateIdx           by remember { mutableIntStateOf(0) }
+    var pendingScriptItems    by remember { mutableStateOf<List<ScriptSaveItem>>(emptyList()) }
+    var localFolders          by remember { mutableStateOf(emptyList<ScriptFolder>()) }
+    var editingMessageId      by remember { mutableStateOf<String?>(null) }
+    var editingText           by remember { mutableStateOf("") }
+    var isMenuOpen            by remember { mutableStateOf(false) }
+    var isSearchMode          by remember { mutableStateOf(false) }
+    var searchQuery           by remember { mutableStateOf("") }
+    var currentMatchIdx       by remember { mutableIntStateOf(0) }
+    var mediaSubPage          by remember { mutableStateOf<String?>(null) }
+    var showInviteScreen      by remember { mutableStateOf(false) }
+
+    val members = remember(state.room) { emptyList<ChatMember>() }
+
+    LaunchedEffect(state.conversationSaveMessages) { separateIdx = 0; pendingScriptItems = emptyList() }
 
     val listState  = rememberLazyListState()
     val scope      = rememberCoroutineScope()
 
-    // 새 메시지 도착 시 최하단 스크롤
+    val searchResults = remember(searchQuery, state.messages) {
+        if (searchQuery.isBlank()) emptyList()
+        else state.messages.filter { it.text.contains(searchQuery, ignoreCase = true) }
+    }
+
+    val highlightedMessageId = if (isSearchMode && searchResults.isNotEmpty())
+        searchResults.getOrNull(currentMatchIdx)?.id
+    else null
+
+    // 검색어 변경 시 인덱스 초기화
+    LaunchedEffect(searchQuery) { currentMatchIdx = 0 }
+
+    // 검색 결과 위치로 스크롤
+    LaunchedEffect(currentMatchIdx, highlightedMessageId) {
+        val targetId = highlightedMessageId ?: return@LaunchedEffect
+        val grouped = state.messages.groupBy { it.timestamp.toLocalDate() }
+        var flatIdx = 0
+        loop@ for ((_, msgs) in grouped) {
+            flatIdx++
+            for (msg in msgs) {
+                if (msg.id == targetId) {
+                    scope.launch { listState.animateScrollToItem((flatIdx - 1).coerceAtLeast(0)) }
+                    break@loop
+                }
+                flatIdx++
+            }
+        }
+    }
+
+    // 새 메시지 도착 시 최하단 스크롤 (검색 중이 아닐 때만)
     LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) {
+        if (state.messages.isNotEmpty() && !isSearchMode) {
             scope.launch {
                 listState.animateScrollToItem(state.messages.size - 1)
             }
@@ -138,16 +299,69 @@ fun ChatRoomContent(
         Column(modifier = Modifier.fillMaxSize()) {
 
             ChatAppBar(
-                roomName = state.room.name,
-                onBack   = onBack,
-                onSearch = { /* TODO: 채팅 내 검색 */ },
-                onMenu   = { isMenuOpen = true },
+                roomName   = state.room.name,
+                onBack     = onBack,
+                onSearch   = { isSearchMode = !isSearchMode; if (!isSearchMode) searchQuery = "" },
+                onMenu     = { isMenuOpen = true },
             )
+
+            AnimatedVisibility(visible = isSearchMode, enter = fadeIn(), exit = fadeOut()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    BasicTextField(
+                        value         = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier      = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFFF2F2F7))
+                            .padding(horizontal = 14.dp, vertical = 9.dp),
+                        textStyle     = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = TextPrimary),
+                        singleLine    = true,
+                        decorationBox = { inner ->
+                            if (searchQuery.isEmpty()) Text("메시지 검색", style = TextStyle(fontSize = 14.sp, color = TextSecondary))
+                            inner()
+                        },
+                    )
+                    if (searchQuery.isNotBlank()) {
+                        if (searchResults.isNotEmpty()) {
+                            Text(
+                                "${currentMatchIdx + 1}/${searchResults.size}",
+                                style = TextStyle(fontSize = 12.sp, color = TextSecondary, fontFamily = PretendardFamily),
+                            )
+                            IconButton(
+                                onClick  = { if (currentMatchIdx > 0) currentMatchIdx-- },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(painterResource(R.drawable.ic_chevron_right), "이전",
+                                    Modifier.size(16.dp), tint = if (currentMatchIdx > 0) AccentBlue else TextSecondary)
+                            }
+                            IconButton(
+                                onClick  = { if (currentMatchIdx < searchResults.size - 1) currentMatchIdx++ },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(painterResource(R.drawable.ic_chevron_right), "다음",
+                                    Modifier.size(16.dp), tint = if (currentMatchIdx < searchResults.size - 1) AccentBlue else TextSecondary)
+                            }
+                        } else {
+                            Text("결과 없음", style = TextStyle(fontSize = 12.sp, color = TextSecondary, fontFamily = PretendardFamily))
+                        }
+                    }
+                }
+            }
 
             HorizontalDivider(color = DividerGray, thickness = 0.5.dp)
 
             MessageList(
                 messages              = state.messages,
+                myUserId              = state.myUserId,
+                userSummaries         = state.userSummaries,
                 isAutoTranslate       = state.isAutoTranslate,
                 showTranslation       = state.showTranslation,
                 translatingMessageIds = state.translatingMessageIds,
@@ -157,10 +371,10 @@ fun ChatRoomContent(
                 onPlayVoice           = onPlayVoice,
                 onToggleTranslation   = onToggleTranslation,
                 onLongPressMessage    = onLongPressMessage,
-                onSaveScript          = { msg ->
-                    scriptSaveMessage = msg
-                    scriptSaveStep    = 1
-                },
+                onSaveScript          = { msg -> onStartScriptSave(msg.id) },
+                onRetryMessage        = onRetryMessage,
+                searchQuery           = if (isSearchMode) searchQuery else "",
+                highlightedMessageId  = highlightedMessageId,
             )
 
             AnimatedVisibility(
@@ -168,13 +382,13 @@ fun ChatRoomContent(
                 enter   = slideInVertically { it } + fadeIn(),
                 exit    = slideOutVertically { it } + fadeOut(),
             ) {
-//                MediaPanel(
-//                    onPhoto      = { /* TODO: 갤러리 */ },
-//                    onCamera     = { /* TODO: 카메라 */ },
-//                    onCall       = { /* TODO: 통화 */ },
-//                    onFile       = { /* TODO: 파일 */ },
-//                    onSaveScript = onConversationSelect,
-//                )
+                MediaPanel(
+                    onPhoto      = onOpenPhotoPicker,
+                    onCamera     = onOpenCamera,
+                    onCall       = { /* TODO: 통화 */ },
+                    onFile       = onOpenFile,
+                    onSaveScript = onOpenConversationSelect,
+                )
             }
 
             if (!state.isRecording) {
@@ -198,74 +412,230 @@ fun ChatRoomContent(
             RecordingOverlay(
                 seconds    = state.recordingSeconds,
                 amplitudes = state.recordingAmplitudes,
+                isPaused   = state.isRecordingPaused,
                 onDelete   = onCancelRecording,
-                onStop     = onStopRecording,
-                onPause    = { /* TODO */ },
-            )
-        }
-
-        state.contextMenuMessage?.let { msg ->
-            MessageContextMenu(
-                onDismiss    = onDismissContextMenu,
-                onCopy       = {
-                    // TODO: 클립보드 복사
-                },
-                onSelectCopy = {
-                    // TODO: 텍스트 선택 복사 UI
-                },
-                onReply      = {
-                    // TODO: 답장 기능
-                },
-                onSaveScript = {
-                    // 컨텍스트 메뉴 닫고 스크립트 저장 화면으로 이동
-                    onDismissContextMenu()
-                    onNavigateToScriptSave(msg.id)
-                },
+                onSend     = onStopRecording,
+                onPause    = onPauseRecording,
             )
         }
 
         AnimatedVisibility(
+            visible  = state.isPhotoPickerOpen,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter    = slideInVertically { it } + fadeIn(),
+            exit     = slideOutVertically { it } + fadeOut(),
+        ) {
+            PhotoPickerSheet(
+                selectedIndices   = state.selectedPhotoIndices,
+                onToggleSelection = onTogglePhotoSelection,
+                onSend            = onSendSelectedPhotos,
+                onDismiss         = onClosePhotoPicker,
+            )
+        }
+
+        state.contextMenuMessage?.let { msg ->
+            val isOwn = msg.senderId.toLongOrNull() == state.myUserId
+            MessageContextMenu(
+                onDismiss    = onDismissContextMenu,
+                onCopy       = { /* TODO: 클립보드 복사 */ },
+                onSelectCopy = { /* TODO: 텍스트 선택 복사 UI */ },
+                onReply      = { /* TODO: 답장 기능 */ },
+                onSaveScript = {
+                    onDismissContextMenu()
+                    onStartScriptSave(msg.id)
+                },
+                isOwnMessage = isOwn,
+                onEdit       = {
+                    editingMessageId = msg.id
+                    editingText      = msg.text
+                },
+                onDelete     = { onDeleteMessage(msg.id) },
+            )
+        }
+
+        if (editingMessageId != null) {
+            Box(
+                modifier         = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)).clickable { editingMessageId = null },
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Surface(
+                    modifier        = Modifier.fillMaxWidth().clickable {},
+                    color           = Color.White,
+                    shadowElevation = 8.dp,
+                ) {
+                    Column(modifier = Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text("메시지 수정", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = TextPrimary), modifier = Modifier.padding(bottom = 8.dp))
+                        BasicTextField(
+                            value         = editingText,
+                            onValueChange = { editingText = it },
+                            modifier      = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFFF2F2F2)).padding(12.dp),
+                            textStyle     = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { editingMessageId = null }) {
+                                Text("취소", style = TextStyle(fontSize = 14.sp, color = TextSecondary))
+                            }
+                            TextButton(onClick = {
+                                val id = editingMessageId
+                                if (id != null && editingText.isNotBlank()) {
+                                    onEditMessage(id, editingText)
+                                    editingMessageId = null
+                                }
+                            }) {
+                                Text("완료", style = TextStyle(fontSize = 14.sp, color = AccentBlue, fontWeight = FontWeight(600)))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        AnimatedVisibility(
             visible  = state.savedToastVisible,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                // TODO padding: 토스트 하단 여백 (현재 80dp)
-                .padding(bottom = 80.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp),
             enter = fadeIn(),
             exit  = fadeOut(),
         ) {
             SavedToast()
         }
+
+        AnimatedVisibility(
+            visible = isMenuOpen,
+            enter   = fadeIn(),
+            exit    = fadeOut(),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f))
+                    .clickable { isMenuOpen = false },
+            )
+        }
+
+        AnimatedVisibility(
+            visible  = isMenuOpen,
+            modifier = Modifier.align(Alignment.CenterEnd).width(300.dp).fillMaxHeight(),
+            enter    = androidx.compose.animation.slideInHorizontally(initialOffsetX = { it }),
+            exit     = androidx.compose.animation.slideOutHorizontally(targetOffsetX = { it }),
+        ) {
+            ChatRoomSidebarScreen(
+                roomName              = state.room.name,
+                isGroup               = state.room.isGroup,
+                members               = members,
+                mediaThumbs           = emptyList(),
+                isAutoTranslate       = state.isAutoTranslate,
+                isMuted               = state.room.isMuted,
+                isStarred             = isStarred,
+                onBack                = { isMenuOpen = false },
+                onPhotoVideo          = { isMenuOpen = false; mediaSubPage = "photo" },
+                onLink                = { isMenuOpen = false; mediaSubPage = "link" },
+                onFile                = { isMenuOpen = false; mediaSubPage = "file" },
+                onInviteMember        = { isMenuOpen = false; showInviteScreen = true },
+                onToggleAutoTranslate = onToggleAutoTranslate,
+                onToggleMute          = onToggleMuteRoom,
+                onToggleStar          = onToggleStar,
+                onDataDelete          = { isMenuOpen = false },
+                onLeaveRoom           = { isMenuOpen = false },
+            )
+        }
+        if (mediaSubPage != null) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+                when (mediaSubPage) {
+                    "photo" -> MediaPhotoScreen(onBack = { mediaSubPage = null })
+                    "link"  -> MediaLinkScreen(onBack  = { mediaSubPage = null })
+                    "file"  -> MediaFileScreen(onBack  = { mediaSubPage = null })
+                }
+            }
+        }
+
+        if (showInviteScreen) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+                InviteMemberScreen(
+                    roomId    = state.room.id,
+                    onBack    = { showInviteScreen = false },
+                    onInvited = { ids ->
+                        onInviteMembers(ids)
+                        showInviteScreen = false
+                    },
+                )
+            }
+        }
     }   // Box 끝
 
-    scriptSaveMessage?.let { msg ->
+    state.scriptSaveMessage?.let { msg ->
         ScriptSaveSheet(
-            message   = msg,
-            step      = scriptSaveStep,
-            onNext    = { scriptSaveStep = 2 },
-            onBack    = { scriptSaveStep = 1 },
-            onSave    = { _ ->
-                // TODO: 스크립트 저장 API 연동
-                onSaveScriptComplete()
-                scriptSaveMessage = null
-                scriptSaveStep    = 1
+            message                    = msg,
+            folders                    = localFolders,
+            onSave                     = { item ->
+                onSaveScriptItem(item)
+                onScriptSaved()
             },
-            onDismiss = {
-                scriptSaveMessage = null
-                scriptSaveStep    = 1
-            },
+            onDismiss                  = onDismissScriptSave,
+            onAddFolder                = { showNewFolderScreen = true },
+            externalAutoSelectFolderId = newFolderAutoSelectId,
         )
     }
 
-    if (saveOptionOpen) {
-        SaveOptionDialog(onDismiss = { saveOptionOpen = false })
+    if (state.conversationSaveMessages.isNotEmpty()) {
+        if (state.conversationCaptureOption == CaptureOption.SEPARATE) {
+            val msg = state.conversationSaveMessages.getOrNull(separateIdx)
+            if (msg != null) {
+                val isLast = separateIdx == state.conversationSaveMessages.size - 1
+                ScriptSaveSheet(
+                    message                    = msg,
+                    folders                    = localFolders,
+                    onSave                     = { item ->
+                        if (!isLast) {
+                            pendingScriptItems = pendingScriptItems + item
+                            separateIdx++
+                        } else {
+                            (pendingScriptItems + item).forEach { onSaveScriptItem(it) }
+                            pendingScriptItems = emptyList()
+                            onConversationSaved()
+                        }
+                    },
+                    onDismiss                  = onDismissConversationSave,
+                    onAddFolder                = { showNewFolderScreen = true },
+                    externalAutoSelectFolderId = newFolderAutoSelectId,
+                    currentIdx                 = separateIdx + 1,
+                    totalCount                 = state.conversationSaveMessages.size,
+                    isLastStep                 = isLast,
+                )
+            }
+        } else {
+            val combinedText = state.conversationSaveMessages.joinToString("\n") { it.text }
+            ScriptSaveSheet(
+                message                    = ChatMessage(id = "combined_save", text = combinedText),
+                folders                    = localFolders,
+                externalAutoSelectFolderId = newFolderAutoSelectId,
+                onSave                     = { item ->
+                    onSaveScriptItem(item)
+                    onConversationSaved()
+                },
+                onDismiss                  = onDismissConversationSave,
+                onAddFolder                = { showNewFolderScreen = true },
+            )
+        }
     }
 
-    if (isMenuOpen) {
-        ChatSideMenu(
-            isAutoTranslate       = state.isAutoTranslate,
-            onToggleAutoTranslate = onToggleAutoTranslate,
-            onDismiss             = { isMenuOpen = false },
-        )
+    if (showNewFolderScreen) {
+        Dialog(
+            onDismissRequest = { showNewFolderScreen = false },
+            properties       = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            NewFolderScreen(
+                roomName = state.room.name,
+                onBack   = { showNewFolderScreen = false },
+                onSave   = { name, coverUri ->
+                    val newFolder = ScriptFolder(id = java.util.UUID.randomUUID().toString(), name = name, coverImage = coverUri ?: "")
+                    localFolders          = localFolders + newFolder
+                    newFolderAutoSelectId = newFolder.id
+                    showNewFolderScreen   = false
+                    onFolderCreated(newFolder)
+                },
+            )
+        }
     }
 }
 
@@ -277,15 +647,17 @@ fun ChatAppBar(
     onSearch : () -> Unit,
     onMenu   : () -> Unit,
 ) {
-    Row(
-        modifier          = Modifier
+    Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
+    Box(
+        modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .background(Color.White)
             .padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+        IconButton(
+            onClick  = onBack,
+            modifier = Modifier.size(40.dp).align(Alignment.CenterStart),
+        ) {
             Icon(
                 painter            = painterResource(R.drawable.ic_back),
                 contentDescription = "뒤로가기",
@@ -303,99 +675,148 @@ fun ChatAppBar(
                 color      = Color(0xFF000000),
                 textAlign  = TextAlign.Center,
             ),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.align(Alignment.Center),
         )
 
-        IconButton(onClick = onSearch, modifier = Modifier.size(40.dp)) {
-            Icon(
-                painter            = painterResource(R.drawable.ic_search),
-                contentDescription = "검색",
-                modifier           = Modifier.size(24.dp),
-                tint               = Color(0xFF000000),
-            )
+        Row(modifier = Modifier.align(Alignment.CenterEnd)) {
+            IconButton(onClick = onSearch, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    painter            = painterResource(R.drawable.ic_search),
+                    contentDescription = "검색",
+                    modifier           = Modifier.size(24.dp),
+                    tint               = Color(0xFF000000),
+                )
+            }
+            IconButton(onClick = onMenu, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    painter            = painterResource(R.drawable.ic_sidemenu),
+                    contentDescription = "메뉴",
+                    modifier           = Modifier.size(24.dp),
+                    tint               = Color(0xFF000000),
+                )
+            }
         }
-
-        IconButton(onClick = onMenu, modifier = Modifier.size(40.dp)) {
-            Icon(
-                painter            = painterResource(R.drawable.ic_sidemenu),
-                contentDescription = "메뉴",
-                modifier           = Modifier.size(24.dp),
-                tint               = Color(0xFF000000),
-            )
-        }
+    }
     }
 }
 
-// ChatSideMenu — 사이드 메뉴 바텀시트
-@OptIn(ExperimentalMaterial3Api::class)
+// ChatSideMenu — 우측 슬라이드 사이드바
 @Composable
 fun ChatSideMenu(
+    roomName              : String  = "",
     isAutoTranslate       : Boolean,
+    isMuted               : Boolean = false,
     onToggleAutoTranslate : () -> Unit,
+    onToggleMute          : () -> Unit = {},
     onDismiss             : () -> Unit,
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState       = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor   = Color.White,
-        shape            = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(280.dp)
+            .background(Color.White)
+            .systemBarsPadding()
+            .padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        if (roomName.isNotEmpty()) {
             Text(
-                text  = "채팅 설정",
-                style = TextStyle(
+                text     = roomName,
+                style    = TextStyle(
                     fontSize   = 17.sp,
                     fontFamily = PretendardFamily,
                     fontWeight = FontWeight(600),
                     color      = TextPrimary,
                 ),
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
             )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFFF8F8F8))
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(
-                        text  = "자동번역",
-                        style = TextStyle(
-                            fontSize   = 15.sp,
-                            fontFamily = PretendardFamily,
-                            fontWeight = FontWeight(500),
-                            color      = TextPrimary,
-                        ),
-                    )
-                    Text(
-                        text  = if (isAutoTranslate) "상대 메시지를 한국어로 자동 번역 중"
-                        else "말풍선 옆 번역 아이콘을 탭하면 번역",
-                        style = TextStyle(fontSize = 12.sp, color = TextSecondary),
-                    )
-                }
-                Switch(
-                    checked         = isAutoTranslate,
-                    onCheckedChange = { onToggleAutoTranslate() },
-                    colors          = SwitchDefaults.colors(
-                        checkedThumbColor   = Color.White,
-                        checkedTrackColor   = AccentBlue,
-                        uncheckedThumbColor = Color.White,
-                        uncheckedTrackColor = Color(0xFFCCCCCC),
-                    ),
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = DividerGray, thickness = 0.5.dp)
         }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text  = if (isAutoTranslate) "자동번역 끄기" else "자동번역 켜기",
+                style = TextStyle(
+                    fontSize   = 15.sp,
+                    fontFamily = PretendardFamily,
+                    fontWeight = FontWeight(500),
+                    color      = TextPrimary,
+                ),
+            )
+            Switch(
+                checked         = isAutoTranslate,
+                onCheckedChange = { onToggleAutoTranslate() },
+                colors          = SwitchDefaults.colors(
+                    checkedThumbColor   = Color.White,
+                    checkedTrackColor   = AccentBlue,
+                    uncheckedThumbColor = Color.White,
+                    uncheckedTrackColor = Color(0xFFCCCCCC),
+                ),
+            )
+        }
+        HorizontalDivider(color = DividerGray, thickness = 0.5.dp)
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text  = "알림",
+                style = TextStyle(
+                    fontSize   = 15.sp,
+                    fontFamily = PretendardFamily,
+                    fontWeight = FontWeight(500),
+                    color      = TextPrimary,
+                ),
+            )
+            Switch(
+                checked         = !isMuted,
+                onCheckedChange = { onToggleMute() },
+                colors          = SwitchDefaults.colors(
+                    checkedThumbColor   = Color.White,
+                    checkedTrackColor   = AccentBlue,
+                    uncheckedThumbColor = Color.White,
+                    uncheckedTrackColor = Color(0xFFCCCCCC),
+                ),
+            )
+        }
+        HorizontalDivider(color = DividerGray, thickness = 0.5.dp)
+
+        Text(
+            text     = "데이터 삭제",
+            style    = TextStyle(
+                fontSize   = 15.sp,
+                fontFamily = PretendardFamily,
+                color      = Color(0xFFFF3333),
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onDismiss() }
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+        )
+        HorizontalDivider(color = DividerGray, thickness = 0.5.dp)
+
+        Text(
+            text     = "채팅방 나가기",
+            style    = TextStyle(
+                fontSize   = 15.sp,
+                fontFamily = PretendardFamily,
+                color      = Color(0xFFFF3333),
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onDismiss() }
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+        )
     }
 }
 
@@ -434,6 +855,8 @@ fun TranslationLoadingDots(modifier: Modifier = Modifier) {
 @Composable
 fun MessageList(
     messages              : List<ChatMessage>,
+    myUserId              : Long,
+    userSummaries         : Map<Long, UserSummary>,
     isAutoTranslate       : Boolean,
     showTranslation       : Map<String, Boolean>,
     translatingMessageIds : Set<String>,
@@ -444,6 +867,9 @@ fun MessageList(
     onToggleTranslation   : (String) -> Unit,
     onLongPressMessage    : (ChatMessage) -> Unit = {},
     onSaveScript          : (ChatMessage) -> Unit,
+    onRetryMessage        : (String) -> Unit = {},
+    searchQuery           : String  = "",
+    highlightedMessageId  : String? = null,
 ) {
     // 날짜별 그룹핑
     val grouped = remember(messages) {
@@ -464,27 +890,37 @@ fun MessageList(
             }
 
             items(msgs, key = { it.id }) { msg ->
-                val isMe    = msg.senderId == "me"
+                val isMe    = msg.senderId.toLongOrNull() == myUserId
                 val showTr  = showTranslation[msg.id] ?: isAutoTranslate
                 val playing = playingMessageId == msg.id
+                val summary = msg.senderId.toLongOrNull()?.let { userSummaries[it] }
+                val senderName            = summary?.name.orEmpty()
+                val senderProfileImageUrl = summary?.profileImageUrl
 
                 when (msg.type) {
                     MessageType.TEXT ->
                         TextMessageBubble(
                             message             = msg,
                             isMe                = isMe,
+                            senderName            = senderName,
+                            senderProfileImageUrl = senderProfileImageUrl,
                             isAutoTranslate     = isAutoTranslate,
                             showTranslation     = showTr,
                             isTranslating       = msg.id in translatingMessageIds,
                             onToggleTranslation = { onToggleTranslation(msg.id) },
                             onSaveScript        = { onSaveScript(msg) },
                             onLongPress         = { onLongPressMessage(msg) },
+                            onRetry             = { onRetryMessage(msg.id) },
+                            searchQuery         = searchQuery,
+                            isHighlighted       = msg.id == highlightedMessageId,
                         )
 
                     MessageType.VOICE ->
                         VoiceMessageBubble(
                             message             = msg,
                             isMe                = isMe,
+                            senderName            = senderName,
+                            senderProfileImageUrl = senderProfileImageUrl,
                             isAutoTranslate     = isAutoTranslate,
                             isPlaying           = playing,
                             showTranslation     = showTr,
@@ -500,6 +936,25 @@ fun MessageList(
                 }
             }
         }
+    }
+}
+
+/** 메시지 옆 송신자 아바타. profileImageUrl 있으면 Coil로 로드, 없으면 회색 placeholder. */
+@Composable
+private fun SenderAvatar(
+    profileImageUrl    : String?,
+    contentDescription : String,
+    size               : Dp,
+) {
+    if (profileImageUrl != null) {
+        AsyncImage(
+            model              = profileImageUrl,
+            contentDescription = contentDescription,
+            contentScale       = ContentScale.Crop,
+            modifier           = Modifier.size(size).clip(CircleShape),
+        )
+    } else {
+        Box(modifier = Modifier.size(size).clip(CircleShape).background(Color(0xFFCCCCCC)))
     }
 }
 
@@ -535,14 +990,57 @@ fun DateDivider(label: String) {
 fun TextMessageBubble(
     message             : ChatMessage,
     isMe                : Boolean,
+    senderName            : String  = "",
+    senderProfileImageUrl : String? = null,
     isAutoTranslate     : Boolean,
     showTranslation     : Boolean,
     isTranslating       : Boolean,
     onToggleTranslation : () -> Unit,
     onSaveScript        : () -> Unit,
     onLongPress         : () -> Unit = {},
+    onRetry             : () -> Unit = {},
+    searchQuery         : String  = "",
+    isHighlighted       : Boolean = false,
 ) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
+    val timeText = remember(message.timestamp, message.editedAt) {
+        val base = message.timestamp.format(timeFormatter)
+        if (message.editedAt != null) "$base · 수정됨" else base
+    }
+    val isFailed = message.status == "FAILED"
+
+    val shakeOffset = remember { Animatable(0f) }
+    LaunchedEffect(isHighlighted) {
+        if (isHighlighted) {
+            repeat(3) {
+                shakeOffset.animateTo(6f, tween(60))
+                shakeOffset.animateTo(-6f, tween(60))
+            }
+            shakeOffset.snapTo(0f)
+        }
+    }
+
+    val displayText = remember(message.text, searchQuery) {
+        buildAnnotatedString {
+            if (searchQuery.isNotBlank()) {
+                val lower  = message.text.lowercase()
+                val qLower = searchQuery.lowercase()
+                var start  = 0
+                var i      = lower.indexOf(qLower, start)
+                while (i >= 0) {
+                    append(message.text.substring(start, i))
+                    withStyle(SpanStyle(background = Color(0xFFFFF59D))) {
+                        append(message.text.substring(i, i + searchQuery.length))
+                    }
+                    start = i + searchQuery.length
+                    i     = lower.indexOf(qLower, start)
+                }
+                append(message.text.substring(start))
+            } else {
+                append(message.text)
+            }
+        }
+    }
 
     Column(
         modifier            = Modifier
@@ -550,97 +1048,98 @@ fun TextMessageBubble(
             .padding(horizontal = 16.dp, vertical = 3.dp),
         horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
     ) {
-        Row(
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            // 상대 아바타
-            if (!isMe) {
-                // TODO: 실제 프로필 이미지 — coil AsyncImage(model = avatarUrl)
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFCCCCCC)),
-                )
-                Spacer(Modifier.width(8.dp))
-            }
-
-            Column(horizontalAlignment = if (isMe) Alignment.End else Alignment.Start) {
-                // 발신자 이름 (상대만)
-                if (!isMe) {
+        if (isMe) {
+            Row(
+                modifier          = Modifier.fillMaxWidth().padding(start = 46.dp),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.End,
+            ) {
+                if (isFailed) {
                     Text(
-                        text  = message.senderName,
-                        style = TextStyle(
-                            fontSize   = 12.sp,
-                            fontFamily = PretendardFamily,
-                            fontWeight = FontWeight(500),
-                            color      = TextSecondary,
-                        ),
-                        modifier = Modifier.padding(bottom = 3.dp),
+                        text     = "전송 실패 · 재시도",
+                        style    = TextStyle(fontSize = 9.sp, color = Color(0xFFE53935), fontFamily = PretendardFamily),
+                        modifier = Modifier.clickable { onRetry() }.padding(end = 6.dp),
                     )
                 }
-
-                // 말풍선 + 번역 버튼 행
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // 말풍선
-                    Box(
-                        modifier = Modifier
-                            .clip(
-                                RoundedCornerShape(
-                                    topStart     = if (isMe) 16.dp else 4.dp,
-                                    topEnd       = if (isMe) 4.dp  else 16.dp,
-                                    bottomStart  = 16.dp,
-                                    bottomEnd    = 16.dp,
-                                )
-                            )
-                            .background(if (isMe) BubbleBlue else BubbleWhite)
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                            .widthIn(max = 260.dp)
-                            .combinedClickable(
-                                onClick     = { /* 기존 동작 */ },
-                                onLongClick = { onLongPress() },
-                            ),
-                    ) {
+                Text(
+                    text     = timeText,
+                    style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+                Box(
+                    modifier = Modifier
+                        .widthIn(max = 260.dp)
+                        .offset(x = shakeOffset.value.dp)
+                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                        .background(if (isHighlighted) BubbleBlue.copy(alpha = 0.7f) else BubbleBlue)
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                        .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
+                ) {
+                    Column {
+                        if (message.isStatusReply && message.statusPreview.isNotEmpty()) {
+                            StatusReplyQuote(preview = message.statusPreview, isMe = true)
+                            Spacer(Modifier.height(6.dp))
+                        }
                         Text(
-                            text  = message.text,
-                            style = TextStyle(
-                                fontSize   = 15.sp,
-                                fontFamily = PretendardFamily,
-                                color      = TextPrimary,
-                                lineHeight  = 22.sp,
-                            ),
+                            text  = displayText,
+                            style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary, lineHeight = 22.sp),
                         )
-                    }
-
-                    // 번역 버튼: 상대 메시지 & 자동번역 OFF일 때만
-                    if (!isMe && !isAutoTranslate) {
-                        Spacer(Modifier.width(4.dp))
-                        TranslateIconButton(onClick = onToggleTranslation)
                     }
                 }
             }
+        } else {
+            Row(
+                modifier          = Modifier.fillMaxWidth().padding(end = 38.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                SenderAvatar(
+                    profileImageUrl    = senderProfileImageUrl,
+                    contentDescription = senderName,
+                    size               = 38.dp,
+                )
+                Spacer(Modifier.width(8.dp))
 
-            // 시간 + 스크립트 저장
-            if (isMe) {
-                Spacer(Modifier.width(4.dp))
-            } else {
-                Spacer(Modifier.width(4.dp))
+                Column(horizontalAlignment = Alignment.Start) {
+                    Text(
+                        text     = senderName,
+                        style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
+                        modifier = Modifier.padding(bottom = 3.dp),
+                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Box(
+                            modifier = Modifier
+                                .widthIn(max = 210.dp)
+                                .offset(x = shakeOffset.value.dp)
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                                .background(if (isHighlighted) BubbleWhite.copy(alpha = 0.7f) else BubbleWhite)
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                                .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
+                        ) {
+                            Column {
+                                if (message.isStatusReply && message.statusPreview.isNotEmpty()) {
+                                    StatusReplyQuote(preview = message.statusPreview, isMe = false)
+                                    Spacer(Modifier.height(6.dp))
+                                }
+                                Text(
+                                    text  = displayText,
+                                    style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary, lineHeight = 22.sp),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text  = timeText,
+                            style = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                        )
+                        if (!isAutoTranslate) {
+                            Spacer(Modifier.width(4.dp))
+                            TranslateIconButton(onClick = onToggleTranslation)
+                        }
+                    }
+                }
             }
         }
 
-        // 시간 표시
-        Text(
-            text    = message.timestamp.format(timeFormatter),
-            style   = TextStyle(fontSize = 11.sp, color = TextSecondary),
-            modifier = Modifier.padding(
-                start = if (!isMe) 46.dp else 0.dp,
-                top   = 2.dp,
-            ),
-        )
-
-        // 번역 결과 (세로바 + 텍스트 or 로딩 점)
         if (isTranslating || (showTranslation && message.translatedText.isNotEmpty())) {
             Spacer(Modifier.height(4.dp))
             Row(
@@ -662,12 +1161,7 @@ fun TextMessageBubble(
                 } else {
                     Text(
                         text  = message.translatedText,
-                        style = TextStyle(
-                            fontSize   = 13.sp,
-                            fontFamily = PretendardFamily,
-                            color      = TextTranslated,
-                            lineHeight  = 20.sp,
-                        ),
+                        style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = TextTranslated, lineHeight = 20.sp),
                     )
                 }
             }
@@ -676,6 +1170,41 @@ fun TextMessageBubble(
 }
 
 // 번역 아이콘 버튼
+@Composable
+private fun StatusReplyQuote(preview: String, isMe: Boolean) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (isMe) Color.White.copy(alpha = 0.25f) else Color(0xFFE8E8E8))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        Column {
+            Text(
+                "상태메시지에 답장",
+                style = TextStyle(
+                    fontSize   = 10.sp,
+                    fontFamily = PretendardFamily,
+                    fontWeight = FontWeight(500),
+                    color      = if (isMe) Color.White.copy(alpha = 0.75f) else Color(0xFF888888),
+                ),
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                preview,
+                style    = TextStyle(
+                    fontSize   = 12.sp,
+                    fontFamily = PretendardFamily,
+                    fontWeight = FontWeight(600),
+                    color      = if (isMe) Color.White else Color(0xFF444444),
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
 @Composable
 fun TranslateIconButton(onClick: () -> Unit) {
     Box(
@@ -700,6 +1229,8 @@ fun TranslateIconButton(onClick: () -> Unit) {
 fun VoiceMessageBubble(
     message             : ChatMessage,
     isMe                : Boolean,
+    senderName            : String  = "",
+    senderProfileImageUrl : String? = null,
     isAutoTranslate     : Boolean,
     isPlaying           : Boolean,
     showTranslation     : Boolean,
@@ -709,6 +1240,10 @@ fun VoiceMessageBubble(
     onLongPress         : () -> Unit = {},
 ) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
+    val timeText = remember(message.timestamp, message.editedAt) {
+        val base = message.timestamp.format(timeFormatter)
+        if (message.editedAt != null) "$base · 수정됨" else base
+    }
     val bubbleBg  = if (isMe) BubbleMyVoice else BubbleWhite
     val textColor = if (isMe) Color.White else TextPrimary
 
@@ -718,158 +1253,161 @@ fun VoiceMessageBubble(
             .padding(horizontal = 16.dp, vertical = 3.dp),
         horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
     ) {
-        Row(
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (!isMe) {
-                // TODO: 실제 프로필 이미지
+        if (isMe) {
+            Row(
+                modifier              = Modifier.fillMaxWidth().padding(start = 46.dp),
+                verticalAlignment     = Alignment.Bottom,
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Text(
+                    text     = timeText,
+                    style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                    modifier = Modifier.padding(end = 4.dp),
+                )
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFCCCCCC)),
-                )
-                Spacer(Modifier.width(8.dp))
-            }
-
-            Column(horizontalAlignment = if (isMe) Alignment.End else Alignment.Start) {
-                if (!isMe) {
-                    Text(
-                        text  = message.senderName,
-                        style = TextStyle(
-                            fontSize   = 12.sp,
-                            fontFamily = PretendardFamily,
-                            fontWeight = FontWeight(500),
-                            color      = TextSecondary,
-                        ),
-                        modifier = Modifier.padding(bottom = 3.dp),
+                        .widthIn(min = 200.dp, max = 260.dp)
+                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                        .background(bubbleBg)
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
+                ) {
+                    VoiceBubbleContent(
+                        message      = message,
+                        isMe         = true,
+                        isPlaying    = isPlaying,
+                        isTranslating = isTranslating,
+                        showTranslation = showTranslation,
+                        textColor    = textColor,
+                        onPlay       = onPlay,
                     )
                 }
+            }
+        } else {
+            Row(
+                modifier          = Modifier.fillMaxWidth().padding(end = 38.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                SenderAvatar(
+                    profileImageUrl    = senderProfileImageUrl,
+                    contentDescription = senderName,
+                    size               = 38.dp,
+                )
+                Spacer(Modifier.width(8.dp))
 
-                // 번역 버튼 + 말풍선
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .clip(
-                                RoundedCornerShape(
-                                    topStart    = if (isMe) 16.dp else 4.dp,
-                                    topEnd      = if (isMe) 4.dp  else 16.dp,
-                                    bottomStart = 16.dp,
-                                    bottomEnd   = 16.dp,
-                                )
+                Column(horizontalAlignment = Alignment.Start) {
+                    Text(
+                        text     = senderName,
+                        style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
+                        modifier = Modifier.padding(bottom = 3.dp),
+                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Box(
+                            modifier = Modifier
+                                .widthIn(min = 180.dp, max = 210.dp)
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                                .background(bubbleBg)
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                                .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
+                        ) {
+                            VoiceBubbleContent(
+                                message         = message,
+                                isMe            = false,
+                                isPlaying       = isPlaying,
+                                isTranslating   = isTranslating,
+                                showTranslation = showTranslation,
+                                textColor       = textColor,
+                                onPlay          = onPlay,
                             )
-                            .background(bubbleBg)
-                            .padding(horizontal = 12.dp, vertical = 10.dp)
-                            .widthIn(min = 200.dp, max = 260.dp)
-                            .combinedClickable(
-                                onClick     = { /* 기존 동작 */ },
-                                onLongClick = { onLongPress() },
-                            ),
-                    ) {
-                        Column {
-                            // 재생 버튼 + 파형
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                // 재생/정지 버튼
-                                Box(
-                                    modifier         = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isMe) Color.White else AccentBlue)
-                                        .clickable(onClick = onPlay),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    // TODO icon: ic_play.xml / ic_pause.xml 교체
-                                    Text(
-                                        text  = if (isPlaying) "⏸" else "▶",
-                                        style = TextStyle(
-                                            fontSize = 11.sp,
-                                            color    = if (isMe) AccentBlue else Color.White,
-                                        ),
-                                    )
-                                }
-
-                                // 파형 Canvas
-                                WaveformView(
-                                    modifier  = Modifier
-                                        .weight(1f)
-                                        .height(24.dp),
-                                    isPlaying = isPlaying,
-                                    progress  = 0f, // TODO: VoicePlayer에서 진행률 StateFlow 노출 후 연동
-                                    barColor  = if (isMe) Color.White.copy(alpha = 0.8f) else AccentBlue,
-                                )
-
-                                // 타이머
-                                Text(
-                                    text  = formatDuration(message.voiceDurationSec),
-                                    style = TextStyle(
-                                        fontSize   = 11.sp,
-                                        fontFamily = PretendardFamily,
-                                        color      = if (isMe) Color.White.copy(0.8f) else TextSecondary,
-                                    ),
-                                )
-                            }
-
-                            // STT 텍스트 (번역 ON이거나 재생 중일 때)
-                            if (message.text.isNotEmpty()) {
-                                Spacer(Modifier.height(6.dp))
-                                HorizontalDivider(
-                                    color     = if (isMe) Color.White.copy(0.3f) else DividerGray,
-                                    thickness = 0.5.dp,
-                                )
-                                Spacer(Modifier.height(6.dp))
-                                Text(
-                                    text  = message.text,
-                                    style = TextStyle(
-                                        fontSize   = 13.sp,
-                                        fontFamily = PretendardFamily,
-                                        color      = textColor,
-                                        lineHeight  = 19.sp,
-                                    ),
-                                )
-                            }
-
-                            // 번역 결과 (세로바 + 텍스트 or 로딩 점)
-                            if (isTranslating || (showTranslation && message.translatedText.isNotEmpty())) {
-                                Spacer(Modifier.height(6.dp))
-                                if (isTranslating) {
-                                    TranslationLoadingDots()
-                                } else {
-                                    Text(
-                                        text  = message.translatedText,
-                                        style = TextStyle(
-                                            fontSize   = 12.sp,
-                                            fontFamily = PretendardFamily,
-                                            color      = if (isMe) Color.White.copy(0.75f) else TextTranslated,
-                                            lineHeight  = 18.sp,
-                                        ),
-                                    )
-                                }
-                            }
                         }
-                    }
-
-                    // 번역 버튼: 상대 메시지 & 자동번역 OFF일 때만
-                    if (!isMe && !isAutoTranslate) {
                         Spacer(Modifier.width(4.dp))
-                        TranslateIconButton(onClick = onToggleTranslation)
+                        Text(
+                            text  = timeText,
+                            style = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                        )
+                        if (!isAutoTranslate) {
+                            Spacer(Modifier.width(4.dp))
+                            TranslateIconButton(onClick = onToggleTranslation)
+                        }
                     }
                 }
             }
         }
 
-        Text(
-            text     = message.timestamp.format(timeFormatter),
-            style    = TextStyle(fontSize = 11.sp, color = TextSecondary),
-            modifier = Modifier.padding(
-                start = if (!isMe) 46.dp else 0.dp,
-                top   = 2.dp,
-            ),
-        )
+    }
+}
+
+@Composable
+private fun VoiceBubbleContent(
+    message         : ChatMessage,
+    isMe            : Boolean,
+    isPlaying       : Boolean,
+    isTranslating   : Boolean,
+    showTranslation : Boolean,
+    textColor       : Color,
+    onPlay          : () -> Unit,
+) {
+    val bubbleBg  = if (isMe) BubbleMyVoice else BubbleWhite
+    Column {
+        Row(
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier         = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(if (isMe) Color.White else AccentBlue)
+                    .clickable(onClick = onPlay),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text  = if (isPlaying) "⏸" else "▶",
+                    style = TextStyle(fontSize = 11.sp, color = if (isMe) AccentBlue else Color.White),
+                )
+            }
+            WaveformView(
+                modifier  = Modifier.weight(1f).height(24.dp),
+                isPlaying = isPlaying,
+                progress  = 0f,
+                barColor  = if (isMe) Color.White.copy(alpha = 0.8f) else AccentBlue,
+            )
+            Text(
+                text  = formatDuration(message.voiceDurationSec),
+                style = TextStyle(
+                    fontSize   = 11.sp,
+                    fontFamily = PretendardFamily,
+                    color      = if (isMe) Color.White.copy(0.8f) else TextSecondary,
+                ),
+            )
+        }
+
+        if (message.text.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            HorizontalDivider(color = if (isMe) Color.White.copy(0.3f) else DividerGray, thickness = 0.5.dp)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text  = message.text,
+                style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = textColor, lineHeight = 19.sp),
+            )
+        }
+
+        if (isTranslating || (showTranslation && message.translatedText.isNotEmpty())) {
+            Spacer(Modifier.height(6.dp))
+            if (isTranslating) {
+                TranslationLoadingDots()
+            } else {
+                Text(
+                    text  = message.translatedText,
+                    style = TextStyle(
+                        fontSize   = 12.sp,
+                        fontFamily = PretendardFamily,
+                        color      = if (isMe) Color.White.copy(0.75f) else TextTranslated,
+                        lineHeight  = 18.sp,
+                    ),
+                )
+            }
+        }
     }
 }
 
@@ -1008,82 +1546,270 @@ fun InputBar(
     }
 }
 
-//@Composable
-//fun MediaPanel(
-//    onPhoto      : () -> Unit,
-//    onCamera     : () -> Unit,
-//    onCall       : () -> Unit,
-//    onFile       : () -> Unit,
-//    onSaveScript : () -> Unit,
-//) {
-//    val items = listOf(
-//        Triple("사진",   R.drawable.ic_media_photo,    onPhoto),
-//        Triple("카메라", R.drawable.ic_media_camera,   onCamera),
-//        Triple("통화",   R.drawable.ic_media_call,     onCall),
-//        Triple("파일",   R.drawable.ic_media_file,     onFile),
-//        Triple("대화저장", R.drawable.ic_media_script, onSaveScript),
-//    )
-//
-//    Row(
-//        modifier              = Modifier
-//            .fillMaxWidth()
-//            .background(Color.White)
-//            .padding(horizontal = 16.dp, vertical = 16.dp),
-//        horizontalArrangement = Arrangement.SpaceAround,
-//    ) {
-//        items.forEach { (label, iconRes, action) ->
-//            Column(
-//                horizontalAlignment = Alignment.CenterHorizontally,
-//                verticalArrangement = Arrangement.spacedBy(6.dp),
-//                modifier            = Modifier.clickable(onClick = action),
-//            ) {
-//                Box(
-//                    modifier         = Modifier
-//                        .size(52.dp)
-//                        .clip(CircleShape)
-//                        .background(Color(0xFFEEF4FF)),
-//                    contentAlignment = Alignment.Center,
-//                ) {
-//                    Icon(
-//                        painter            = painterResource(iconRes),
-//                        contentDescription = label,
-//                        modifier           = Modifier.size(26.dp),
-//                        tint               = AccentBlue,
-//                    )
-//                }
-//                Text(
-//                    text  = label,
-//                    style = TextStyle(
-//                        fontSize   = 11.sp,
-//                        fontFamily = PretendardFamily,
-//                        color      = TextSecondary,
-//                    ),
-//                )
-//            }
-//        }
-//    }
-//}
+@Composable
+fun MediaPanel(
+    onPhoto      : () -> Unit,
+    onCamera     : () -> Unit,
+    onCall       : () -> Unit,
+    onFile       : () -> Unit,
+    onSaveScript : () -> Unit,
+) {
+    val items = listOf(
+        Triple("사진",    R.drawable.ic_option_photo,  onPhoto),
+        Triple("카메라",  R.drawable.ic_option_camera, onCamera),
+        Triple("파일",    R.drawable.ic_option_file,   onFile),
+        Triple("대화저장", R.drawable.ic_option_script, onSaveScript),
+    )
+
+    Row(
+        modifier              = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.SpaceAround,
+    ) {
+        items.forEach { (label, iconRes, action) ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier            = Modifier.clickable(onClick = action),
+            ) {
+                Box(
+                    modifier         = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFEEF4FF)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (iconRes == R.drawable.ic_option_camera) {
+                        Image(
+                            painter            = painterResource(iconRes),
+                            contentDescription = label,
+                            modifier           = Modifier.size(26.dp),
+                        )
+                    } else {
+                        Icon(
+                            painter            = painterResource(iconRes),
+                            contentDescription = label,
+                            modifier           = Modifier.size(26.dp),
+                            tint               = AccentBlue,
+                        )
+                    }
+                }
+                Text(
+                    text  = label,
+                    style = TextStyle(
+                        fontSize   = 11.sp,
+                        fontFamily = PretendardFamily,
+                        color      = TextSecondary,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PhotoPickerSheet(
+    selectedIndices   : Set<Int>,
+    onToggleSelection : (Int) -> Unit,
+    onSend            : () -> Unit,
+    onDismiss         : () -> Unit,
+) {
+    Surface(
+        modifier        = Modifier.fillMaxWidth().wrapContentHeight(),
+        shape           = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        color           = Color.White,
+        shadowElevation = 8.dp,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
+            ) {
+                Text(
+                    text  = "사진",
+                    style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = TextPrimary),
+                    modifier = Modifier.align(Alignment.Center),
+                )
+                Text(
+                    text     = "닫기",
+                    style    = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = TextSecondary),
+                    modifier = Modifier.align(Alignment.CenterEnd).clickable(onClick = onDismiss),
+                )
+            }
+
+            LazyVerticalGrid(
+                columns        = GridCells.Fixed(3),
+                modifier       = Modifier.height(280.dp).padding(horizontal = 2.dp),
+                contentPadding = PaddingValues(2.dp),
+            ) {
+                itemsIndexed(List(18) { it }) { index, _ ->
+                    val isSelected = selectedIndices.contains(index)
+                    Box(
+                        modifier = Modifier
+                            .aspectRatio(1f)
+                            .padding(2.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFDDDDDD))
+                            .clickable { onToggleSelection(index) },
+                    ) {
+                        if (isSelected) {
+                            val order = selectedIndices.sorted().indexOf(index) + 1
+                            Box(
+                                modifier         = Modifier
+                                    .size(24.dp)
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
+                                    .clip(CircleShape)
+                                    .background(AccentBlue),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text  = "$order",
+                                    style = TextStyle(fontSize = 10.sp, color = Color.White, fontWeight = FontWeight(700)),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (selectedIndices.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    Button(
+                        onClick = onSend,
+                        shape   = RoundedCornerShape(50.dp),
+                        colors  = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                    ) {
+                        Text("전송 (${selectedIndices.size})", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = Color.White, fontWeight = FontWeight(600)))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ConversationSaveSheet(
+    messages                   : List<ChatMessage>,
+    captureOption              : CaptureOption,
+    folders                    : List<ScriptFolder>,
+    onSave                     : (String?) -> Unit,
+    onDismiss                  : () -> Unit,
+    onAddFolder                : () -> Unit = {},
+    externalAutoSelectFolderId : String?    = null,
+) {
+    var selectedFolder by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(externalAutoSelectFolderId) {
+        if (externalAutoSelectFolderId != null) selectedFolder = externalAutoSelectFolderId
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor   = Color.White,
+        shape            = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        dragHandle = {
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFFDDDDDD)))
+            }
+        },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                text  = "대화 저장 (${messages.size}개)",
+                style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = TextPrimary),
+            )
+
+            Text(
+                text  = "저장할 폴더를 선택하세요",
+                style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = TextSecondary),
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                folders.forEach { folder ->
+                    val isSel = selectedFolder == folder.id
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, if (isSel) AccentBlue else DividerGray, RoundedCornerShape(10.dp))
+                            .background(if (isSel) AccentBlue.copy(0.08f) else Color.Transparent)
+                            .clickable { selectedFolder = folder.id }
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            text  = folder.name,
+                            style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = if (isSel) AccentBlue else TextPrimary),
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(1.dp, DividerGray, RoundedCornerShape(10.dp))
+                        .clickable(onClick = onAddFolder)
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Text("+ 새 폴더", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = TextSecondary))
+                }
+            }
+
+            Button(
+                onClick  = { onSave(selectedFolder) },
+                shape    = RoundedCornerShape(12.dp),
+                colors   = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) {
+                Text("저장하기", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
+            }
+
+            Spacer(Modifier.height(4.dp))
+        }
+    }
+}
 
 // RecordingOverlay — 흰 바텀시트, 마이크(파란 원) + 파동 애니메이션, 타이머, 삭제/일시정지/정지 버튼
 @Composable
 fun RecordingOverlay(
     seconds    : Int,
     amplitudes : List<Float>,
+    isPaused   : Boolean = false,
     onDelete   : () -> Unit,
     onPause    : () -> Unit,
-    onStop     : () -> Unit,
+    onSend     : () -> Unit,
 ) {
-    // 파동 애니메이션
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
+    val rawPulseScale by infiniteTransition.animateFloat(
         initialValue   = 0.85f,
         targetValue    = 1.15f,
         animationSpec  = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
+            animation  = tween(800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "pulse_scale",
     )
+    val pulseScale = if (isPaused) 1f else rawPulseScale
 
     Surface(
         modifier = Modifier
@@ -1182,12 +1908,12 @@ fun RecordingOverlay(
                     onClick  = onPause,
                 )
 
-                // 정지 (완료)
+                // 전송
                 RecordActionButton(
-                    label    = "완료",
-                    iconRes  = R.drawable.ic_stop,
-                    tint     = TextSecondary,
-                    onClick  = onStop,
+                    label    = "전송",
+                    iconRes  = R.drawable.ic_send,
+                    tint     = AccentBlue,
+                    onClick  = onSend,
                 )
             }
         }
@@ -1243,292 +1969,6 @@ fun RealtimeWaveform(
                 size         = Size(barW, barH),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.5.dp.toPx()),
             )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ScriptSaveSheet(
-    message   : ChatMessage,
-    step      : Int,
-    onNext    : () -> Unit,
-    onBack    : () -> Unit,
-    onSave    : () -> Unit,
-    onDismiss : () -> Unit,
-) {
-    var memo         by remember { mutableStateOf("") }
-    var selectedFolder by remember { mutableStateOf<String?>(null) }
-    // TODO: 실제 폴더 목록 — ScriptViewModel 또는 Repository에서 로드
-
-    val dummyFolders = listOf("영어" to 15, "일본어" to 27)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState       = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor   = Color.White,
-        shape            = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .navigationBarsPadding(),
-        ) {
-            // 타이틀
-            Text(
-                text  = "스크립트 저장 ($step/2)",
-                style = TextStyle(
-                    fontSize   = 18.sp,
-                    fontFamily = PretendardFamily,
-                    fontWeight = FontWeight(600),
-                    color      = AccentBlue.copy(alpha = 0.85f), // 숫자 파란색
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 20.dp),
-                textAlign = TextAlign.Center,
-            )
-
-            // 원문 카드
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFF8F8F8))
-                    .border(0.5.dp, DividerGray, RoundedCornerShape(12.dp))
-                    .padding(16.dp),
-            ) {
-                Column {
-                    Text(
-                        text  = message.text,
-                        style = TextStyle(
-                            fontSize   = 15.sp,
-                            fontFamily = PretendardFamily,
-                            color      = TextPrimary,
-                            lineHeight  = 22.sp,
-                        ),
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        modifier              = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment     = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text  = "버튼을 눌러 원하는 대로 수정해보세요.",
-                            style = TextStyle(fontSize = 12.sp, color = TextSecondary),
-                        )
-                        // TODO icon: ic_edit.xml
-                        OutlinedButton(
-                            onClick      = { /* TODO: 원문 편집 */ },
-                            shape        = RoundedCornerShape(20.dp),
-                            border       = BorderStroke(0.5.dp, DividerGray),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        ) {
-                            Text("✏ 수정하기", fontSize = 12.sp, color = TextSecondary)
-                        }
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // 뜻 섹션
-            Text(
-                text  = "뜻",
-                style = TextStyle(
-                    fontSize   = 15.sp,
-                    fontFamily = PretendardFamily,
-                    fontWeight = FontWeight(600),
-                    color      = TextPrimary,
-                ),
-            )
-            Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFF8F8F8))
-                    .border(0.5.dp, DividerGray, RoundedCornerShape(12.dp))
-                    .padding(16.dp),
-            ) {
-                Column {
-                    Text(
-                        text  = message.translatedText.ifEmpty { "(번역 없음)" },
-                        style = TextStyle(
-                            fontSize   = 14.sp,
-                            fontFamily = PretendardFamily,
-                            color      = TextPrimary,
-                            lineHeight  = 21.sp,
-                        ),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text     = "${message.translatedText.length}자",
-                        style    = TextStyle(fontSize = 11.sp, color = TextSecondary),
-                        modifier = Modifier.align(Alignment.End),
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // 메모 섹션
-            Text(
-                text  = "메모",
-                style = TextStyle(
-                    fontSize   = 15.sp,
-                    fontFamily = PretendardFamily,
-                    fontWeight = FontWeight(600),
-                    color      = TextPrimary,
-                ),
-            )
-            Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFF8F8F8))
-                    .border(0.5.dp, DividerGray, RoundedCornerShape(12.dp))
-                    .padding(16.dp),
-            ) {
-                Column {
-                    BasicTextField(
-                        value         = memo,
-                        onValueChange = { if (it.length <= 150) memo = it },
-                        modifier      = Modifier.fillMaxWidth(),
-                        textStyle     = TextStyle(
-                            fontSize   = 14.sp,
-                            fontFamily = PretendardFamily,
-                            color      = TextPrimary,
-                        ),
-                        decorationBox = { inner ->
-                            if (memo.isEmpty()) {
-                                Text(
-                                    text  = "메모를 입력해보세요",
-                                    style = TextStyle(fontSize = 14.sp, color = TextSecondary),
-                                )
-                            }
-                            inner()
-                        },
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text     = "${memo.length}/150",
-                        style    = TextStyle(fontSize = 11.sp, color = TextSecondary),
-                        modifier = Modifier.align(Alignment.End),
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // 폴더 선택 섹션
-            Text(
-                text  = "폴더 선택",
-                style = TextStyle(
-                    fontSize   = 15.sp,
-                    fontFamily = PretendardFamily,
-                    fontWeight = FontWeight(600),
-                    color      = TextPrimary,
-                ),
-            )
-            Spacer(Modifier.height(10.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                dummyFolders.forEach { (name, count) ->
-                    val isSelected = selectedFolder == name
-                    Box(
-                        modifier = Modifier
-                            .size(width = 110.dp, height = 80.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFFCCCCCC))   // TODO: 실제 폴더 커버 이미지
-                            .border(
-                                width = if (isSelected) 2.dp else 0.dp,
-                                color = if (isSelected) AccentBlue else Color.Transparent,
-                                shape = RoundedCornerShape(10.dp),
-                            )
-                            .clickable { selectedFolder = name },
-                        contentAlignment = Alignment.BottomStart,
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color.Black.copy(alpha = 0.4f))
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(name, fontSize = 12.sp, color = Color.White)
-                            Text("$count", fontSize = 12.sp, color = Color.White.copy(0.7f))
-                        }
-                    }
-                }
-
-                // + 폴더추가
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .size(width = 70.dp, height = 80.dp)
-                        .clickable { /* TODO: 폴더 추가 화면 이동 */ },
-                ) {
-                    Box(
-                        modifier         = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .border(1.dp, DividerGray, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("+", fontSize = 20.sp, color = TextSecondary)
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Text("폴더추가", fontSize = 11.sp, color = TextSecondary)
-                }
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-            // 다음 or 저장 버튼
-            Button(
-                onClick      = if (step == 1) onNext else onSave,
-                modifier     = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape        = RoundedCornerShape(12.dp),
-                colors       = ButtonDefaults.buttonColors(containerColor = AccentBlue),
-            ) {
-                Text(
-                    text  = if (step == 1) "다음" else "저장",
-                    style = TextStyle(
-                        fontSize   = 16.sp,
-                        fontFamily = PretendardFamily,
-                        fontWeight = FontWeight(600),
-                        color      = Color.White,
-                    ),
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // 취소하기 or 이전으로
-            TextButton(
-                onClick  = if (step == 1) onDismiss else onBack,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text  = if (step == 1) "취소하기" else "이전으로",
-                    style = TextStyle(
-                        fontSize   = 15.sp,
-                        fontFamily = PretendardFamily,
-                        color      = if (step == 1) Color(0xFFFF4444) else TextPrimary,
-                    ),
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -1630,42 +2070,3 @@ private fun formatDuration(seconds: Int): String {
     return "%02d:%02d".format(m, s)
 }
 
-@Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "우원재 채팅방")
-@Composable
-private fun PreviewWoowonjai() {
-    val room     = dummyChatRooms.find { it.id == "r_woowonjai" }!!
-    val messages = dummyMessages["r_woowonjai"] ?: emptyList()
-    ChatRoomContent(
-        state                 = ChatRoomUiState(room = room, messages = messages),
-        onBack                = {},
-        onInputChange         = {},
-        onSendText            = {},
-        onStartRecording      = {},
-        onStopRecording       = {},
-        onCancelRecording     = {},
-        onPlayVoice           = {},
-        onToggleTranslation   = {},
-        onToggleAutoTranslate = {},
-        onToggleMediaPanel    = {},
-    )
-}
-
-@Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "우원재 채팅방 자동번역 ON")
-@Composable
-private fun PreviewWoowonajaiAutoTranslate() {
-    val room     = dummyChatRooms.find { it.id == "r_woowonjai" }!!
-    val messages = dummyMessages["r_woowonjai"] ?: emptyList()
-    ChatRoomContent(
-        state                 = ChatRoomUiState(room = room, messages = messages, isAutoTranslate = true),
-        onBack                = {},
-        onInputChange         = {},
-        onSendText            = {},
-        onStartRecording      = {},
-        onStopRecording       = {},
-        onCancelRecording     = {},
-        onPlayVoice           = {},
-        onToggleTranslation   = {},
-        onToggleAutoTranslate = {},
-        onToggleMediaPanel    = {},
-    )
-}

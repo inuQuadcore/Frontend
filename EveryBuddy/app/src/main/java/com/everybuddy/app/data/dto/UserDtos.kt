@@ -7,8 +7,12 @@ data class UserPublicProfileResponse(
     @SerializedName("country")         val country         : String  = "",
     @SerializedName("name")            val name            : String,
     @SerializedName("age")             val age             : Int     = 0,
+    // 본인이 자기 자신을 조회할 때만 값이 채워짐. 타인 조회 시 null.
+    @SerializedName("birthday")        val birthday        : String? = null,
     @SerializedName("gender")          val gender          : String  = "",
     @SerializedName("bio")             val bio             : String  = "",
+    @SerializedName("consecutiveDays") val consecutiveDays : Int     = 0,
+    @SerializedName("isFriend")        val isFriend        : Boolean? = null,
 )
 
 data class UserProfileResponse(

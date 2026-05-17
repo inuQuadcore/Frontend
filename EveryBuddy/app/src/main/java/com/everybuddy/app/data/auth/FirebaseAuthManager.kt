@@ -24,6 +24,8 @@ class FirebaseAuthManager @Inject constructor() {
                 }
         }
 
+    fun isSignedIn(): Boolean = firebaseAuth.currentUser != null
+
     fun signOut() {
         firebaseAuth.signOut()
     }

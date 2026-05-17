@@ -22,13 +22,15 @@ class MessageRepository @Inject constructor(
 ) {
     /**
      * 텍스트 메시지 전송 — POST /api/v1/messages
+     * @param statusPreview 상태메시지 답장이면 인용 프리뷰 텍스트, 일반 메시지면 null
      * 에러: 400(입력오류) | 401(인증) | 403(채팅방 접근 불가) | 404(방없음)
      */
     suspend fun sendTextMessage(
-        chatRoomId : Long,
-        content    : String,
+        chatRoomId    : Long,
+        content       : String,
+        statusPreview : String? = null,
     ): ApiResult<Unit> {
-        val requestBody = gson.toJson(SendMessageRequest(chatRoomId, content))
+        val requestBody = gson.toJson(SendMessageRequest(chatRoomId, content, statusPreview))
             .toRequestBody("application/json".toMediaType())
         return safeApiCall(gson, { api.sendMessage(request = requestBody) }) {
             ApiResult.Success(Unit)

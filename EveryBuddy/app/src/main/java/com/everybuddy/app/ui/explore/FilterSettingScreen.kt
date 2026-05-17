@@ -26,6 +26,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
 import com.everybuddy.app.R
 import com.everybuddy.app.ui.theme.PretendardFamily
 
@@ -51,7 +52,7 @@ fun FilterSettingScreen(
     var minAge          by remember { mutableFloatStateOf(current.minAge.toFloat()) }
     var maxAge          by remember { mutableFloatStateOf(current.maxAge.toFloat()) }
     var country         by remember { mutableStateOf(current.country) }
-    var language        by remember { mutableStateOf(current.language) }
+    var languages       by remember { mutableStateOf(current.languages) }
     var activityFilters by remember { mutableStateOf(current.activityFilters) }
     var selectedTags    by remember { mutableStateOf(current.selectedTags) }
     var tagCategoryIdx  by remember { mutableIntStateOf(0) }
@@ -84,8 +85,7 @@ fun FilterSettingScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color.White)
-                        // TODO padding: 하단바 horizontal 16dp, vertical 12dp
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 16.dp, vertical = 20.dp)
                         .navigationBarsPadding(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -94,7 +94,7 @@ fun FilterSettingScreen(
                     OutlinedButton(
                         onClick        = {
                             gender = GenderFilter.ALL; minAge = AGE_MIN.toFloat()
-                            maxAge = AGE_MAX.toFloat(); country = null; language = null
+                            maxAge = AGE_MAX.toFloat(); country = null; languages = emptyList()
                             activityFilters = emptySet(); selectedTags = emptyList()
                         },
                         modifier       = Modifier.weight(1f).height(52.dp),
@@ -115,7 +115,7 @@ fun FilterSettingScreen(
                                 minAge          = minAge.toInt(),
                                 maxAge          = maxAge.toInt(),
                                 country         = country,
-                                language        = language,
+                                languages       = languages,
                                 activityFilters = activityFilters,
                                 selectedTags    = selectedTags,
                                 isOnline        = activityFilters.contains(ActivityFilter.ONLINE),
@@ -167,21 +167,10 @@ fun FilterSettingScreen(
                 desc  = "소통하고 싶은 친구의 나이를 선택해주세요",
                 badge = "${minAge.toInt()}~${maxAge.toInt()}세",
             ) {
-                // 스무딩 범위 슬라이더 (눈금 없음, 1세 단위)
-                RangeSlider(
-                    value            = minAge..maxAge,
-                    onValueChange    = { range ->
-                        minAge = range.start.coerceIn(AGE_MIN.toFloat(), maxAge - 1)
-                        maxAge = range.endInclusive.coerceIn(minAge + 1, AGE_MAX.toFloat())
-                    },
-                    valueRange       = AGE_MIN.toFloat()..AGE_MAX.toFloat(),
-                    steps            = 0,  // 스무딩
-                    colors           = SliderDefaults.colors(
-                        thumbColor         = C.Accent,
-                        activeTrackColor   = C.Accent,
-                        inactiveTrackColor = C.Border,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
+                AgeRangeSlider(
+                    minAge        = minAge,
+                    maxAge        = maxAge,
+                    onRangeChange = { newMin, newMax -> minAge = newMin; maxAge = newMax },
                 )
             }
 
@@ -200,9 +189,11 @@ fun FilterSettingScreen(
 
             // ── 언어 ──────────────────────────────────────────────────────
             FilterSection(title = "언어", desc = "내가 학습하고 싶은 언어를 사용하는 친구를 찾아봐요") {
-                SelectionRow(
-                    label = language ?: "모든 언어",
-                    onTap = { /* TODO: 언어 선택 BottomSheet */ },
+                LanguageMultiSelect(
+                    selected = languages,
+                    onToggle = { code ->
+                        languages = if (code in languages) languages - code else languages + code
+                    },
                 )
             }
 
@@ -225,16 +216,17 @@ fun FilterSettingScreen(
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                // TODO: 아이콘 (현활/최근/대화빈도)
-                                Box(
-                                    modifier = Modifier.size(28.dp).clip(CircleShape)
-                                        .background(if (isSelected) C.Accent else C.Border),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    if (isSelected) {
-                                        Text("✓", style = TextStyle(fontSize = 14.sp, color = Color.White, fontWeight = FontWeight(700)))
-                                    }
-                                }
+                                Image(
+                                    painter            = painterResource(
+                                        when (af) {
+                                            ActivityFilter.ONLINE -> R.drawable.markbtn1
+                                            ActivityFilter.RECENT -> R.drawable.markbtn3
+                                        }
+                                    ),
+                                    contentDescription = null,
+                                    contentScale       = ContentScale.Fit,
+                                    modifier           = Modifier.size(18.dp),
+                                )
                                 Spacer(Modifier.width(12.dp))
                                 Column {
                                     Text(af.label, style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = if (isSelected) C.Accent else C.TextPri))
@@ -311,21 +303,41 @@ fun FilterSettingScreen(
                         else -> true
                     }
                 }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(filteredTags.take(12)) { tag ->
-                        val isSel = selectedTags.any { it.tag == tag.tag }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(if (isSel) C.TagBg else C.TagBgGray)
-                                .border(if (isSel) 1.5.dp else 0.dp, if (isSel) C.Accent else Color.Transparent, RoundedCornerShape(20.dp))
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                                .clickable {
-                                    selectedTags = if (isSel) selectedTags - tag
-                                    else if (selectedTags.size < 15) selectedTags + tag else selectedTags
-                                },
-                        ) {
-                            Text("${tag.emoji} ${tag.displayName}", style = TextStyle(fontSize = 12.sp, color = if (isSel) C.Accent else C.TagTextGray, fontFamily = PretendardFamily))
+                Column(
+                    modifier            = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val rowCount = 3
+                    repeat(rowCount) { rowIdx ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            filteredTags.filterIndexed { idx, _ -> idx % rowCount == rowIdx }.forEach { tag ->
+                                val isSel = selectedTags.any { it.tag == tag.tag }
+                                Box(
+                                    modifier = Modifier
+                                        .height(40.dp)
+                                        .clip(RoundedCornerShape(19.dp))
+                                        .background(if (isSel) Color(0xFFDEF0FF) else Color(0xFFF5F5F5))
+                                        .border(1.7.dp, if (isSel) C.Accent else Color.Transparent, RoundedCornerShape(19.dp))
+                                        .clickable {
+                                            selectedTags = if (isSel) selectedTags - tag
+                                            else if (selectedTags.size < 15) selectedTags + tag else selectedTags
+                                        }
+                                        .padding(horizontal = 14.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        "${tag.emoji} ${tag.displayName}",
+                                        style = TextStyle(
+                                            fontSize   = 15.sp,
+                                            color      = if (isSel) C.Accent else C.TagTextGray,
+                                            fontFamily = PretendardFamily,
+                                            fontWeight = if (isSel) FontWeight(700) else FontWeight(600),
+                                        ),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -374,12 +386,94 @@ private fun SelectionRow(label: String, onTap: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.size(24.dp).clip(CircleShape).background(C.Border), contentAlignment = Alignment.Center) {
-                    Text("A", style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight(700), color = C.TextSec))
+                Box(Modifier.size(32.dp).clip(CircleShape).background(C.Border), contentAlignment = Alignment.Center) {
+                    Text("ALL", style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight(700), color = C.TextSec))
                 }
                 Text(label, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
             }
             Icon(painterResource(R.drawable.ic_chevron_right), "선택", Modifier.size(16.dp), tint = C.TextSec)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AgeRangeSlider(
+    minAge        : Float,
+    maxAge        : Float,
+    onRangeChange : (Float, Float) -> Unit,
+) {
+    RangeSlider(
+        value         = minAge..maxAge,
+        onValueChange = { r ->
+            onRangeChange(
+                r.start.coerceIn(AGE_MIN.toFloat(), maxAge - 1),
+                r.endInclusive.coerceIn(minAge + 1, AGE_MAX.toFloat()),
+            )
+        },
+        valueRange    = AGE_MIN.toFloat()..AGE_MAX.toFloat(),
+        steps         = 0,
+        track         = { rs ->
+            SliderDefaults.Track(
+                rangeSliderState   = rs,
+                modifier           = Modifier.height(2.dp),
+                colors             = SliderDefaults.colors(
+                    activeTrackColor   = C.Accent,
+                    inactiveTrackColor = C.Border,
+                ),
+            )
+        },
+        startThumb    = {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .background(Color.White, CircleShape)
+                    .border(2.dp, C.Accent, CircleShape),
+            )
+        },
+        endThumb      = {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .background(Color.White, CircleShape)
+                    .border(2.dp, C.Accent, CircleShape),
+            )
+        },
+        modifier      = Modifier.fillMaxWidth(),
+    )
+}
+
+// 언어 다중 선택 — 서버 enum 코드 기준
+@Composable
+private fun LanguageMultiSelect(
+    selected : List<String>,
+    onToggle : (String) -> Unit,
+) {
+    val options = listOf(
+        "영어"     to "ENGLISH",
+        "일본어"   to "JAPANESE",
+        "한국어"   to "KOREAN",
+        "중국어"   to "CHINESE",
+        "프랑스어" to "FRENCH",
+    )
+    Column(
+        modifier            = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (label, code) ->
+                val isSel = code in selected
+                FilterChip(
+                    selected = isSel,
+                    onClick  = { onToggle(code) },
+                    label    = { Text(label, style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily)) },
+                    shape    = RoundedCornerShape(20.dp),
+                    colors   = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = C.Accent,
+                        selectedLabelColor     = Color.White,
+                    ),
+                )
+            }
         }
     }
 }

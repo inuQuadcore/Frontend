@@ -10,7 +10,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.network.AuthApi
 import com.everybuddy.app.data.network.BlockApi
-import com.everybuddy.app.data.network.ChatApiService
 import com.everybuddy.app.data.network.ChatRoomApi
 import com.everybuddy.app.data.network.DiscoverApi
 import com.everybuddy.app.data.network.FcmTokenApi
@@ -46,6 +45,7 @@ object TokenKeys {
     val ACCESS_TOKEN_EXPIRES_AT   = stringPreferencesKey("access_token_expires_at")
     val REFRESH_TOKEN_EXPIRES_AT  = stringPreferencesKey("refresh_token_expires_at")
     val USER_ID                   = stringPreferencesKey("user_id")
+    val LAST_ATTENDANCE_DATE      = stringPreferencesKey("last_attendance_date")  // "yyyy-MM-dd" — 출석 API 마지막 호출일
 }
 
 @Module
@@ -94,7 +94,7 @@ object NetworkModule {
     fun provideAuthenticator(authenticator: TokenAuthenticator): Authenticator = authenticator
 
     // Main OkHttpClient — JWT 인터셉터 + Authenticator (401 자동 refresh)
-    // 일반 API(도메인별 *Api 인터페이스들, ChatApiService)용
+    // 일반 API(도메인별 *Api 인터페이스들)용
     @Provides
     @Singleton
     fun provideOkHttpClient(
@@ -120,7 +120,7 @@ object NetworkModule {
         @Named("logging") loggingInterceptor : Interceptor,
     ): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(jwtInterceptor)
-        .addInterceptor(loggingInterceptor)  // TODO: Release 빌드에서 제거
+        .apply { if (BuildConfig.DEBUG) addInterceptor(loggingInterceptor) }
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -186,10 +186,6 @@ object NetworkModule {
     @Provides @Singleton
     fun provideStatusMessageApi(retrofit: Retrofit): StatusMessageApi =
         retrofit.create(StatusMessageApi::class.java)
-
-    @Provides @Singleton
-    fun provideChatApiService(retrofit: Retrofit): ChatApiService =
-        retrofit.create(ChatApiService::class.java)
 
     @Provides @Singleton
     fun provideFcmTokenApi(retrofit: Retrofit): FcmTokenApi =

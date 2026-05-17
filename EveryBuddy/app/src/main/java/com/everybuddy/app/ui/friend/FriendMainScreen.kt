@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.everybuddy.app.ui.friend
 
 import androidx.compose.foundation.background
@@ -6,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.DisposableEffect
 import kotlinx.coroutines.delay
 import com.everybuddy.app.ui.theme.PretendardFamily
 import com.everybuddy.app.R
@@ -22,22 +26,35 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import com.everybuddy.app.ui.explore.DiscoverUser
+import com.everybuddy.app.ui.explore.ExploreDemo
+import com.everybuddy.app.ui.explore.UserLanguage
+import com.everybuddy.app.ui.explore.UserTag
+import com.everybuddy.app.ui.explore.UserProfileScreen
 
 private val C = FriendColors
 
 @Composable
 fun FriendMainScreen(
-    viewModel         : FriendViewModel,
-    statusVm          : StatusMessageViewModel = hiltViewModel(),
-    onNavigateToChat  : () -> Unit = {},
-    onNavigateToFind  : () -> Unit = {},
-    onNavigateToScript: () -> Unit = {},
-    onNavigateToMy    : () -> Unit = {},
-    onFriendClick     : (FriendProfile) -> Unit = {},
-    onAddFriend       : () -> Unit = {},
+    viewModel       : FriendViewModel,
+    statusVm        : StatusMessageViewModel = hiltViewModel(),
+    onAddFriend     : () -> Unit = {},
+    onStartChat     : (DiscoverUser) -> Unit = {},
+    onNotification  : () -> Unit = {},
+    onReplyToStatus : (friendId: String, friendName: String) -> Unit = { _, _ -> },
 ) {
     val uiState     by viewModel.uiState.collectAsState()
     val statusState by statusVm.state.collectAsState()
+
+    // 탭 진입 시점마다 친구/상태메시지 갱신 (다른 탭 갔다 와도 stale 방지).
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+        statusVm.loadAll()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { viewModel.clearSelectedFriend() }
+    }
 
     LaunchedEffect(uiState.toastMessage) {
         if (uiState.toastMessage != null) {
@@ -54,18 +71,26 @@ fun FriendMainScreen(
     }
 
     when {
-        uiState.isSearchActive         -> FriendSearchScreen(viewModel = viewModel)
-        uiState.isStatusPageOpen       -> StatusMessageAllScreen(viewModel = viewModel, statusVm = statusVm)
+        uiState.selectedFriend != null -> UserProfileScreen(
+            user           = uiState.selectedFriend!!.toDiscoverUser(),
+            isFriend       = uiState.selectedFriend!!.isFriend,
+            onBack         = viewModel::clearSelectedFriend,
+            onChat         = { onStartChat(it) },
+            onAddFriend    = { viewModel.addFriendById(uiState.selectedFriend!!.id) },
+            onRemoveFriend = { viewModel.removeFriendById(uiState.selectedFriend!!.id) },
+            onBlock        = { viewModel.blockFriendById(uiState.selectedFriend!!.id) },
+        )
+        uiState.isSearchActive         -> FriendSearchScreen(viewModel = viewModel, statusVm = statusVm)
         statusState.isWriteScreenOpen  -> StatusWriteScreen(viewModel = statusVm)
+        uiState.isStatusPageOpen       -> StatusMessageAllScreen(viewModel = viewModel, statusVm = statusVm)
         else                           -> FriendMainContent(
-            viewModel          = viewModel,
-            statusVm           = statusVm,
-            onNavigateToChat   = onNavigateToChat,
-            onNavigateToFind   = onNavigateToFind,
-            onNavigateToScript = onNavigateToScript,
-            onNavigateToMy     = onNavigateToMy,
-            onFriendClick      = onFriendClick,
-            onAddFriend        = onAddFriend,
+            viewModel      = viewModel,
+            statusVm       = statusVm,
+            onFriendClick  = { viewModel.selectFriend(it) },
+            onAddFriend    = onAddFriend,
+            onNotification = onNotification,
+            isRefreshing   = uiState.isRefreshing,
+            onRefresh      = viewModel::refresh,
         )
     }
 
@@ -78,20 +103,31 @@ fun FriendMainScreen(
     }
 
     statusState.expandedStatus?.let { sm ->
-        FriendStatusDetailPopup(sm = sm, viewModel = statusVm)
+        FriendStatusDetailPopup(sm = sm, viewModel = statusVm, onReplySent = onReplyToStatus)
     }
 }
 
+private fun FriendProfile.toDiscoverUser() = DiscoverUser(
+    userId          = id,
+    name            = name,
+    profileImageUrl = profileImageUrl,
+    country         = nationality,
+    bio             = bio,
+    languages       = nativeLanguages.map { UserLanguage(it, 5) } + learningLanguages.map { UserLanguage(it, 2) },
+    tags            = interests.mapNotNull { apiVal -> ExploreDemo.allTags.find { it.tag == apiVal } },
+    isOnline        = isOnline,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FriendMainContent(
-    viewModel          : FriendViewModel,
-    statusVm           : StatusMessageViewModel,
-    onNavigateToChat   : () -> Unit,
-    onNavigateToFind   : () -> Unit,
-    onNavigateToScript : () -> Unit,
-    onNavigateToMy     : () -> Unit,
-    onFriendClick      : (FriendProfile) -> Unit,
-    onAddFriend        : () -> Unit,
+    viewModel      : FriendViewModel,
+    statusVm       : StatusMessageViewModel,
+    onFriendClick  : (FriendProfile) -> Unit,
+    onAddFriend    : () -> Unit,
+    onNotification : () -> Unit = {},
+    isRefreshing   : Boolean    = false,
+    onRefresh      : () -> Unit = {},
 ) {
     val uiState     by viewModel.uiState.collectAsState()
     val statusState by statusVm.state.collectAsState()
@@ -103,16 +139,8 @@ private fun FriendMainContent(
                 title          = "친구",
                 showAddFriend  = true,
                 onSearch       = { viewModel.setSearchActive(true) },
-                onNotification = { /* TODO: 알림 화면 */ },
+                onNotification = onNotification,
                 onAddFriend    = onAddFriend,
-            )
-        },
-        bottomBar = {
-            FriendBottomNavBar(
-                onChat   = onNavigateToChat,
-                onFind   = onNavigateToFind,
-                onScript = onNavigateToScript,
-                onMy     = onNavigateToMy,
             )
         },
         containerColor = Color.White,
@@ -120,6 +148,11 @@ private fun FriendMainContent(
 
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
 
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh    = onRefresh,
+                modifier     = Modifier.fillMaxSize(),
+            ) {
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
 
                 item {
@@ -160,7 +193,7 @@ private fun FriendMainContent(
                         item {
                             MyStatusCard(viewModel = statusVm)
                         }
-                        items(statusState.friendStatuses.take(2)) { sm ->
+                        items(statusState.friendStatuses.take(3)) { sm ->
                             FriendStatusPreviewCard(sm = sm, onClick = { statusVm.openFriendStatus(sm) })
                         }
                     }
@@ -197,8 +230,14 @@ private fun FriendMainContent(
                 }
 
                 items(friends) { friend ->
-                    FriendListItem(friend = friend, onClick = onFriendClick)
+                    FriendListItem(
+                        friend         = friend,
+                        isFollowing    = uiState.followedFriendIds.contains(friend.id),
+                        onFollowToggle = { viewModel.onFollowToggle(friend.id) },
+                        onClick        = onFriendClick,
+                    )
                 }
+            }
             }
 
             val toastMsg = uiState.toastMessage ?: statusState.toastMessage

@@ -1,17 +1,19 @@
 package com.everybuddy.app.ui.script
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,56 +27,56 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.everybuddy.app.R
 import com.everybuddy.app.ui.chat.ScriptFolder
+import com.everybuddy.app.ui.chat.ScriptFolderThumbnail
 import com.everybuddy.app.ui.chat.ScriptItem
 import com.everybuddy.app.ui.theme.PretendardFamily
 
-private val SmAccent      = Color(0xFF0167FF)
-private val SmTextPri     = Color(0xFF000000)
-private val SmTextSec     = Color(0xFF797979)
-private val SmBorder      = Color(0xFFE5E5E5)
-private val SmNavInactive = Color(0xFFAAAAAA)
-private val SmNavBg       = Color(0xFFFFFFFF)
+private val SmAccent  = Color(0xFF0167FF)
+private val SmTextPri = Color(0xFF000000)
+private val SmTextSec = Color(0xFF797979)
+private val SmBorder  = Color(0xFFE5E5E5)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScriptMainScreen(
-    viewModel         : ScriptViewModel,
-    onNavigateToChat  : () -> Unit = {},
-    onNavigateToFriend: () -> Unit = {},
-    onNavigateToFind  : () -> Unit = {},
-    onNavigateToMy    : () -> Unit = {},
-    onAddFolder       : () -> Unit = {},
-    onFolderClick     : (ScriptFolder) -> Unit = {},
-    onItemClick       : (ScriptItem) -> Unit = {},
-    onItemAudio       : (ScriptItem) -> Unit = {},
+    viewModel      : ScriptViewModel,
+    isRefreshing   : Boolean    = false,
+    onRefresh      : () -> Unit = {},
+    onAddFolder    : () -> Unit = {},
+    onFolderClick  : (ScriptFolder) -> Unit = {},
+    onItemClick    : (ScriptItem) -> Unit = {},
+    onItemAudio    : (ScriptItem) -> Unit = {},
+    onNotification : () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val items = viewModel.filteredItems
 
-    // 정렬 드롭다운
-    var sortMenuOpen by remember { mutableStateOf(false) }
+    var sortMenuOpen   by remember { mutableStateOf(false) }
+    var isSearchOpen   by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             ScriptTopBar(
-                onSearchClick       = { /* TODO: 검색창 열기 */ },
-                onNotificationClick = { /* TODO: 알림 화면 이동 */ },
-            )
-        },
-        bottomBar = {
-            ScriptBottomNavBar(
-                onChat   = onNavigateToChat,
-                onFriend = onNavigateToFriend,
-                onFind   = onNavigateToFind,
-                onMy     = onNavigateToMy,
+                isSearchOpen        = isSearchOpen,
+                searchQuery         = uiState.searchQuery,
+                onSearchClick       = {
+                    isSearchOpen = !isSearchOpen
+                    if (!isSearchOpen) viewModel.updateSearchQuery("")
+                },
+                onSearchChange      = viewModel::updateSearchQuery,
+                onNotificationClick = onNotification,
             )
         },
         containerColor = Color.White,
     ) { innerPadding ->
 
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh    = onRefresh,
+            modifier     = Modifier.padding(innerPadding).fillMaxSize(),
+        ) {
         LazyColumn(
-            modifier       = Modifier
-                .padding(innerPadding)
-                .fillMaxSize(),
+            modifier       = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 16.dp),
         ) {
 
@@ -177,72 +179,99 @@ fun ScriptMainScreen(
                 )
             }
         }
+        }
     }
 }
 
 @Composable
 private fun ScriptTopBar(
+    isSearchOpen        : Boolean  = false,
+    searchQuery         : String   = "",
     onSearchClick       : () -> Unit,
+    onSearchChange      : (String) -> Unit = {},
     onNotificationClick : () -> Unit,
+    hasNotification     : Boolean  = false,
 ) {
-    Column {
-        Row(
+    Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
-                .background(Color.White)
-                // TODO padding: TopBar horizontal 16dp
                 .padding(horizontal = 16.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            // 타이틀
             Text(
                 "스크립트",
-                style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri),
+                modifier = Modifier.align(Alignment.Center),
+                style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri),
             )
-
-            // 우측 아이콘 2개
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier              = Modifier.align(Alignment.CenterEnd),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 IconButton(
                     onClick  = onSearchClick,
                     modifier = Modifier.size(40.dp),
                 ) {
-                    // ic_search.xml
                     Icon(
-                        painter            = painterResource(R.drawable.ic_search),
-                        contentDescription = "검색",
-                        modifier           = Modifier.size(22.dp),
+                        painter            = painterResource(if (isSearchOpen) R.drawable.ic_back else R.drawable.ic_search),
+                        contentDescription = if (isSearchOpen) "검색 닫기" else "검색",
+                        modifier           = Modifier.size(24.dp),
                         tint               = SmTextPri,
                     )
                 }
-                // 알림 아이콘 — 파란 점 뱃지 포함
                 Box {
                     IconButton(
                         onClick  = onNotificationClick,
                         modifier = Modifier.size(40.dp),
                     ) {
-                        // ic_notification.xml
                         Icon(
                             painter            = painterResource(R.drawable.ic_alarm),
                             contentDescription = "알림",
-                            modifier           = Modifier.size(22.dp),
+                            modifier           = Modifier.size(24.dp),
                             tint               = SmTextPri,
                         )
                     }
-                    // 파란 뱃지 점
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(SmAccent)
-                            .align(Alignment.TopEnd)
-                            // TODO padding: 뱃지 위치 offset (현재 6dp from end, 6dp from top)
-                            .offset(x = (-6).dp, y = 6.dp),
-                    )
+                    if (hasNotification) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(SmAccent)
+                                .align(Alignment.TopEnd)
+                                .offset(x = (-6).dp, y = 6.dp),
+                        )
+                    }
                 }
             }
         }
+
+        AnimatedVisibility(visible = isSearchOpen) {
+            BasicTextField(
+                value         = searchQuery,
+                onValueChange = onSearchChange,
+                singleLine    = true,
+                textStyle     = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SmTextPri),
+                modifier      = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFF2F2F2))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                decorationBox = { innerTextField ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(painterResource(R.drawable.ic_search), null, Modifier.size(16.dp), tint = SmTextSec)
+                        Spacer(Modifier.width(6.dp))
+                        Box(Modifier.weight(1f)) {
+                            if (searchQuery.isEmpty()) {
+                                Text("본문 / 뜻 / 메모 검색", style = TextStyle(fontSize = 15.sp, color = SmTextSec, fontFamily = PretendardFamily))
+                            }
+                            innerTextField()
+                        }
+                    }
+                },
+            )
+        }
+
         HorizontalDivider(color = SmBorder, thickness = 0.5.dp)
     }
 }
@@ -267,13 +296,14 @@ private fun FolderThumbnailCard(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.BottomStart,
     ) {
-        // TODO: 실제 폴더 커버 이미지 로딩 (Coil AsyncImage)
-        // AsyncImage(
-        //     model          = folder.coverImage,
-        //     contentDescription = folder.name,
-        //     contentScale   = ContentScale.Crop,
-        //     modifier       = Modifier.fillMaxSize(),
-        // )
+        if (folder.coverImage.isNotEmpty()) {
+            coil.compose.AsyncImage(
+                model              = folder.coverImage,
+                contentDescription = folder.name,
+                contentScale       = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
+            )
+        }
 
         // 하단 오버레이 — 이름 + 개수
         Row(
@@ -425,101 +455,344 @@ fun ScriptItemCard(
     )
 }
 
+// 임시 BorderStroke import (ScriptItemCard 에서 사용)
+private fun BorderStroke(width: androidx.compose.ui.unit.Dp, color: Color) =
+    androidx.compose.foundation.BorderStroke(width, color)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ScriptBottomNavBar(
-    onChat   : () -> Unit,
-    onFriend : () -> Unit,
-    onFind   : () -> Unit,
-    onMy     : () -> Unit,
+fun ScriptDetailScreen(
+    item     : ScriptItem,
+    folders  : List<ScriptFolder> = emptyList(),
+    onBack   : () -> Unit,
+    onAudio  : (ScriptItem) -> Unit = {},
+    onSave   : (ScriptItem) -> Unit = {},
+    onDelete : (ScriptItem) -> Unit = {},
 ) {
-    Column {
-        HorizontalDivider(color = SmBorder, thickness = 0.5.dp)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(60.dp)
-                .background(SmNavBg)
-                .navigationBarsPadding(),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment     = Alignment.CenterVertically,
+    BackHandler(onBack = onBack)
+
+    var editingTranslation by remember { mutableStateOf(false) }
+    var editedTranslation  by remember { mutableStateOf(item.translatedText) }
+    var editingMemo        by remember { mutableStateOf(false) }
+    var editedMemo         by remember { mutableStateOf(item.memo1) }
+    var showDeleteConfirm  by remember { mutableStateOf(false) }
+    var showFolderSheet    by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                ) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(40.dp).align(Alignment.CenterStart)) {
+                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = SmTextPri)
+                    }
+                    Text(
+                        "스크립트 상세",
+                        modifier = Modifier.align(Alignment.Center),
+                        style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri),
+                    )
+                }
+                HorizontalDivider(color = SmBorder, thickness = 0.5.dp)
+            }
+        },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier.padding(innerPadding).fillMaxSize().padding(horizontal = 20.dp, vertical = 24.dp),
         ) {
-            // 대화 탭 — ic_nav_chat.xml
-            NavItem(
-                iconRes     = R.drawable.ic_nav_chat,
-                label       = "대화",
-                isSelected  = false,
-                onClick     = onChat,
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    item.originalText,
+                    modifier = Modifier.weight(1f),
+                    style    = TextStyle(fontSize = 22.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri, lineHeight = 32.sp),
+                )
+                IconButton(onClick = { onAudio(item) }, modifier = Modifier.size(36.dp)) {
+                    Icon(painterResource(R.drawable.ic_speaker), "발음 듣기", Modifier.size(22.dp), tint = SmAccent)
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("뜻", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SmTextSec))
+                Spacer(Modifier.weight(1f))
+                if (editingTranslation) {
+                    Text(
+                        "취소",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmTextSec),
+                        modifier = Modifier.clickable { editingTranslation = false; editedTranslation = item.translatedText },
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "완료",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmAccent, fontWeight = FontWeight(600)),
+                        modifier = Modifier.clickable {
+                            onSave(item.copy(translatedText = editedTranslation))
+                            editingTranslation = false
+                        },
+                    )
+                } else {
+                    Text(
+                        "수정하기",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmTextSec),
+                        modifier = Modifier.clickable { editingTranslation = true; editedTranslation = item.translatedText },
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            if (editingTranslation) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, SmAccent, RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                ) {
+                    BasicTextField(
+                        value         = editedTranslation,
+                        onValueChange = { editedTranslation = it },
+                        textStyle     = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = SmTextPri, lineHeight = 24.sp),
+                        modifier      = Modifier.fillMaxWidth(),
+                        decorationBox = { inner ->
+                            if (editedTranslation.isEmpty()) {
+                                Text("뜻을 입력하세요", style = TextStyle(fontSize = 16.sp, color = SmTextSec, fontFamily = PretendardFamily))
+                            }
+                            inner()
+                        },
+                    )
+                }
+            } else {
+                Text(
+                    text  = item.translatedText.ifEmpty { "—" },
+                    style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = if (item.translatedText.isEmpty()) SmTextSec else SmTextPri, lineHeight = 24.sp),
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("메모", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SmTextSec))
+                Spacer(Modifier.weight(1f))
+                if (editingMemo) {
+                    Text(
+                        "취소",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmTextSec),
+                        modifier = Modifier.clickable { editingMemo = false; editedMemo = item.memo1 },
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "완료",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmAccent, fontWeight = FontWeight(600)),
+                        modifier = Modifier.clickable {
+                            onSave(item.copy(memo1 = editedMemo))
+                            editingMemo = false
+                        },
+                    )
+                } else {
+                    Text(
+                        "수정하기",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmTextSec),
+                        modifier = Modifier.clickable { editingMemo = true; editedMemo = item.memo1 },
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            if (editingMemo) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, SmAccent, RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                ) {
+                    BasicTextField(
+                        value         = editedMemo,
+                        onValueChange = { editedMemo = it },
+                        textStyle     = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = SmTextPri, lineHeight = 24.sp),
+                        modifier      = Modifier.fillMaxWidth(),
+                        decorationBox = { inner ->
+                            if (editedMemo.isEmpty()) {
+                                Text("메모를 입력하세요", style = TextStyle(fontSize = 16.sp, color = SmTextSec, fontFamily = PretendardFamily))
+                            }
+                            inner()
+                        },
+                    )
+                }
+            } else {
+                Text(
+                    text  = item.memo1.ifEmpty { "—" },
+                    style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = if (item.memo1.isEmpty()) SmTextSec else SmTextPri, lineHeight = 24.sp),
+                )
+            }
+
+            Spacer(Modifier.weight(1f))
+
+            Button(
+                onClick  = { showFolderSheet = true },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape    = RoundedCornerShape(12.dp),
+                colors   = ButtonDefaults.buttonColors(containerColor = SmAccent),
+            ) {
+                Text("폴더에 저장하기", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
+            }
+            Spacer(Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFF5F5F5))
+                    .clickable { showDeleteConfirm = true }
+                    .padding(vertical = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("스크립트 삭제하기", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = Color(0xFFFF3333)))
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+
+    if (showFolderSheet) {
+        FolderMoveSheet(
+            currentFolderId = item.folderId,
+            folders         = folders,
+            onDismiss       = { showFolderSheet = false },
+            onConfirm       = { newFolderId ->
+                onSave(item.copy(folderId = newFolderId))
+                showFolderSheet = false
+            },
+        )
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            text             = {
+                Text(
+                    "정말 삭제하시겠습니까?",
+                    style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = SmTextPri),
+                )
+            },
+            confirmButton    = {
+                TextButton(onClick = { showDeleteConfirm = false; onDelete(item) }) {
+                    Text("삭제", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = Color(0xFFFF3333), fontWeight = FontWeight(600)))
+                }
+            },
+            dismissButton    = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("취소", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SmTextSec))
+                }
+            },
+            containerColor   = Color.White,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FolderMoveSheet(
+    currentFolderId : String?,
+    folders         : List<ScriptFolder>,
+    onDismiss       : () -> Unit,
+    onConfirm       : (String?) -> Unit,
+) {
+    var selectedId by remember { mutableStateOf(currentFolderId) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor   = Color.White,
+        shape            = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        dragHandle = {
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.width(40.dp).height(4.dp).clip(CircleShape).background(Color(0xFFDDDDDD)))
+            }
+        },
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).navigationBarsPadding()) {
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "폴더 선택",
+                style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SmTextPri),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
-            // 친구 탭 — ic_nav_friend.xml
-            NavItem(
-                iconRes     = R.drawable.ic_nav_friend,
-                label       = "친구",
-                isSelected  = false,
-                onClick     = onFriend,
-            )
-            // 찾기 탭 — ic_nav_find.xml
-            NavItem(
-                iconRes     = R.drawable.ic_nav_find,
-                label       = "찾기",
-                isSelected  = false,
-                onClick     = {},
-            )
-            // 스크립트 탭 (선택됨) — ic_nav_script.xml
-            NavItem(
-                iconRes     = R.drawable.ic_nav_script,
-                label       = "스크립트",
-                isSelected  = true,
-                onClick     = {},
-            )
-            // 마이 탭 — ic_nav_my.xml
-            NavItem(
-                iconRes     = R.drawable.ic_nav_my,
-                label       = "마이",
-                isSelected  = false,
-                onClick     = onMy,
-            )
+            Spacer(Modifier.height(20.dp))
+            if (folders.isEmpty()) {
+                Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                    Text("저장된 폴더가 없습니다.", style = TextStyle(fontSize = 14.sp, color = SmTextSec, fontFamily = PretendardFamily))
+                }
+            } else {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(folders) { folder ->
+                        ScriptFolderThumbnail(
+                            folder     = folder,
+                            isSelected = selectedId == folder.id,
+                            onClick    = { selectedId = folder.id },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+            val changed = selectedId != currentFolderId
+            Button(
+                onClick  = { onConfirm(selectedId) },
+                enabled  = changed,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape    = RoundedCornerShape(12.dp),
+                colors   = ButtonDefaults.buttonColors(
+                    containerColor         = SmAccent,
+                    disabledContainerColor = Color(0xFFCCCCCC),
+                ),
+            ) {
+                Text("확인", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
+            }
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
 
 @Composable
-private fun NavItem(
-    iconRes    : Int,
-    label      : String,
-    isSelected : Boolean,
-    onClick    : () -> Unit,
+fun ScriptFolderScreen(
+    folder      : ScriptFolder,
+    allItems    : List<ScriptItem>,
+    onBack      : () -> Unit,
+    onItemClick : (ScriptItem) -> Unit = {},
+    onItemAudio : (ScriptItem) -> Unit = {},
 ) {
-    val tintColor = if (isSelected) SmAccent else SmNavInactive
+    val folderItems = remember(folder.id, allItems) { allItems.filter { it.folderId == folder.id } }
 
-    Column(
-        modifier            = Modifier
-            .clickable(onClick = onClick)
-            // TODO padding: 네비 탭 아이템 horizontal 12dp, vertical 8dp
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            painter            = painterResource(iconRes),
-            contentDescription = label,
-            // TODO size: 네비 아이콘 크기 24dp
-            modifier           = Modifier.size(24.dp),
-            tint               = tintColor,
-        )
-        // TODO padding: 네비 라벨 상단 2dp
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text  = label,
-            style = TextStyle(
-                fontSize   = 10.sp,
-                fontFamily = PretendardFamily,
-                color      = tintColor,
-                fontWeight = if (isSelected) FontWeight(600) else FontWeight(400),
-            ),
-        )
+    BackHandler(onBack = onBack)
+
+    Scaffold(
+        topBar = {
+            Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                ) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(40.dp).align(Alignment.CenterStart)) {
+                        Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = SmTextPri)
+                    }
+                    Text(
+                        folder.name,
+                        modifier = Modifier.align(Alignment.Center),
+                        style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri),
+                    )
+                }
+                HorizontalDivider(color = SmBorder, thickness = 0.5.dp)
+            }
+        },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        if (folderItems.isEmpty()) {
+            Box(Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("저장된 스크립트가 없습니다.", style = TextStyle(fontSize = 14.sp, color = SmTextSec))
+            }
+        } else {
+            LazyColumn(
+                modifier       = Modifier.padding(innerPadding).fillMaxSize(),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
+            ) {
+                items(folderItems) { item ->
+                    ScriptItemCard(item = item, onClick = { onItemClick(item) }, onAudio = { onItemAudio(item) })
+                }
+            }
+        }
     }
 }
-
-// 임시 BorderStroke import (ScriptItemCard 에서 사용)
-private fun BorderStroke(width: androidx.compose.ui.unit.Dp, color: Color) =
-    androidx.compose.foundation.BorderStroke(width, color)

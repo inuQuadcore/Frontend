@@ -1,6 +1,7 @@
 package com.everybuddy.app.data.repository
 
 import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.dto.BlockedUsersResponse
 import com.everybuddy.app.data.network.BlockApi
 import com.google.gson.Gson
 import javax.inject.Inject
@@ -11,6 +12,12 @@ class BlockRepository @Inject constructor(
     private val api  : BlockApi,
     private val gson : Gson,
 ) {
+    /**
+     * 차단 목록 조회 — GET /api/v1/blocks
+     */
+    suspend fun getBlockedUsers(): ApiResult<BlockedUsersResponse> =
+        safeApiCall(gson, { api.getBlockedUsers() })
+
     /**
      * 차단 — POST /api/v1/blocks/{userId}
      * 에러: 400(자기자신) | 404(유저없음) | 409(이미차단) | 410(탈퇴)

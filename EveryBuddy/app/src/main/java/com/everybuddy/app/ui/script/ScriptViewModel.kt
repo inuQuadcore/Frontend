@@ -1,24 +1,26 @@
 package com.everybuddy.app.ui.script
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.ui.chat.ScriptFolder
 import com.everybuddy.app.ui.chat.ScriptItem
-import com.everybuddy.app.ui.chat.dummyScriptFolders
-import com.everybuddy.app.ui.chat.dummyScriptItems
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
 
 data class ScriptUiState(
-    val folders       : List<ScriptFolder> = dummyScriptFolders,
-    val items         : List<ScriptItem>   = dummyScriptItems,
+    val folders       : List<ScriptFolder> = emptyList(),
+    val items         : List<ScriptItem>   = emptyList(),
     val selectedFolderIndex : Int          = 0,   // 0 = 전체, 1~ = 특정 폴더
     val sortOption    : ScriptSortOption   = ScriptSortOption.SAVED_AT_DESC,
     val searchQuery   : String             = "",
+    val isRefreshing  : Boolean            = false,
     val toastMessage  : String?            = null,
 )
 
@@ -83,14 +85,24 @@ class ScriptViewModel @Inject constructor() : ViewModel() {
         }
     }
 
-    fun addFolder(name: String, coverImageUri: String?) {
+    fun addFolder(name: String, coverImageUri: String?, id: String = UUID.randomUUID().toString()) {
         val newFolder = ScriptFolder(
-            id         = UUID.randomUUID().toString(),
+            id         = id,
             name       = name,
             count      = 0,
             coverImage = coverImageUri ?: "",
         )
         _uiState.update { it.copy(folders = it.folders + newFolder) }
+    }
+
+    fun deleteItem(id: String) {
+        _uiState.update { state ->
+            val item = state.items.find { it.id == id }
+            val updatedFolders = if (item?.folderId != null) {
+                state.folders.map { f -> if (f.id == item.folderId) f.copy(count = (f.count - 1).coerceAtLeast(0)) else f }
+            } else state.folders
+            state.copy(items = state.items.filter { it.id != id }, folders = updatedFolders)
+        }
     }
 
     fun selectFolder(index: Int) {
@@ -103,6 +115,25 @@ class ScriptViewModel @Inject constructor() : ViewModel() {
 
     fun updateSearchQuery(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true) }
+            delay(300)
+            // TODO: real API call
+            _uiState.update { it.copy(
+                isRefreshing = false,
+                folders      = emptyList(),
+                items        = emptyList(),
+            ) }
+        }
+    }
+
+    fun updateItem(updatedItem: ScriptItem) {
+        _uiState.update { state ->
+            state.copy(items = state.items.map { if (it.id == updatedItem.id) updatedItem else it })
+        }
     }
 
     fun consumeToast() {
