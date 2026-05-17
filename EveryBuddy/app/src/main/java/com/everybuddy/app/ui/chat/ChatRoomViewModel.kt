@@ -9,6 +9,7 @@ import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.local.MessageDao
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.local.formatRestLocalDateTime
+import com.everybuddy.app.data.firebase.ChatMessageListener
 import com.everybuddy.app.data.repository.MessageRepository
 import com.everybuddy.app.ui.friend.FriendDemoData
 import com.google.firebase.database.FirebaseDatabase
@@ -39,9 +40,12 @@ class ChatRoomViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ChatRoomUiState())
     val uiState: StateFlow<ChatRoomUiState> = _uiState.asStateFlow()
 
-    /** RTDB messages listener 시작점. 본인 입장 이전 메시지 격리용 (C10에서 사용). */
+    /** RTDB messages listener 시작점. 본인 입장 이전 메시지 격리용. */
     private var enterChatRoomAt: Long = 0L
     private val rtdb = FirebaseDatabase.getInstance()
+
+    /** 현재 구독 중인 메시지 listener. 채팅방 이동/onCleared 시 detach. */
+    private var messageListener: ChatMessageListener? = null
 
     init {
         viewModelScope.launch {
@@ -67,6 +71,10 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     fun loadRoom(roomId: String, roomName: String = "") {
+        // 채팅방 이동/재진입 시 이전 listener 정리
+        messageListener?.detach()
+        messageListener = null
+
         // friend dummy 답장 흐름 — C13/C14에서 통째 제거 예정. 일단 호환성 유지.
         if (BuildConfig.USE_DUMMY_DATA && roomId.startsWith("reply_")) {
             val friendId = roomId.removePrefix("reply_")
@@ -114,12 +122,28 @@ class ChatRoomViewModel @Inject constructor(
             }
         }
 
-        // enterChatRoomAt 단건 read + REST sync
+        // enterChatRoomAt read → REST sync → RTDB listener attach
         viewModelScope.launch {
             val myUserId = tokenManager.userId.firstOrNull() ?: return@launch
             enterChatRoomAt = readEnterChatRoomAt(myUserId, chatRoomId)
             syncMessagesFromServer(chatRoomId)
+            attachMessageListener(chatRoomId)
         }
+    }
+
+    private fun attachMessageListener(chatRoomId: Long) {
+        val listener = ChatMessageListener(
+            chatRoomId      = chatRoomId,
+            enterChatRoomAt = enterChatRoomAt,
+            onUpsert        = { entity ->
+                viewModelScope.launch { messageDao.upsert(entity) }
+            },
+            onRemoved       = { messageId ->
+                viewModelScope.launch { messageDao.delete(messageId) }
+            },
+        )
+        listener.attach()
+        messageListener = listener
     }
 
     /** RTDB users/{me}/chatrooms/{roomId}/enterChatRoomAt 단건 read (epoch ms). 실패 시 0. */
@@ -428,6 +452,8 @@ class ChatRoomViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        messageListener?.detach()
+        messageListener = null
         voiceRecorder.release()
         voicePlayer.release()
     }
