@@ -1,5 +1,6 @@
 package com.everybuddy.app.ui.chat
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
@@ -26,11 +27,12 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ChatRoomViewModel @Inject constructor(
-    private val voiceRecorder     : VoiceRecorder,
-    private val voicePlayer       : VoicePlayer,
-    private val messageRepository : MessageRepository,
-    private val messageDao        : MessageDao,
-    private val tokenManager      : TokenManager,
+    private val voiceRecorder       : VoiceRecorder,
+    private val voicePlayer         : VoicePlayer,
+    private val messageRepository   : MessageRepository,
+    private val messageDao          : MessageDao,
+    private val tokenManager        : TokenManager,
+    private val fileMessageUploader : FileMessageUploader,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatRoomUiState())
@@ -357,17 +359,29 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     fun onFilePicked(uri: String) {
-        val msg = ChatMessage(
-            id         = UUID.randomUUID().toString(),
-            roomId     = _uiState.value.room.id,
-            senderId   = "me",
-            senderName = "나",
-            type       = MessageType.IMAGE,
-            text       = "[파일] ${uri.substringAfterLast('/')}",
-            voiceUrl   = uri,
-            timestamp  = LocalDateTime.now(),
-        )
-        _uiState.update { it.copy(messages = it.messages + msg, isMediaPanelOpen = false) }
+        _uiState.update { it.copy(isMediaPanelOpen = false) }
+
+        val chatRoomId = _uiState.value.room.id.toLongOrNull()
+        if (chatRoomId == null) {
+            // dummy 채팅방: 기존 로컬 메시지 흐름 유지
+            val msg = ChatMessage(
+                id         = UUID.randomUUID().toString(),
+                roomId     = _uiState.value.room.id,
+                senderId   = "me",
+                senderName = "나",
+                type       = MessageType.IMAGE,
+                text       = "[파일] ${uri.substringAfterLast('/')}",
+                voiceUrl   = uri,
+                timestamp  = LocalDateTime.now(),
+            )
+            _uiState.update { it.copy(messages = it.messages + msg) }
+            return
+        }
+
+        viewModelScope.launch {
+            fileMessageUploader.upload(chatRoomId, Uri.parse(uri))
+            // 결과 토스트/재시도는 C21에서.
+        }
     }
 
     fun onToggleMuteRoom() {
