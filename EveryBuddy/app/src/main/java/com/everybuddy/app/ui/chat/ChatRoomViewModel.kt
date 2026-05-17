@@ -10,6 +10,7 @@ import com.everybuddy.app.data.local.MessageDao
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.local.formatRestLocalDateTime
 import com.everybuddy.app.data.firebase.ChatMessageListener
+import com.everybuddy.app.data.firebase.ViewingManager
 import com.everybuddy.app.data.repository.MessageRepository
 import com.everybuddy.app.ui.friend.FriendDemoData
 import com.google.firebase.database.FirebaseDatabase
@@ -35,6 +36,7 @@ class ChatRoomViewModel @Inject constructor(
     private val messageDao          : MessageDao,
     private val tokenManager        : TokenManager,
     private val fileMessageUploader : FileMessageUploader,
+    private val viewingManager      : ViewingManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatRoomUiState())
@@ -46,6 +48,9 @@ class ChatRoomViewModel @Inject constructor(
 
     /** 현재 구독 중인 메시지 listener. 채팅방 이동/onCleared 시 detach. */
     private var messageListener: ChatMessageListener? = null
+
+    /** 현재 viewing 중인 채팅방 ID. onCleared에서 leave 호출용. */
+    private var viewingChatRoomId: Long? = null
 
     init {
         viewModelScope.launch {
@@ -122,12 +127,14 @@ class ChatRoomViewModel @Inject constructor(
             }
         }
 
-        // enterChatRoomAt read → REST sync → RTDB listener attach
+        // enterChatRoomAt read → REST sync → RTDB listener attach + viewing 등록
         viewModelScope.launch {
             val myUserId = tokenManager.userId.firstOrNull() ?: return@launch
             enterChatRoomAt = readEnterChatRoomAt(myUserId, chatRoomId)
             syncMessagesFromServer(chatRoomId)
             attachMessageListener(chatRoomId)
+            viewingManager.enter(myUserId, chatRoomId)
+            viewingChatRoomId = chatRoomId
         }
     }
 
@@ -454,6 +461,8 @@ class ChatRoomViewModel @Inject constructor(
         super.onCleared()
         messageListener?.detach()
         messageListener = null
+        viewingChatRoomId?.let { viewingManager.leave(it) }
+        viewingChatRoomId = null
         voiceRecorder.release()
         voicePlayer.release()
     }
