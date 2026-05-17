@@ -154,7 +154,7 @@ class StatusMessageViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isSending = true, replyText = "") }
 
-            val createResult = chatRoomRepository.createChatRoom(target.userName, listOf(target.userId))
+            val createResult = chatRoomRepository.createChatRoom(target.userName, isGroup = false, listOf(target.userId))
             if (createResult is ApiResult.Success) {
                 val chatRoomId = createResult.data?.chatRoomId
                 if (chatRoomId != null) {

@@ -221,6 +221,7 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                         onStartChat     = { user ->
                             chatVm.createChatRoom(
                                 roomName       = user.name,
+                                isGroup        = false,                       // 친구 화면에서 시작 = 1:1
                                 participantIds = listOf(user.userId),
                                 onSuccess      = { room ->
                                     isChatRoomOpen = true

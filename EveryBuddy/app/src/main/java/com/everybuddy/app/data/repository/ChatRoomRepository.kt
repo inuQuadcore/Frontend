@@ -23,13 +23,16 @@ class ChatRoomRepository @Inject constructor(
     /**
      * 채팅방 생성 — POST /api/v1/chatrooms
      * roomName: 항상 필수 (NotBlank). 1:1방은 호출자가 상대 이름을, 그룹방은 사용자 입력값을 전달.
-     * 에러: 400(errors.roomName / errors.participantIds) | 401 | 404(유저없음)
+     * isGroup: 클라가 UI에 따라 결정. 1:1방=false + participantIds.size==1, 그룹방=true.
+     * 1:1방은 백엔드 idempotent — 이미 있으면 기존 chatRoomId 반환.
+     * 에러: 400(roomName/isGroup/participantIds 검증 실패) | 401 | 404(유저없음)
      */
     suspend fun createChatRoom(
         roomName       : String,
+        isGroup        : Boolean,
         participantIds : List<Long>,
     ): ApiResult<ChatRoom> = safeApiCall(gson, {
-        api.createChatRoom(CreateChatRoomRequest(roomName, participantIds))
+        api.createChatRoom(CreateChatRoomRequest(roomName, isGroup, participantIds))
     })
 
     /**

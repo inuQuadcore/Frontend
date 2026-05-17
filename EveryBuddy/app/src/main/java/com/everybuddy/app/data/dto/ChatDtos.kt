@@ -21,8 +21,10 @@ data class ChatRoom(
 /**
  * 채팅방 생성 요청.
  * - roomName: 항상 필수. 1:1방은 클라가 상대 이름을, 그룹방은 사용자 입력값을 넣어 전송.
+ * - isGroup: 클라가 UI 흐름("1:1 대화" vs "그룹 채팅 만들기")에 따라 결정. 1:1방은 false + participantIds.size==1, 그룹방은 true + participantIds.size>=1.
  */
 data class CreateChatRoomRequest(
     @SerializedName("roomName")       val roomName       : String,
+    @SerializedName("isGroup")        val isGroup        : Boolean,
     @SerializedName("participantIds") val participantIds : List<Long>,
 )

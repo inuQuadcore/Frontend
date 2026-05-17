@@ -175,8 +175,10 @@ class ChatViewModel @Inject constructor(
 
     // 채팅방 생성 — POST /api/v1/chatrooms
     // roomName: 항상 필수. 1:1방은 호출자가 상대 이름을, 그룹방은 사용자 입력값을 전달.
+    // isGroup: UI 흐름에 따라 — 1:1방=false, 그룹방=true.
     fun createChatRoom(
         roomName       : String,
+        isGroup        : Boolean,
         participantIds : List<Long>,
         onSuccess      : (ChatRoomUi) -> Unit,
         onError        : (String) -> Unit,
@@ -184,7 +186,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             _listState.update { it.copy(isLoading = true) }
 
-            when (val result = chatRoomRepository.createChatRoom(roomName, participantIds)) {
+            when (val result = chatRoomRepository.createChatRoom(roomName, isGroup, participantIds)) {
                 is ApiResult.Success -> {
                     val createdDto = result.data
                     val created = createdDto?.let { toChatRoomUis(listOf(it)).firstOrNull() }

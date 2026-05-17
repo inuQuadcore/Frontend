@@ -195,7 +195,7 @@ class FriendViewModel @Inject constructor(
         val preview = target.preview15()
 
         viewModelScope.launch {
-            when (val createResult = chatRoomRepository.createChatRoom(target.authorName, listOf(target.authorId))) {
+            when (val createResult = chatRoomRepository.createChatRoom(target.authorName, isGroup = false, listOf(target.authorId))) {
                 is ApiResult.Success -> {
                     val chatRoomId = createResult.data?.chatRoomId
                     if (chatRoomId == null) {
