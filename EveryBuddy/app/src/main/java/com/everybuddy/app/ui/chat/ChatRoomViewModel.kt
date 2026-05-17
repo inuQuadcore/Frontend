@@ -99,23 +99,30 @@ class ChatRoomViewModel @Inject constructor(
             }
         }
 
-        // enterChatRoomAt read → REST sync → RTDB listener attach + viewing 등록
+        // enterChatRoomAt read → REST sync → RTDB listener attach + viewing 등록 → read 표시
         viewModelScope.launch {
             val myUserId = tokenManager.userId.firstOrNull() ?: return@launch
             enterChatRoomAt = readEnterChatRoomAt(myUserId, chatRoomId)
             syncMessagesFromServer(chatRoomId)
-            attachMessageListener(chatRoomId)
+            attachMessageListener(chatRoomId, myUserId)
             viewingManager.enter(myUserId, chatRoomId)
             viewingChatRoomId = chatRoomId
+            markChatRoomAsRead(chatRoomId)
         }
     }
 
-    private fun attachMessageListener(chatRoomId: Long) {
+    private fun attachMessageListener(chatRoomId: Long, myUserId: Long) {
         val listener = ChatMessageListener(
             chatRoomId      = chatRoomId,
             enterChatRoomAt = enterChatRoomAt,
             onUpsert        = { entity ->
-                viewModelScope.launch { messageDao.upsert(entity) }
+                viewModelScope.launch {
+                    messageDao.upsert(entity)
+                    // 본인이 viewing 중 + 타인 메시지면 즉시 read 표시 (본인 메시지는 unreadCount 영향 없음)
+                    if (viewingChatRoomId == chatRoomId && entity.senderId != myUserId) {
+                        markChatRoomAsRead(chatRoomId)
+                    }
+                }
             },
             onRemoved       = { messageId ->
                 viewModelScope.launch { messageDao.delete(messageId) }
@@ -123,6 +130,12 @@ class ChatRoomViewModel @Inject constructor(
         )
         listener.attach()
         messageListener = listener
+    }
+
+    /** 채팅방의 마지막 SENT 메시지 ID로 POST /messages/{id}/read — RTDB unreadCount=0 reset. */
+    private suspend fun markChatRoomAsRead(chatRoomId: Long) {
+        val lastMessageId = messageDao.lastMessageId(chatRoomId) ?: return
+        messageRepository.readMessage(lastMessageId)
     }
 
     /** RTDB users/{me}/chatrooms/{roomId}/enterChatRoomAt 단건 read (epoch ms). 실패 시 0. */

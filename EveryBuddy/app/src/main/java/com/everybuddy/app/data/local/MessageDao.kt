@@ -43,6 +43,14 @@ interface MessageDao {
     """)
     suspend fun lastSentAt(chatRoomId: Long): LocalDateTime?
 
+    /** SENT 상태의 마지막 messageId — POST /messages/{id}/read 호출에 사용. */
+    @Query("""
+        SELECT messageId FROM chat_messages
+        WHERE chatRoomId = :chatRoomId AND status = 'SENT'
+        ORDER BY sendAt DESC LIMIT 1
+    """)
+    suspend fun lastMessageId(chatRoomId: Long): Long?
+
     /** SENT 상태 메시지 개수 — 로컬 페이지네이션 hasMore 판정. */
     @Query("""
         SELECT COUNT(*) FROM chat_messages
