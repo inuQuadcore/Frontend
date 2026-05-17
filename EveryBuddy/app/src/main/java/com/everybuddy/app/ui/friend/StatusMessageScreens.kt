@@ -511,7 +511,7 @@ fun FriendStatusPreviewCard(
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                text     = if (sm.content.length > 25) sm.content.take(25) + "…" else sm.content,
+                text     = if (sm.content.length > 15) sm.content.take(15) + "…" else sm.content,
                 style    = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = C.TextPri),
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
@@ -563,7 +563,7 @@ fun FriendStatusGridCard(
                 )
             }
             Spacer(Modifier.height(8.dp))
-            val content = if (sm.content.length > 80) sm.content.take(80) + "…" else sm.content
+            val content = if (sm.content.length > 15) sm.content.take(15) + "…" else sm.content
             Text(
                 text     = content,
                 style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 18.sp),

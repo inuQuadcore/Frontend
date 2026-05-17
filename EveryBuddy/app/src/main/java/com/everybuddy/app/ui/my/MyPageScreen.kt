@@ -1168,7 +1168,7 @@ private fun VersionScreen(onBack: () -> Unit) {
 
             // 앱 아이콘
             Box(
-                modifier = Modifier.size(96.dp).clip(RoundedCornerShape(20.dp)).background(C.Accent),
+                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(20.dp)).background(C.Accent),
                 contentAlignment = Alignment.Center,
             ) {
                 Image(

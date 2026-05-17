@@ -278,7 +278,7 @@ fun StatusMessagePreviewCard(
             val preview = when {
                 isMe && sm.content.isEmpty() -> "💬 작성하기..."
                 isMe -> sm.preview80()
-                else -> sm.preview25()
+                else -> sm.preview15()
             }
             Text(
                 text     = preview,
