@@ -191,11 +191,11 @@ class ChatViewModel @Inject constructor(
                     val createdDto = result.data
                     val created = createdDto?.let { toChatRoomUis(listOf(it)).firstOrNull() }
                     if (created != null) {
-                        // 목록 맨 앞에 추가
+                        // 1:1방 idempotent — 기존 방 반환된 경우 중복 방지: 같은 id 제거 후 맨 앞에 추가
                         _listState.update { state ->
                             state.copy(
                                 isLoading = false,
-                                rooms     = listOf(created) + state.rooms,
+                                rooms     = listOf(created) + state.rooms.filter { it.id != created.id },
                             )
                         }
                         onSuccess(created)
