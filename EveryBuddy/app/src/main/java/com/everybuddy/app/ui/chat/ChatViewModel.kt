@@ -9,6 +9,8 @@ import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.ChatRoom
 import com.everybuddy.app.data.firebase.RoomMeta
 import com.everybuddy.app.data.firebase.UserChatRoomsListener
+import com.everybuddy.app.data.local.FolderDao
+import com.everybuddy.app.data.local.FolderRoomEntity
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.ui.friend.KoreanChosung
@@ -33,6 +35,7 @@ class ChatViewModel @Inject constructor(
     private val chatRoomRepository : ChatRoomRepository,
     private val tokenManager       : TokenManager,
     private val userSummaryCache   : UserSummaryCache,
+    private val folderDao          : FolderDao,
 ) : ViewModel() {
 
     private val _listState = MutableStateFlow(ChatListUiState())
@@ -41,7 +44,19 @@ class ChatViewModel @Inject constructor(
     /** RTDB `users/{me}/chatrooms/` 메타 구독. loadChatRooms 후 attach. */
     private var userChatRoomsListener: UserChatRoomsListener? = null
 
-    init { loadChatRooms() }
+    init {
+        loadChatRooms()
+        viewModelScope.launch { refreshFolders() }
+    }
+
+    /** Room에 영속화된 폴더 + 매핑을 ChatFolder list로 로드해 uiState에 채움. */
+    private suspend fun refreshFolders() {
+        val folders = folderDao.getFolders().map { entity ->
+            val roomIds = folderDao.getRoomsInFolder(entity.id)
+            entity.toChatFolder(roomIds)
+        }
+        _listState.update { it.copy(folders = folders) }
+    }
 
     override fun onCleared() {
         super.onCleared()
@@ -310,25 +325,36 @@ class ChatViewModel @Inject constructor(
     }
 
     fun saveFolder(folder: ChatFolder) {
-        _listState.update { state ->
-            val list = state.folders.toMutableList()
-            val idx  = list.indexOfFirst { it.id == folder.id }
-            if (idx >= 0) list[idx] = folder else list.add(folder)
-            state.copy(folders = list.toList())
+        viewModelScope.launch {
+            // 신규면 마지막 order에 추가, 기존이면 order 유지.
+            val existing = _listState.value.folders.find { it.id == folder.id }
+            val order    = existing?.order ?: _listState.value.folders.size
+            val toSave   = folder.copy(order = order)
+
+            folderDao.upsertFolder(toSave.toEntity())
+            folderDao.clearFolder(toSave.id)
+            toSave.toRoomEntities().forEach { folderDao.addRoomToFolder(it) }
+
+            refreshFolders()
         }
     }
 
     fun deleteFolder(id: String) {
-        _listState.update { state ->
-            state.copy(
-                folders        = state.folders.filter { it.id != id },
-                activeFolderId = if (state.activeFolderId == id) null else state.activeFolderId,
-            )
+        viewModelScope.launch {
+            folderDao.deleteFolder(id)   // FolderRoomEntity는 별도 — 명시 삭제 필요
+            folderDao.clearFolder(id)
+            refreshFolders()
+            _listState.update { state ->
+                state.copy(activeFolderId = if (state.activeFolderId == id) null else state.activeFolderId)
+            }
         }
     }
 
     fun reorderFolders(ordered: List<ChatFolder>) {
-        _listState.update { it.copy(folders = ordered) }
+        viewModelScope.launch {
+            ordered.forEachIndexed { idx, f -> folderDao.updateOrder(f.id, idx) }
+            refreshFolders()
+        }
     }
 
     fun onFolderTabSelect(folderId: String?) {

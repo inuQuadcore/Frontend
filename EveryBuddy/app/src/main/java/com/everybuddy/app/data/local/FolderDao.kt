@@ -12,6 +12,9 @@ interface FolderDao {
     @Query("SELECT * FROM folders ORDER BY `order` ASC")
     fun observeFolders(): Flow<List<FolderEntity>>
 
+    @Query("SELECT * FROM folders ORDER BY `order` ASC")
+    suspend fun getFolders(): List<FolderEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertFolder(folder: FolderEntity)
 
@@ -23,6 +26,9 @@ interface FolderDao {
 
     @Query("SELECT chatRoomId FROM folder_rooms WHERE folderId = :folderId")
     fun observeRoomsInFolder(folderId: String): Flow<List<String>>
+
+    @Query("SELECT chatRoomId FROM folder_rooms WHERE folderId = :folderId")
+    suspend fun getRoomsInFolder(folderId: String): List<String>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addRoomToFolder(folderRoom: FolderRoomEntity)

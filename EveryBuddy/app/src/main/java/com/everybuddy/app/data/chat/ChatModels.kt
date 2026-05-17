@@ -47,6 +47,7 @@ fun com.everybuddy.app.data.dto.ChatRoom.toChatRoomUi(
 data class ChatFolder(
     val id          : String       = System.currentTimeMillis().toString(),
     val name        : String       = "",
+    val order       : Int          = 0,
     val chatRoomIds : List<String> = emptyList(),
 )
 
