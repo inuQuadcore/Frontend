@@ -23,7 +23,7 @@ object Route {
 
 // AppNavGraph — 스플래시 → 로그인/자동로그인 → 회원가입 → 온보딩 → 메인
 // SPLASH: 저장된 JWT 토큰 확인 → 있으면 MAIN, 없으면 LOGIN
-// TODO: 딥링크 — 푸시 알림 클릭 시 특정 채팅방 진입
+// FCM 푸시 클릭 라우팅은 MainActivity → PendingDeepLink → MainScreen 경로 (NavGraph 외부).
 @Composable
 fun AppNavGraph(
     navController : NavHostController = rememberNavController(),

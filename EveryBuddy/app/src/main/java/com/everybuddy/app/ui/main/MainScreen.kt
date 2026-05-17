@@ -78,8 +78,26 @@ fun MainScreen(onLogout: () -> Unit = {}) {
     val scriptViewModel   : ScriptViewModel     = hiltViewModel()
     val chatVm            : ChatViewModel       = hiltViewModel()
     val attendanceVm      : AttendanceViewModel = hiltViewModel()
+    val friendVm          : FriendViewModel     = hiltViewModel()
 
     LaunchedEffect(Unit) { attendanceVm.markAttendanceIfNeeded() }
+
+    // FCM 푸시 클릭으로 들어온 deep link 1회 consume.
+    // chatRoomId가 있으면 채팅방 직접 진입, friendUserId가 있으면 친구 탭 + 프로필 표시.
+    LaunchedEffect(PendingDeepLink.chatRoomId, PendingDeepLink.friendUserId) {
+        PendingDeepLink.chatRoomId?.let { roomId ->
+            selectedTab    = MainTab.CHAT
+            isChatRoomOpen = true
+            chatVm.markRoomAsRead(roomId)
+            chatNavController.navigate(MainRoute.chatRoom(roomId))
+            PendingDeepLink.chatRoomId = null
+        }
+        PendingDeepLink.friendUserId?.let { userId ->
+            selectedTab = MainTab.FRIEND
+            friendVm.selectFriendByUserId(userId)
+            PendingDeepLink.friendUserId = null
+        }
+    }
 
     var selectedScriptItem    by remember { mutableStateOf<ScriptItem?>(null) }
     var selectedScriptFolder  by remember { mutableStateOf<ScriptFolder?>(null) }
@@ -217,7 +235,6 @@ fun MainScreen(onLogout: () -> Unit = {}) {
 
                 MainTab.FRIEND -> {
                     isChatRoomOpen = false
-                    val friendVm: FriendViewModel = hiltViewModel()
                     FriendMainScreen(
                         viewModel       = friendVm,
                         onAddFriend     = { selectedTab = MainTab.EXPLORE },

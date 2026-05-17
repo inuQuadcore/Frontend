@@ -1,6 +1,7 @@
 package com.everybuddy.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -16,6 +17,7 @@ import androidx.lifecycle.lifecycleScope
 import com.everybuddy.app.data.firebase.FcmTokenManager
 import com.everybuddy.app.navigation.AppNavGraph
 import com.everybuddy.app.navigation.Route
+import com.everybuddy.app.ui.main.PendingDeepLink
 import com.everybuddy.app.ui.theme.EveryBuddyTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -40,6 +42,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestNotificationPermissionIfNeeded()
+        handlePushIntent(intent)
         setContent {
             EveryBuddyTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -59,5 +62,20 @@ class MainActivity : ComponentActivity() {
         if (!granted) {
             notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    // 웜 스타트 (앱 이미 떠있을 때 푸시 클릭) — 새 intent로 라우팅 갱신
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePushIntent(intent)
+    }
+
+    // FCM 트레이 알림 클릭으로 들어온 Intent의 data payload를 PendingDeepLink로 전달.
+    // MainScreen이 LaunchedEffect로 consume.
+    private fun handlePushIntent(intent: Intent?) {
+        intent ?: return
+        intent.getStringExtra("chatRoomId")?.let { PendingDeepLink.chatRoomId = it }
+        intent.getStringExtra("fromUserId")?.toLongOrNull()?.let { PendingDeepLink.friendUserId = it }
     }
 }
