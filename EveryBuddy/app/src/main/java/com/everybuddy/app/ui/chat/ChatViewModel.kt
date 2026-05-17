@@ -8,6 +8,7 @@ import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.ChatRoom
 import com.everybuddy.app.data.firebase.RoomMeta
 import com.everybuddy.app.data.firebase.UserChatRoomsListener
+import com.everybuddy.app.data.local.ChatRoomPreferences
 import com.everybuddy.app.data.local.FolderDao
 import com.everybuddy.app.data.local.FolderRoomEntity
 import com.everybuddy.app.data.local.TokenManager
@@ -35,6 +36,7 @@ class ChatViewModel @Inject constructor(
     private val tokenManager       : TokenManager,
     private val userSummaryCache   : UserSummaryCache,
     private val folderDao          : FolderDao,
+    private val roomPreferences    : ChatRoomPreferences,
 ) : ViewModel() {
 
     private val _listState = MutableStateFlow(ChatListUiState())
@@ -97,14 +99,19 @@ class ChatViewModel @Inject constructor(
         _listState.update { state -> state.copy(rooms = state.rooms.filter { it.id != idStr }) }
     }
 
-    /** N개 채팅방의 displayName을 병렬 fetch 후 ChatRoomUi 리스트 반환. */
+    /** N개 채팅방의 displayName 병렬 fetch + 로컬 mute/pin/star 플래그 적용 후 반환. */
     private suspend fun toChatRoomUis(rooms: List<ChatRoom>): List<ChatRoomUi> {
         val myUserId = tokenManager.userId.firstOrNull() ?: 0L
         return coroutineScope {
             rooms.map { room ->
                 async {
                     val displayName = ChatRoomDisplayName.resolve(room, myUserId, userSummaryCache)
-                    room.toChatRoomUi(displayName = displayName)
+                    val idStr = room.chatRoomId.toString()
+                    room.toChatRoomUi(displayName = displayName).copy(
+                        isMuted   = roomPreferences.isMuted(idStr),
+                        isPinned  = roomPreferences.isPinned(idStr),
+                        isStarred = roomPreferences.isStarred(idStr),
+                    )
                 }
             }.awaitAll()
         }
@@ -237,24 +244,19 @@ class ChatViewModel @Inject constructor(
         val current = _listState.value
         when (action) {
             "toggle_mute" -> {
-                val updated = current.rooms.map {
-                    if (it.id == room.id) it.copy(isMuted = !it.isMuted) else it
-                }
-                _listState.update { it.copy(rooms = updated) }
-                // TODO: PATCH /api/v1/chatrooms/{roomId}/mute
+                val next = !room.isMuted
+                roomPreferences.setMuted(room.id, next)
+                _listState.update { it.copy(rooms = current.rooms.map { r -> if (r.id == room.id) r.copy(isMuted = next) else r }) }
             }
             "toggle_pin" -> {
-                val updated = current.rooms.map {
-                    if (it.id == room.id) it.copy(isPinned = !it.isPinned) else it
-                }
-                _listState.update { it.copy(rooms = updated) }
-                // TODO: PATCH /api/v1/chatrooms/{roomId}/pin
+                val next = !room.isPinned
+                roomPreferences.setPinned(room.id, next)
+                _listState.update { it.copy(rooms = current.rooms.map { r -> if (r.id == room.id) r.copy(isPinned = next) else r }) }
             }
             "toggle_star" -> {
-                val updated = current.rooms.map {
-                    if (it.id == room.id) it.copy(isStarred = !it.isStarred) else it
-                }
-                _listState.update { it.copy(rooms = updated) }
+                val next = !room.isStarred
+                roomPreferences.setStarred(room.id, next)
+                _listState.update { it.copy(rooms = current.rooms.map { r -> if (r.id == room.id) r.copy(isStarred = next) else r }) }
             }
             "leave" -> {
                 val chatRoomId = room.id.toLongOrNull()
