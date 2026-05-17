@@ -61,4 +61,12 @@ interface MessageDao {
         WHERE chatRoomId = :chatRoomId AND status = 'SENT'
     """)
     suspend fun countSent(chatRoomId: Long): Int
+
+    /** 번역 결과 영구 캐싱. sourceText는 음성 메시지의 STT 결과(텍스트는 null로 호출). */
+    @Query("""
+        UPDATE chat_messages
+        SET translatedText = :translatedText, sourceText = :sourceText
+        WHERE messageId = :messageId
+    """)
+    suspend fun updateTranslation(messageId: Long, translatedText: String, sourceText: String?)
 }

@@ -31,4 +31,9 @@ data class ChatMessageEntity(
     val fileName      : String?         = null,
     val fileSize      : Long?           = null,
     val mediaType     : String?         = null,          // "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT"
+    // 번역 캐시 (Translate API 응답 보존).
+    // - 텍스트: translatedText만 채움
+    // - 음성: sourceText(STT) + translatedText 둘 다
+    val translatedText : String?        = null,
+    val sourceText     : String?        = null,
 )
