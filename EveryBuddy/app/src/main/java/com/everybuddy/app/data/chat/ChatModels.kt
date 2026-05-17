@@ -75,19 +75,21 @@ enum class ChatFilter(val label: String) {
 enum class MessageType { TEXT, VOICE, IMAGE }
 
 data class ChatMessage(
-    val id               : String        = "",
-    val roomId           : String        = "",
-    val senderId         : String        = "",
-    val senderName       : String        = "",
-    val type             : MessageType   = MessageType.TEXT,
-    val text             : String        = "",
-    val voiceUrl         : String        = "",
-    val voiceDurationSec : Int           = 0,
-    val timestamp        : LocalDateTime = LocalDateTime.now(),
-    val isTranslated     : Boolean       = false,
-    val translatedText   : String        = "",
-    val isStatusReply    : Boolean       = false,
-    val statusPreview    : String        = "",
+    val id               : String          = "",
+    val roomId           : String          = "",
+    val senderId         : String          = "",
+    val senderName       : String          = "",
+    val type             : MessageType     = MessageType.TEXT,
+    val text             : String          = "",
+    val voiceUrl         : String          = "",
+    val voiceDurationSec : Int             = 0,
+    val timestamp        : LocalDateTime   = LocalDateTime.now(),
+    val editedAt         : LocalDateTime?  = null,                  // null이면 미수정, 값 있으면 "(수정됨)" 표시
+    val status           : String          = "SENT",                // "SENT" | "PENDING" | "FAILED" — 송신 인디케이터
+    val isTranslated     : Boolean         = false,
+    val translatedText   : String          = "",
+    val isStatusReply    : Boolean         = false,
+    val statusPreview    : String          = "",
 )
 
 data class ChatRoomUiState(

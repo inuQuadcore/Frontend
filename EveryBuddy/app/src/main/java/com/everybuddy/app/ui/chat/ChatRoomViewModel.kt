@@ -4,26 +4,41 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.chat.*
+import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.local.MessageDao
+import com.everybuddy.app.data.local.TokenManager
+import com.everybuddy.app.data.local.formatRestLocalDateTime
+import com.everybuddy.app.data.repository.MessageRepository
 import com.everybuddy.app.ui.friend.FriendDemoData
+import com.google.firebase.database.FirebaseDatabase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.time.LocalDateTime
 import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
 class ChatRoomViewModel @Inject constructor(
-    private val voiceRecorder : VoiceRecorder,
-    private val voicePlayer   : VoicePlayer,
+    private val voiceRecorder     : VoiceRecorder,
+    private val voicePlayer       : VoicePlayer,
+    private val messageRepository : MessageRepository,
+    private val messageDao        : MessageDao,
+    private val tokenManager      : TokenManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatRoomUiState())
     val uiState: StateFlow<ChatRoomUiState> = _uiState.asStateFlow()
+
+    /** RTDB messages listener 시작점. 본인 입장 이전 메시지 격리용 (C10에서 사용). */
+    private var enterChatRoomAt: Long = 0L
+    private val rtdb = FirebaseDatabase.getInstance()
 
     init {
         viewModelScope.launch {
@@ -49,6 +64,7 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     fun loadRoom(roomId: String, roomName: String = "") {
+        // friend dummy 답장 흐름 — C13/C14에서 통째 제거 예정. 일단 호환성 유지.
         if (BuildConfig.USE_DUMMY_DATA && roomId.startsWith("reply_")) {
             val friendId = roomId.removePrefix("reply_")
             val demoRoom = FriendDemoData.chatRooms.find { it.friendId == friendId }
@@ -69,10 +85,65 @@ class ChatRoomViewModel @Inject constructor(
             _uiState.update { it.copy(room = room, messages = messages) }
             return
         }
-        val dummyRoom = if (BuildConfig.USE_DUMMY_DATA) dummyChatRooms.find { it.id == roomId } else null
-        val room      = dummyRoom ?: ChatRoomUi(id = roomId, name = roomName)
-        val messages  = if (BuildConfig.USE_DUMMY_DATA) dummyMessages[roomId] ?: emptyList() else emptyList()
-        _uiState.update { it.copy(room = room, messages = messages) }
+
+        val chatRoomId = roomId.toLongOrNull()
+        // toLong 실패 = dummy ID (예: "r01"). USE_DUMMY_DATA 분기 처리.
+        if (chatRoomId == null) {
+            if (BuildConfig.USE_DUMMY_DATA) {
+                val dummyRoom = dummyChatRooms.find { it.id == roomId }
+                _uiState.update {
+                    it.copy(
+                        room     = dummyRoom ?: ChatRoomUi(id = roomId, name = roomName),
+                        messages = dummyMessages[roomId] ?: emptyList(),
+                    )
+                }
+            }
+            return
+        }
+
+        _uiState.update { it.copy(room = ChatRoomUi(id = roomId, name = roomName)) }
+
+        // Room flow collect → UI state.messages
+        viewModelScope.launch {
+            messageDao.observeRoom(chatRoomId, limit = 50, offset = 0).collect { entities ->
+                val messages = entities.map { it.toChatMessage() }
+                _uiState.update { it.copy(messages = messages) }
+            }
+        }
+
+        // enterChatRoomAt 단건 read + REST sync
+        viewModelScope.launch {
+            val myUserId = tokenManager.userId.firstOrNull() ?: return@launch
+            enterChatRoomAt = readEnterChatRoomAt(myUserId, chatRoomId)
+            syncMessagesFromServer(chatRoomId)
+        }
+    }
+
+    /** RTDB users/{me}/chatrooms/{roomId}/enterChatRoomAt 단건 read (epoch ms). 실패 시 0. */
+    private suspend fun readEnterChatRoomAt(myUserId: Long, chatRoomId: Long): Long {
+        return try {
+            val snap = rtdb.getReference("users/$myUserId/chatrooms/$chatRoomId/enterChatRoomAt")
+                .get()
+                .await()
+            snap.getValue(Long::class.java) ?: 0L
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    /** GET /messages/chatrooms/{roomId}?since= 호출 + Room 동기화. 백엔드가 enterChatRoomAt 자동 필터. */
+    private suspend fun syncMessagesFromServer(chatRoomId: Long) {
+        val since = messageDao.lastSentAt(chatRoomId)?.let(::formatRestLocalDateTime)
+        when (val result = messageRepository.syncMessages(chatRoomId, since)) {
+            is ApiResult.Success -> {
+                val data = result.data ?: return
+                val toUpsert = (data.newMessages + data.updatedMessages)
+                    .map { it.toChatMessageEntity(chatRoomId) }
+                if (toUpsert.isNotEmpty()) messageDao.upsertAll(toUpsert)
+                if (data.deletedIds.isNotEmpty()) messageDao.deleteAll(data.deletedIds)
+            }
+            else -> { /* 에러는 silent fail — Room의 옛 메시지만 표시 */ }
+        }
     }
 
     fun onInputChange(text: String) {
