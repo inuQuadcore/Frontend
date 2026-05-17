@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -105,7 +107,8 @@ fun OnboardingHost(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White),
+            .background(Color.White)
+            .statusBarsPadding(),
     ) {
         // Step 8(앱 소개)는 뒤로가기/인디케이터 없음
         if (uiState.currentStep < 8) {
@@ -380,20 +383,15 @@ fun StepBasicInfo(
     val canProceed = uiState.name.isNotBlank() && uiState.gender != null &&
             uiState.birthYear != null && uiState.birthMonth != null && uiState.birthDay != null
 
-    // DatePicker 다이얼로그 (showDatePicker = true일 때만 표시)
     if (uiState.showDatePicker) {
-        DatePickerModal(
-            onConfirm = { y, m, d ->
-                onStateChange(
-                    uiState.copy(
-                        birthYear      = y,
-                        birthMonth     = m,
-                        birthDay       = d,
-                        showDatePicker = false,
-                    )
-                )
+        BirthdayDrumRollDialog(
+            initialYear  = uiState.birthYear  ?: 2000,
+            initialMonth = uiState.birthMonth ?: 1,
+            initialDay   = uiState.birthDay   ?: 1,
+            onConfirm    = { y, m, d ->
+                onStateChange(uiState.copy(birthYear = y, birthMonth = m, birthDay = d, showDatePicker = false))
             },
-            onDismiss = { onStateChange(uiState.copy(showDatePicker = false)) },
+            onDismiss    = { onStateChange(uiState.copy(showDatePicker = false)) },
         )
     }
 
@@ -443,8 +441,7 @@ fun StepBasicInfo(
                 },
                 singleLine    = true,
                 modifier      = Modifier
-                    .width(287.dp)
-                    .height(50.dp),
+                    .width(287.dp),
                 shape         = RoundedCornerShape(6.dp),
                 colors        = OutlinedTextFieldDefaults.colors(
                     unfocusedContainerColor = Color(0xFFFFFFFF),
@@ -579,49 +576,134 @@ fun StepBasicInfo(
     }
 }
 
-// 생일 고르는 Dialog -  DataPickerModal
-/**
- * DatePickerModal
- *
- * Material3 DatePickerDialog를 래핑한 생일 선택 다이얼로그.
- * 선택 완료 시 Calendar에서 연/월/일을 추출해 onConfirm으로 전달.
- * 취소 또는 날짜 미선택 상태에서 확인 클릭 시 onDismiss 호출.
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DatePickerModal(
-    onConfirm : (Int, Int, Int) -> Unit,
-    onDismiss : () -> Unit,
+private fun BirthdayDrumRollDialog(
+    initialYear  : Int = 2000,
+    initialMonth : Int = 1,
+    initialDay   : Int = 1,
+    onConfirm    : (Int, Int, Int) -> Unit,
+    onDismiss    : () -> Unit,
 ) {
-    // 2000-01-01 UTC 기준으로 시작 — 생일 선택에 적합한 초기 위치
-    val defaultMillis = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
-        set(2000, 0, 1, 0, 0, 0)
-        set(java.util.Calendar.MILLISECOND, 0)
-    }.timeInMillis
+    var selectedYear  by remember { mutableStateOf(initialYear) }
+    var selectedMonth by remember { mutableStateOf(initialMonth) }
+    var selectedDay   by remember { mutableStateOf(initialDay) }
 
-    val state = rememberDatePickerState(
-        initialSelectedDateMillis   = defaultMillis,
-        initialDisplayedMonthMillis = defaultMillis,
-    )
-    DatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = {
-                state.selectedDateMillis?.let { ms ->
-                    // UTC 기준으로 파싱해야 타임존에 관계없이 선택한 날짜 그대로 추출됨
-                    val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
-                        .apply { timeInMillis = ms }
-                    onConfirm(
-                        cal.get(java.util.Calendar.YEAR),
-                        cal.get(java.util.Calendar.MONTH) + 1,
-                        cal.get(java.util.Calendar.DAY_OF_MONTH),
+    val years  = (1950..2015).toList()
+    val months = (1..12).toList()
+    val days   = (1..31).toList()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+        ) {
+            Column(
+                modifier            = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    "생일 선택",
+                    style = TextStyle(fontSize = 17.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color(0xFF1B1B1B)),
+                )
+                Spacer(Modifier.height(20.dp))
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OnboardingDrumRollPicker(
+                        label    = "년",
+                        items    = years.map { "${it}년" },
+                        selected = years.indexOf(selectedYear).coerceAtLeast(0),
+                        onSelect = { selectedYear = years[it] },
+                        modifier = Modifier.weight(2f),
                     )
-                } ?: onDismiss()
-            }) { Text("확인") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
-    ) {
-        DatePicker(state = state)
+                    OnboardingDrumRollPicker(
+                        label    = "월",
+                        items    = months.map { "${it}월" },
+                        selected = months.indexOf(selectedMonth).coerceAtLeast(0),
+                        onSelect = { selectedMonth = months[it] },
+                        modifier = Modifier.weight(1f),
+                    )
+                    OnboardingDrumRollPicker(
+                        label    = "일",
+                        items    = days.map { "${it}일" },
+                        selected = days.indexOf(selectedDay).coerceAtLeast(0),
+                        onSelect = { selectedDay = days[it] },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick  = onDismiss,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape    = RoundedCornerShape(10.dp),
+                    ) {
+                        Text("취소", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = Color(0xFF8F9399)))
+                    }
+                    Button(
+                        onClick  = { onConfirm(selectedYear, selectedMonth, selectedDay) },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape    = RoundedCornerShape(10.dp),
+                        colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF0167FF)),
+                    ) {
+                        Text("확인", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color.White))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingDrumRollPicker(
+    label    : String,
+    items    : List<String>,
+    selected : Int,
+    onSelect : (Int) -> Unit,
+    modifier : Modifier = Modifier,
+) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = Color(0xFF797979)))
+        Spacer(Modifier.height(6.dp))
+        Surface(
+            shape    = RoundedCornerShape(12.dp),
+            color    = Color(0xFFF8F8F8),
+            border   = BorderStroke(0.5.dp, Color(0xFFE5E5E5)),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            LazyColumn(
+                modifier       = Modifier.height(180.dp),
+                state          = rememberLazyListState(initialFirstVisibleItemIndex = (selected - 1).coerceAtLeast(0)),
+                contentPadding = PaddingValues(vertical = 72.dp),
+            ) {
+                items.forEachIndexed { idx, label ->
+                    item(key = idx) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(idx) }
+                                .background(if (idx == selected) Color(0xFF0167FF).copy(alpha = 0.08f) else Color.Transparent)
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                label,
+                                style = TextStyle(
+                                    fontSize   = 15.sp,
+                                    fontFamily = PretendardFamily,
+                                    color      = if (idx == selected) Color(0xFF0167FF) else Color(0xFF1B1B1B),
+                                    fontWeight = if (idx == selected) FontWeight(600) else FontWeight(400),
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

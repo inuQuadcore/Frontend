@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -82,7 +84,7 @@ private fun MyPageContent(
                     modifier = Modifier.fillMaxWidth().height(56.dp).background(Color.White).padding(horizontal = 16.dp),
                 ) {
                     Text(
-                        "마이페이지",
+                        "마이",
                         modifier = Modifier.align(Alignment.Center),
                         style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
                     )
@@ -884,6 +886,128 @@ private fun SubMenuScreen(key: String, viewModel: MyViewModel, onBack: () -> Uni
     }
 }
 
+private data class FriendListItem(
+    val userId      : Long,
+    val name        : String,
+    val nationality : String,
+    val languages   : List<String>,
+)
+
+@Composable
+private fun FriendManageScreen(
+    title        : String,
+    actionLabel  : String,
+    dialogText   : String,
+    friends      : List<FriendListItem>,
+    isLoading    : Boolean  = false,
+    errorMessage : String?  = null,
+    onRetry      : () -> Unit = {},
+    onAction     : (Long) -> Unit = {},
+    onBack       : () -> Unit,
+) {
+    BackHandler(onBack = onBack)
+    var confirmTarget by remember { mutableStateOf<FriendListItem?>(null) }
+
+    Scaffold(
+        topBar = { SubScreenTopBar(title = title, onBack = onBack) },
+        containerColor = Color.White,
+    ) { innerPadding ->
+        if (isLoading) {
+            Box(Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = C.Accent)
+            }
+        } else if (errorMessage != null) {
+            Column(
+                modifier            = Modifier.padding(innerPadding).fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(errorMessage, style = TextStyle(fontSize = 14.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = onRetry) {
+                    Text("다시 시도", style = TextStyle(fontSize = 14.sp, color = C.Accent, fontFamily = PretendardFamily))
+                }
+            }
+        } else if (friends.isEmpty()) {
+            Box(Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("목록이 없습니다.", style = TextStyle(fontSize = 14.sp, color = C.TextSec, fontFamily = PretendardFamily))
+            }
+        } else {
+            LazyColumn(
+                modifier       = Modifier.padding(innerPadding).fillMaxSize(),
+                contentPadding = PaddingValues(vertical = 8.dp),
+            ) {
+                items(friends) { friend ->
+                    Row(
+                        modifier              = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment     = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment     = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    friend.name,
+                                    style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                                )
+                                friend.languages.forEach { lang ->
+                                    Text(
+                                        lang,
+                                        style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.Accent),
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                friend.nationality,
+                                style = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = C.TextSec),
+                            )
+                        }
+                        OutlinedButton(
+                            onClick  = { confirmTarget = friend },
+                            shape    = RoundedCornerShape(8.dp),
+                            border   = BorderStroke(1.dp, C.Border),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        ) {
+                            Text(actionLabel, style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.TextPri))
+                        }
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
+                }
+            }
+        }
+    }
+
+    confirmTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { confirmTarget = null },
+            containerColor   = Color.White,
+            shape            = RoundedCornerShape(16.dp),
+            text = {
+                Text(
+                    dialogText,
+                    style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onAction(target.userId)
+                    confirmTarget = null
+                }) {
+                    Text("예", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.Accent, fontWeight = FontWeight(600)))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmTarget = null }) {
+                    Text("아니오", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextSec))
+                }
+            },
+        )
+    }
+}
+
 // 설정 화면
 @Composable
 private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
@@ -892,6 +1016,26 @@ private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
     var soundEnabled     by remember { mutableStateOf(true) }
     var vibrationEnabled by remember { mutableStateOf(true) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var settingsSubPage  by remember { mutableStateOf<String?>(null) }
+
+    when (settingsSubPage) {
+        "blocked" -> {
+            LaunchedEffect(Unit) { viewModel.loadBlockedUsers() }
+            FriendManageScreen(
+                title        = "차단한 친구",
+                actionLabel  = "차단 해제",
+                dialogText   = "차단을 해제하시겠습니까?",
+                friends      = uiState.blockedFriends.map {
+                    FriendListItem(it.userId, it.name, it.nationality, it.languages)
+                },
+                isLoading    = uiState.isLoadingBlocked,
+                errorMessage = uiState.blockedError,
+                onRetry      = { viewModel.loadBlockedUsers() },
+                onAction     = { userId -> viewModel.unblockFriend(userId) },
+                onBack       = { settingsSubPage = null },
+            )
+        }
+        else -> {
 
     Scaffold(
         topBar = {
@@ -931,6 +1075,21 @@ private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
                 )
             }
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider(color = C.Border, thickness = 8.dp)
+
+            listOf("차단한 친구" to "blocked").forEach { (label, key) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { settingsSubPage = key }.padding(horizontal = 16.dp, vertical = 18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(label, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
+                    Icon(painterResource(R.drawable.ic_chevron_right), "이동", Modifier.size(16.dp), tint = C.TextSec)
+                }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
+            }
 
             Spacer(Modifier.height(24.dp))
             HorizontalDivider(color = C.Border, thickness = 8.dp)
@@ -981,6 +1140,9 @@ private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
             },
         )
     }
+
+        }
+    }
 }
 
 // 버전정보 화면
@@ -1009,11 +1171,10 @@ private fun VersionScreen(onBack: () -> Unit) {
                 modifier = Modifier.size(96.dp).clip(RoundedCornerShape(20.dp)).background(C.Accent),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    painterResource(R.drawable.ic_logo),
+                Image(
+                    painter = painterResource(R.drawable.ic_logo),
                     contentDescription = "앱 아이콘",
-                    modifier = Modifier.size(56.dp),
-                    tint = Color.White,
+                    modifier = Modifier.size(96.dp),
                 )
             }
 

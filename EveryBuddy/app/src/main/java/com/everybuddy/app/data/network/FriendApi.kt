@@ -1,6 +1,7 @@
 package com.everybuddy.app.data.network
 
 import com.everybuddy.app.data.dto.FriendListResponse
+import com.everybuddy.app.data.dto.RemovedFriendsResponse
 import retrofit2.Response
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -35,4 +36,7 @@ interface FriendApi {
      */
     @GET("api/v1/friends")
     suspend fun getFriends(): Response<FriendListResponse>
+
+    @GET("api/v1/friends/removed")
+    suspend fun getRemovedFriends(): Response<RemovedFriendsResponse>
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.Friend
 import com.everybuddy.app.data.dto.userMessage
+import com.everybuddy.app.data.repository.BlockRepository
 import com.everybuddy.app.data.repository.FriendRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
@@ -58,7 +59,8 @@ data class FriendUiState(
 
 @HiltViewModel
 class FriendViewModel @Inject constructor(
-    private val friendRepository: FriendRepository,
+    private val friendRepository : FriendRepository,
+    private val blockRepository  : BlockRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FriendUiState())
@@ -281,6 +283,24 @@ class FriendViewModel @Inject constructor(
                         s.copy(selectedFriend = s.selectedFriend?.let { if (it.id == friendId) it.copy(isFriend = false) else it })
                     }
                     loadFriends()
+                }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _uiState.update { it.copy(toastMessage = r.userMessage()) }
+            }
+        }
+    }
+
+    fun blockFriendById(friendId: Long) {
+        viewModelScope.launch {
+            when (val r = blockRepository.blockUser(friendId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { s ->
+                        s.copy(
+                            friends       = s.friends.filter { it.id != friendId },
+                            selectedFriend = null,
+                            toastMessage  = "차단되었습니다.",
+                        )
+                    }
                 }
                 is ApiResult.Error, is ApiResult.NetworkError ->
                     _uiState.update { it.copy(toastMessage = r.userMessage()) }

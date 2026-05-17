@@ -6,6 +6,7 @@ import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.repository.ChatRepository
+import com.everybuddy.app.ui.friend.KoreanChosung
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -149,7 +150,12 @@ class ChatViewModel @Inject constructor(
     }
 
     fun onSearchToggle() {
-        // TODO: 검색창 AnimatedVisibility 토글 + 포커스 처리
+        _listState.update { state ->
+            if (state.isSearchOpen)
+                state.copy(isSearchOpen = false, searchQuery = "")
+            else
+                state.copy(isSearchOpen = true)
+        }
     }
 
     fun onContextMenu(room: ChatRoomUi) {
@@ -176,6 +182,12 @@ class ChatViewModel @Inject constructor(
                 }
                 _listState.update { it.copy(rooms = updated) }
                 // TODO: PATCH /api/v1/chatrooms/{roomId}/pin
+            }
+            "toggle_star" -> {
+                val updated = current.rooms.map {
+                    if (it.id == room.id) it.copy(isStarred = !it.isStarred) else it
+                }
+                _listState.update { it.copy(rooms = updated) }
             }
             "leave" -> {
                 _listState.update { it.copy(rooms = current.rooms.filter { r -> r.id != room.id }) }
@@ -205,6 +217,14 @@ class ChatViewModel @Inject constructor(
         if (_listState.value.rooms.any { it.id == roomId }) return
         val newRoom = ChatRoomUi(id = roomId, name = friendName, lastMessage = "답장을 보냈습니다.", timestamp = "방금")
         _listState.update { state -> state.copy(rooms = listOf(newRoom) + state.rooms) }
+    }
+
+    fun toggleStar(roomId: String) {
+        _listState.update { state ->
+            state.copy(rooms = state.rooms.map {
+                if (it.id == roomId) it.copy(isStarred = !it.isStarred) else it
+            })
+        }
     }
 
     fun updateRoomMute(roomId: String, isMuted: Boolean) {
@@ -255,8 +275,8 @@ class ChatViewModel @Inject constructor(
         state.rooms
             .filter { room ->
                 val matchQuery = state.searchQuery.isEmpty() ||
-                        room.name.contains(state.searchQuery, ignoreCase = true) ||
-                        room.lastMessage.contains(state.searchQuery, ignoreCase = true)
+                        KoreanChosung.matches(state.searchQuery, room.name) ||
+                        KoreanChosung.matches(state.searchQuery, room.lastMessage)
                 val matchFilter = when {
                     state.activeFolderId != null -> {
                         val folder = state.folders.find { it.id == state.activeFolderId }
@@ -265,7 +285,7 @@ class ChatViewModel @Inject constructor(
                     else -> when (state.activeFilter) {
                         ChatFilter.ALL      -> true
                         ChatFilter.UNREAD   -> room.unreadCount > 0
-                        ChatFilter.FAVORITE -> room.isPinned
+                        ChatFilter.FAVORITE -> room.isStarred
                     }
                 }
                 matchQuery && matchFilter

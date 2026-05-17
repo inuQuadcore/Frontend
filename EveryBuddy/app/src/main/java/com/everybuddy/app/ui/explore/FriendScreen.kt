@@ -180,14 +180,6 @@ fun FriendItem(
         Spacer(Modifier.width(15.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                user.topTags().forEach { tag ->
-                    ExploreTagChip(label = tag.replace("_", " "))
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text  = user.name,
@@ -253,6 +245,16 @@ fun FriendItem(
                                 )
                             }
                         }
+                    }
+                }
+            }
+
+            val topTags = user.topTags()
+            if (topTags.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    topTags.forEach { tag ->
+                        ExploreTagChip(label = tag.replace("_", " "))
                     }
                 }
             }

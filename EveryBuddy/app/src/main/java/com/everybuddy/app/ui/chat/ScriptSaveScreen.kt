@@ -54,10 +54,7 @@ data class ScriptFolder(
     val coverImage : String = "",
 )
 
-val dummyScriptFolders = listOf(
-    ScriptFolder("f01", "영어",  15),
-    ScriptFolder("f02", "일본어", 27),
-)
+val dummyScriptFolders: List<ScriptFolder> = emptyList()
 
 data class ScriptSaveItem(
     val messageId      : String,
@@ -79,24 +76,7 @@ data class ScriptItem(
     val folderId       : String? = null,
 )
 
-val dummyScriptItems = listOf(
-    ScriptItem("s01",
-        "I open up the messages, then had to hit the zoom. Turns out the girl was really a dude.",
-        "메시지를 열어보니 자세히 봐야 했어. 알고 보니 그녀가 사실 남자였던 거야.",
-        "확대/축소하기",
-        "have to와 함께 쓰면 \"자세히 보다\" 라고도 쓰임",
-        "f01"),
-    ScriptItem("s02",
-        "HE think he slicked back 'til I slipped back.",
-        "그놈은 교묘하게 숨겼다고 생각했지만 난 알아냈지.",
-        "말만(겉만) 번드르르한, 살짝 돌아가다",
-        "\"번드르르하게 넘겼다\"고 생각했겠지, 내가 \"살짝 돌아가기 전까지\"",
-        "f01"),
-    ScriptItem("s03",
-        "She didn't know about me and I didn't know 'bout Sue",
-        "그녀도 날 몰랐고, 나도 수에 대해 몰랐고",
-        folderId = "f01"),
-)
+val dummyScriptItems: List<ScriptItem> = emptyList()
 
 @Composable
 fun MessageContextMenu(
@@ -105,6 +85,9 @@ fun MessageContextMenu(
     onSelectCopy : () -> Unit,
     onReply      : () -> Unit,
     onSaveScript : () -> Unit,
+    isOwnMessage : Boolean    = false,
+    onEdit       : () -> Unit = {},
+    onDelete     : () -> Unit = {},
 ) {
     Box(
         modifier         = Modifier
@@ -114,27 +97,32 @@ fun MessageContextMenu(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier        = Modifier.widthIn(min = 160.dp).clickable {},
+            modifier        = Modifier.clickable {},
             shape           = RoundedCornerShape(12.dp),
             color           = Color.White,
             shadowElevation = 8.dp,
         ) {
-            Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                listOf(
-                    "복사"              to onCopy,
-                    "선택 복사"         to onSelectCopy,
-                    "답장"              to onReply,
-                    "대화 스크립트 저장" to onSaveScript,
-                ).forEach { (label, action) ->
+            Column(modifier = Modifier.padding(vertical = 4.dp).width(IntrinsicSize.Max)) {
+                val baseItems = mutableListOf(
+                    Triple("복사",              SsTextPri, onCopy),
+                    Triple("선택 복사",         SsTextPri, onSelectCopy),
+                    Triple("답장",              SsTextPri, onReply),
+                    Triple("대화 스크립트 저장", SsTextPri, onSaveScript),
+                )
+                if (isOwnMessage) {
+                    baseItems.add(Triple("수정하기", SsTextPri, onEdit))
+                    baseItems.add(Triple("삭제하기", SsTextRed, onDelete))
+                }
+                baseItems.forEachIndexed { idx, (label, color, action) ->
                     Text(
                         text     = label,
-                        style    = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SsTextPri),
+                        style    = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = color),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { action(); onDismiss() }
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                            .padding(horizontal = 26.dp, vertical = 13.dp),
                     )
-                    if (label != "대화 스크립트 저장") {
+                    if (idx < baseItems.size - 1) {
                         HorizontalDivider(color = SsBorder, thickness = 0.5.dp)
                     }
                 }
@@ -147,13 +135,14 @@ fun MessageContextMenu(
 @Composable
 fun ScriptSaveSheet(
     message                  : ChatMessage,
-    folders                  : List<ScriptFolder> = dummyScriptFolders,
+    folders                  : List<ScriptFolder> = emptyList(),
     onSave                   : (ScriptSaveItem) -> Unit,
     onDismiss                : () -> Unit,
     onAddFolder              : () -> Unit = {},
     externalAutoSelectFolderId : String? = null,
     currentIdx               : Int = 0,
     totalCount               : Int = 0,
+    isLastStep               : Boolean = true,
 ) {
     var editedText     by remember(message.id) { mutableStateOf(message.text) }
     var memo1          by remember(message.id) { mutableStateOf(message.translatedText) }
@@ -266,7 +255,7 @@ fun ScriptSaveSheet(
                 shape    = RoundedCornerShape(12.dp),
                 colors   = ButtonDefaults.buttonColors(containerColor = SsAccent),
             ) {
-                Text("저장", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
+                Text(if (isLastStep) "저장" else "다음", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
             }
             Spacer(Modifier.height(12.dp))
             TextButton(
@@ -359,6 +348,14 @@ fun ScriptFolderThumbnail(folder: ScriptFolder, isSelected: Boolean, onClick: ()
         ) {
             Text(folder.name, style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text("${folder.count}", style = TextStyle(fontSize = 12.sp, color = Color.White.copy(alpha = 0.75f)))
+        }
+        if (isSelected) {
+            Box(
+                modifier         = Modifier.align(Alignment.TopEnd).padding(4.dp).size(20.dp).clip(CircleShape).background(SsAccent),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(painterResource(R.drawable.ic_check), null, Modifier.size(12.dp), tint = Color.White)
+            }
         }
     }
 }
@@ -768,18 +765,10 @@ fun NewFolderScreen(
                         modifier           = Modifier.fillMaxSize(),
                     )
                 } else {
-                    Column(
-                        modifier            = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
+                    Box(
+                        modifier         = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Image(
-                            painter            = painterResource(R.drawable.ic_media_camera),
-                            contentDescription = "사진 추가",
-                            modifier           = Modifier.size(32.dp),
-                            colorFilter        = androidx.compose.ui.graphics.ColorFilter.tint(Color(0xFFAAAAAA)),
-                        )
-                        Spacer(Modifier.height(6.dp))
                         Text("커버사진추가", style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = SsTextSec))
                     }
                 }
@@ -788,7 +777,7 @@ fun NewFolderScreen(
                     modifier         = Modifier.align(Alignment.BottomEnd).padding(8.dp).size(32.dp).clip(CircleShape).background(Color(0xFF888888)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Image(painterResource(R.drawable.ic_media_camera), "카메라", Modifier.size(18.dp), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White))
+                    Image(painterResource(R.drawable.ic_pencil), "편집", Modifier.size(18.dp), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White))
                 }
             }
 

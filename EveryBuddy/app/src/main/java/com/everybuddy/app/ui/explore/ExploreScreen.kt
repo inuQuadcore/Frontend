@@ -2,6 +2,7 @@
 
 package com.everybuddy.app.ui.explore
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -12,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +42,7 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 private val C = AppColors
 
 // ExploreScreen
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
     viewModel      : ExploreViewModel       = hiltViewModel(),
@@ -76,7 +79,6 @@ fun ExploreScreen(
     Scaffold(
         topBar = {
             ExploreTopBar(
-                onSearch       = { /* TODO: 검색 */ },
                 onNotification = onNotification,
             )
         },
@@ -115,17 +117,23 @@ fun ExploreScreen(
                 }
             }
 
-            when (uiState.selectedTab) {
-                0 -> RecommendTab(
-                    uiState        = uiState,
-                    viewModel      = viewModel,
-                    onOpenProfile  = { viewModel.openProfile(it); onOpenProfile(it) },
-                )
-                1 -> FilterTab(
-                    uiState       = uiState,
-                    viewModel     = viewModel,
-                    onOpenProfile = { viewModel.openProfile(it); onOpenProfile(it) },
-                )
+            PullToRefreshBox(
+                isRefreshing = uiState.isRefreshing,
+                onRefresh    = { viewModel.resetCardInteractions() },
+                modifier     = Modifier.fillMaxSize(),
+            ) {
+                when (uiState.selectedTab) {
+                    0 -> RecommendTab(
+                        uiState        = uiState,
+                        viewModel      = viewModel,
+                        onOpenProfile  = { viewModel.openProfile(it); onOpenProfile(it) },
+                    )
+                    1 -> FilterTab(
+                        uiState       = uiState,
+                        viewModel     = viewModel,
+                        onOpenProfile = { viewModel.openProfile(it); onOpenProfile(it) },
+                    )
+                }
             }
         }
     }
@@ -138,8 +146,20 @@ private fun RecommendTab(
     viewModel     : ExploreViewModel,
     onOpenProfile : (DiscoverUser) -> Unit,
 ) {
-    // 스와이프 새로고침 (위/아래 땡기면 전체 새로고침)
-    // TODO: SwipeRefresh 라이브러리 연동 후 실제 API 호출
+    var moreListTitle by remember { mutableStateOf("") }
+    var moreListUsers by remember { mutableStateOf<List<DiscoverUser>?>(null) }
+
+    if (moreListUsers != null) {
+        BackHandler { moreListUsers = null }
+        UserMoreListScreen(
+            title   = moreListTitle,
+            users   = moreListUsers!!,
+            onBack  = { moreListUsers = null },
+            onClick = onOpenProfile,
+        )
+        return
+    }
+
     LazyColumn(
         modifier       = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp),
@@ -162,7 +182,10 @@ private fun RecommendTab(
             SectionHeader(
                 title    = "나와 같은 '$topTag' 관심사를 가진 추천 친구",
                 subtitle = "관심사가 같으면 대화도 쉬워져요",
-                onMore   = { /* TODO: 더보기 → 무한 스크롤 화면 */ },
+                onMore   = {
+                    moreListTitle = "나와 같은 '$topTag' 관심사 친구"
+                    moreListUsers = uiState.tagMatchUsers
+                },
             )
         }
         items(uiState.tagMatchUsers.take(3)) { user ->
@@ -184,7 +207,10 @@ private fun RecommendTab(
             SectionHeader(
                 title    = "${lang}를 배우고 싶어해요",
                 subtitle = "편하게 대화 나눠주실래요?",
-                onMore   = { /* TODO: 더보기 */ },
+                onMore   = {
+                    moreListTitle = "${lang}를 배우고 싶어하는 친구"
+                    moreListUsers = uiState.learningLangUsers
+                },
             )
         }
         items(uiState.learningLangUsers.take(3)) { user ->
@@ -192,6 +218,40 @@ private fun RecommendTab(
                 user    = user,
                 onClick = { onOpenProfile(user) },
             )
+        }
+    }
+}
+
+@Composable
+private fun UserMoreListScreen(
+    title   : String,
+    users   : List<DiscoverUser>,
+    onBack  : () -> Unit,
+    onClick : (DiscoverUser) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+        Box(
+            modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+        ) {
+            androidx.compose.material3.IconButton(onClick = onBack, modifier = Modifier.size(40.dp).align(Alignment.CenterStart)) {
+                Icon(painterResource(R.drawable.ic_back), "뒤로", Modifier.size(24.dp), tint = C.TextPri)
+            }
+            Text(
+                title,
+                modifier = Modifier.align(Alignment.Center),
+                style    = TextStyle(fontSize = 17.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+        LazyColumn(
+            modifier       = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
+            items(users) { user ->
+                UserListItem(user = user, onClick = { onClick(user) })
+            }
         }
     }
 }
@@ -621,14 +681,6 @@ fun UserListItem(
         Spacer(Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
-            // 태그 3개 (온보딩 순서)
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                user.top3Tags().forEach { tag ->
-                    ExploreTag(label = "${tag.emoji} ${tag.displayName}")
-                }
-            }
-            Spacer(Modifier.height(3.dp))
-
             // 이름 + 현활뱃지
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(user.name, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri))
@@ -658,6 +710,17 @@ fun UserListItem(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 user.languageLabels().take(4).forEach { code ->
                     Text(code, style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextSec, fontWeight = FontWeight(500)))
+                }
+            }
+
+            // 태그 3개 (언어 아래)
+            val tags = user.top3Tags()
+            if (tags.isNotEmpty()) {
+                Spacer(Modifier.height(3.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    tags.forEach { tag ->
+                        ExploreTag(label = "${tag.emoji} ${tag.displayName}")
+                    }
                 }
             }
         }
@@ -708,7 +771,6 @@ fun ActiveBadge() {
 // TopBar + BottomNavBar
 @Composable
 private fun ExploreTopBar(
-    onSearch       : () -> Unit,
     onNotification : () -> Unit,
     hasNotification: Boolean = false,
 ) {
@@ -721,20 +783,12 @@ private fun ExploreTopBar(
                 modifier = Modifier.align(Alignment.Center),
                 style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
             )
-            Row(
-                modifier              = Modifier.align(Alignment.CenterEnd),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                IconButton(onClick = onSearch, modifier = Modifier.size(40.dp)) {
-                    Icon(painterResource(R.drawable.ic_search), "검색", Modifier.size(24.dp), tint = C.TextPri)
+            Box(modifier = Modifier.align(Alignment.CenterEnd)) {
+                IconButton(onClick = onNotification, modifier = Modifier.size(40.dp)) {
+                    Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(24.dp), tint = C.TextPri)
                 }
-                Box {
-                    IconButton(onClick = onNotification, modifier = Modifier.size(40.dp)) {
-                        Icon(painterResource(R.drawable.ic_alarm), "알림", Modifier.size(24.dp), tint = C.TextPri)
-                    }
-                    if (hasNotification) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(C.Accent).align(Alignment.TopEnd).offset(x = (-6).dp, y = 6.dp))
-                    }
+                if (hasNotification) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(C.Accent).align(Alignment.TopEnd).offset(x = (-6).dp, y = 6.dp))
                 }
             }
         }

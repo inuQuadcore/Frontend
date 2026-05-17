@@ -30,6 +30,8 @@ import com.everybuddy.app.R
 import com.everybuddy.app.ui.chat.ChatListScreen
 import com.everybuddy.app.ui.chat.ChatRoomScreen
 import com.everybuddy.app.ui.chat.ChatViewModel
+import com.everybuddy.app.ui.chat.DirectChatScreen
+import com.everybuddy.app.ui.chat.GroupChatScreen
 import com.everybuddy.app.ui.chat.NewFolderScreen
 import com.everybuddy.app.ui.chat.ScriptFolder
 import com.everybuddy.app.ui.chat.ScriptItem
@@ -55,7 +57,7 @@ private object MainRoute {
 private enum class MainTab(val label: String, val iconRes: Int) {
     CHAT    ("대화",    R.drawable.ic_nav_chat),
     FRIEND  ("친구",    R.drawable.ic_nav_friend),
-    EXPLORE ("찾기",    R.drawable.ic_nav_find),
+    EXPLORE ("탐색",    R.drawable.ic_nav_find),
     SCRIPT  ("스크립트", R.drawable.ic_nav_script),
     MY      ("마이",    R.drawable.ic_nav_my),
 }
@@ -69,6 +71,8 @@ fun MainScreen(onLogout: () -> Unit = {}) {
     var selectedTab       by remember { mutableStateOf(MainTab.CHAT) }
     var isChatRoomOpen    by remember { mutableStateOf(false) }
     var showNotification  by remember { mutableStateOf(false) }
+    var showDirectChat    by remember { mutableStateOf(false) }
+    var showGroupChat     by remember { mutableStateOf(false) }
 
     val chatNavController = rememberNavController()
     val scriptViewModel   : ScriptViewModel     = hiltViewModel()
@@ -140,8 +144,11 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                                     chatVm.markRoomAsRead(room.id)
                                     chatNavController.navigate(MainRoute.chatRoom(room.id))
                                 },
-                                onStartChat         = { /* TODO: 채팅 시작 화면 */ },
+                                onStartChat         = {},
+                                onStartDirectChat   = { showDirectChat = true },
+                                onStartGroupChat    = { showGroupChat = true },
                                 onNotificationClick = { showNotification = true },
+                                onNavigateToExplore = { selectedTab = MainTab.EXPLORE },
                             )
                         }
                         composable(
@@ -149,9 +156,12 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                             arguments = listOf(navArgument("roomId") { type = NavType.StringType }),
                         ) { backStack ->
                             val roomId = backStack.arguments?.getString("roomId") ?: return@composable
+                            val chatListState by chatVm.listState.collectAsState()
+                            val roomName = chatListState.rooms.find { it.id == roomId }?.name ?: ""
                             isChatRoomOpen = true
                             ChatRoomScreen(
                                 roomId                = roomId,
+                                roomName              = roomName,
                                 onBack                = { isChatRoomOpen = false; chatNavController.popBackStack() },
                                 onNavigateToScriptTab = {
                                     isChatRoomOpen = false
@@ -168,9 +178,37 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                                     )
                                 },
                                 onMuteChanged   = { isMuted -> chatVm.updateRoomMute(roomId, isMuted) },
-                                onFolderCreated = { folder -> scriptViewModel.addFolder(folder.name, folder.coverImage.ifEmpty { null }) },
+                                onFolderCreated = { folder -> scriptViewModel.addFolder(folder.name, folder.coverImage.ifEmpty { null }, folder.id) },
+                                isStarred       = chatListState.rooms.find { it.id == roomId }?.isStarred ?: false,
+                                onToggleStar    = { chatVm.toggleStar(roomId) },
                             )
                         }
+                    }
+
+                    if (showDirectChat) {
+                        DirectChatScreen(
+                            onBack        = { showDirectChat = false },
+                            onRoomCreated = { room ->
+                                showDirectChat = false
+                                isChatRoomOpen = true
+                                chatVm.markRoomAsRead(room.id)
+                                chatNavController.navigate(MainRoute.chatRoom(room.id))
+                            },
+                            chatVm   = chatVm,
+                        )
+                    }
+
+                    if (showGroupChat) {
+                        GroupChatScreen(
+                            onBack        = { showGroupChat = false },
+                            onRoomCreated = { room ->
+                                showGroupChat = false
+                                isChatRoomOpen = true
+                                chatVm.markRoomAsRead(room.id)
+                                chatNavController.navigate(MainRoute.chatRoom(room.id))
+                            },
+                            chatVm   = chatVm,
+                        )
                     }
                 }
 
@@ -180,7 +218,19 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                     FriendMainScreen(
                         viewModel       = friendVm,
                         onAddFriend     = { selectedTab = MainTab.EXPLORE },
-                        onStartChat     = { user -> chatNavController.navigate(MainRoute.chatRoom("chat_${user.userId}")); selectedTab = MainTab.CHAT },
+                        onStartChat     = { user ->
+                            chatVm.createChatRoom(
+                                roomName       = user.name,
+                                participantIds = listOf(user.userId),
+                                onSuccess      = { room ->
+                                    isChatRoomOpen = true
+                                    chatVm.markRoomAsRead(room.id)
+                                    chatNavController.navigate(MainRoute.chatRoom(room.id))
+                                    selectedTab = MainTab.CHAT
+                                },
+                                onError        = {},
+                            )
+                        },
                         onNotification  = { showNotification = true },
                         onReplyToStatus = { friendId, friendName ->
                             chatVm.addReplyRoom(friendId, friendName)
@@ -203,9 +253,19 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                     isChatRoomOpen = false
                     when {
                         selectedScriptItem != null -> {
+                            val scriptUiStateDetail by scriptViewModel.uiState.collectAsState()
                             ScriptDetailScreen(
-                                item   = selectedScriptItem!!,
-                                onBack = { selectedScriptItem = null },
+                                item     = selectedScriptItem!!,
+                                folders  = scriptUiStateDetail.folders,
+                                onBack   = { selectedScriptItem = null },
+                                onSave   = { updatedItem ->
+                                    scriptViewModel.updateItem(updatedItem)
+                                    selectedScriptItem = updatedItem
+                                },
+                                onDelete = { item ->
+                                    scriptViewModel.deleteItem(item.id)
+                                    selectedScriptItem = null
+                                },
                             )
                         }
                         selectedScriptFolder != null -> {

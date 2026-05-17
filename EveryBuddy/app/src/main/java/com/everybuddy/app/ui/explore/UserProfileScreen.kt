@@ -38,6 +38,7 @@ fun UserProfileScreen(
     onChat          : (DiscoverUser) -> Unit = {},
     onAddFriend     : (DiscoverUser) -> Unit = {},
     onRemoveFriend  : (DiscoverUser) -> Unit = {},
+    onBlock         : (DiscoverUser) -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
 
@@ -239,7 +240,7 @@ fun UserProfileScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("나의 태그", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri))
+                Text("친구의 태그", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri))
                 if (matchingCount > 0) {
                     Text(
                         "나와 ${matchingCount}개 일치해요!",
@@ -292,7 +293,7 @@ fun UserProfileScreen(
                 userName  = user.name,
                 onConfirm = {
                     when (action) {
-                        "차단" -> { /* TODO: API - POST /api/v1/users/{userId}/block */ }
+                        "차단" -> { onBlock(user); onBack() }
                         "삭제" -> { isFriendLocal = false; onRemoveFriend(user) }
                         "신고" -> { /* TODO: API - POST /api/v1/users/{userId}/report */ }
                     }

@@ -79,30 +79,47 @@ private val DateBadgeBg    = Color(0xFFDDDDDD)
 @Composable
 fun ChatRoomScreen(
     roomId                : String,
+    roomName              : String                   = "",
     onBack                : () -> Unit,
     onNavigateToScriptTab : () -> Unit               = {},
     onSaveScriptItem      : (ScriptSaveItem) -> Unit = {},
     onMuteChanged         : (Boolean) -> Unit        = {},
     onFolderCreated       : (ScriptFolder) -> Unit   = {},
+    isStarred             : Boolean                  = false,
+    onToggleStar          : () -> Unit               = {},
     viewModel             : ChatRoomViewModel         = hiltViewModel(),
 ) {
-    LaunchedEffect(roomId) { viewModel.loadRoom(roomId) }
+    LaunchedEffect(roomId) { viewModel.loadRoom(roomId, roomName) }
     val state by viewModel.uiState.collectAsState()
 
     val micPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> if (granted) viewModel.onStartRecording() }
 
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicturePreview()
+    ) { bitmap -> if (bitmap != null) viewModel.onCameraCapture() }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri -> if (uri != null) viewModel.onFilePicked(uri.toString()) }
+
     val cameraPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) { /* TODO: 카메라 인텐트 실행 */ }
+        if (granted) takePictureLauncher.launch(null)
+    }
+
+    val photoPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) viewModel.onOpenPhotoPicker()
     }
 
     val storagePermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) { /* TODO: 파일 피커 인텐트 실행 */ }
+        if (granted) filePickerLauncher.launch("*/*")
     }
 
     if (state.isConversationSelectOpen) {
@@ -134,7 +151,13 @@ fun ChatRoomScreen(
         onToggleMediaPanel       = viewModel::onToggleMediaPanel,
         onLongPressMessage       = viewModel::onLongPressMessage,
         onDismissContextMenu     = viewModel::onDismissContextMenu,
-        onOpenPhotoPicker        = viewModel::onOpenPhotoPicker,
+        onOpenPhotoPicker        = {
+            val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                Manifest.permission.READ_MEDIA_IMAGES
+            else
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            photoPermLauncher.launch(perm)
+        },
         onClosePhotoPicker       = viewModel::onClosePhotoPicker,
         onTogglePhotoSelection   = viewModel::onTogglePhotoSelection,
         onSendSelectedPhotos     = viewModel::onSendSelectedPhotos,
@@ -154,6 +177,10 @@ fun ChatRoomScreen(
             storagePermLauncher.launch(perm)
         },
         onFolderCreated          = onFolderCreated,
+        onDeleteMessage          = viewModel::onDeleteMessage,
+        onEditMessage            = viewModel::onEditMessage,
+        isStarred                = isStarred,
+        onToggleStar             = onToggleStar,
     )
 }
 
@@ -189,17 +216,35 @@ fun ChatRoomContent(
     onOpenCamera              : () -> Unit             = {},
     onOpenFile                : () -> Unit             = {},
     onFolderCreated           : (ScriptFolder) -> Unit = {},
+    onDeleteMessage           : (String) -> Unit       = {},
+    onEditMessage             : (String, String) -> Unit = { _, _ -> },
+    isStarred                 : Boolean                = false,
+    onToggleStar              : () -> Unit             = {},
 ) {
     var showNewFolderScreen   by remember { mutableStateOf(false) }
     var newFolderAutoSelectId by remember { mutableStateOf<String?>(null) }
     var separateIdx           by remember { mutableIntStateOf(0) }
+    var pendingScriptItems    by remember { mutableStateOf<List<ScriptSaveItem>>(emptyList()) }
     var localFolders          by remember { mutableStateOf(dummyScriptFolders) }
+    var editingMessageId      by remember { mutableStateOf<String?>(null) }
+    var editingText           by remember { mutableStateOf("") }
     var isMenuOpen            by remember { mutableStateOf(false) }
     var isSearchMode          by remember { mutableStateOf(false) }
     var searchQuery           by remember { mutableStateOf("") }
     var currentMatchIdx       by remember { mutableIntStateOf(0) }
+    var mediaSubPage          by remember { mutableStateOf<String?>(null) }
+    var showInviteScreen      by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.conversationSaveMessages) { separateIdx = 0 }
+    val members = remember(state.room) {
+        buildList {
+            add(ChatMember(id = "me", name = "나", isMe = true))
+            if (state.room.name.isNotEmpty()) {
+                add(ChatMember(id = state.room.id, name = state.room.name))
+            }
+        }
+    }
+
+    LaunchedEffect(state.conversationSaveMessages) { separateIdx = 0; pendingScriptItems = emptyList() }
 
     val listState  = rememberLazyListState()
     val scope      = rememberCoroutineScope()
@@ -391,7 +436,51 @@ fun ChatRoomContent(
                     onDismissContextMenu()
                     onStartScriptSave(msg.id)
                 },
+                isOwnMessage = msg.senderId == "me",
+                onEdit       = {
+                    editingMessageId = msg.id
+                    editingText      = msg.text
+                },
+                onDelete     = { onDeleteMessage(msg.id) },
             )
+        }
+
+        if (editingMessageId != null) {
+            Box(
+                modifier         = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)).clickable { editingMessageId = null },
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Surface(
+                    modifier        = Modifier.fillMaxWidth().clickable {},
+                    color           = Color.White,
+                    shadowElevation = 8.dp,
+                ) {
+                    Column(modifier = Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text("메시지 수정", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = TextPrimary), modifier = Modifier.padding(bottom = 8.dp))
+                        BasicTextField(
+                            value         = editingText,
+                            onValueChange = { editingText = it },
+                            modifier      = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFFF2F2F2)).padding(12.dp),
+                            textStyle     = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { editingMessageId = null }) {
+                                Text("취소", style = TextStyle(fontSize = 14.sp, color = TextSecondary))
+                            }
+                            TextButton(onClick = {
+                                val id = editingMessageId
+                                if (id != null && editingText.isNotBlank()) {
+                                    onEditMessage(id, editingText)
+                                    editingMessageId = null
+                                }
+                            }) {
+                                Text("완료", style = TextStyle(fontSize = 14.sp, color = AccentBlue, fontWeight = FontWeight(600)))
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         AnimatedVisibility(
@@ -418,18 +507,47 @@ fun ChatRoomContent(
 
         AnimatedVisibility(
             visible  = isMenuOpen,
-            modifier = Modifier.align(Alignment.CenterEnd),
+            modifier = Modifier.align(Alignment.CenterEnd).width(300.dp).fillMaxHeight(),
             enter    = androidx.compose.animation.slideInHorizontally(initialOffsetX = { it }),
             exit     = androidx.compose.animation.slideOutHorizontally(targetOffsetX = { it }),
         ) {
-            ChatSideMenu(
+            ChatRoomSidebarScreen(
                 roomName              = state.room.name,
+                members               = members,
+                mediaThumbs           = emptyList(),
                 isAutoTranslate       = state.isAutoTranslate,
                 isMuted               = state.room.isMuted,
+                isStarred             = isStarred,
+                onBack                = { isMenuOpen = false },
+                onPhotoVideo          = { isMenuOpen = false; mediaSubPage = "photo" },
+                onLink                = { isMenuOpen = false; mediaSubPage = "link" },
+                onFile                = { isMenuOpen = false; mediaSubPage = "file" },
+                onInviteMember        = { isMenuOpen = false; showInviteScreen = true },
                 onToggleAutoTranslate = onToggleAutoTranslate,
                 onToggleMute          = onToggleMuteRoom,
-                onDismiss             = { isMenuOpen = false },
+                onToggleStar          = onToggleStar,
+                onDataDelete          = { isMenuOpen = false },
+                onLeaveRoom           = { isMenuOpen = false },
             )
+        }
+        if (mediaSubPage != null) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+                when (mediaSubPage) {
+                    "photo" -> MediaPhotoScreen(onBack = { mediaSubPage = null })
+                    "link"  -> MediaLinkScreen(onBack  = { mediaSubPage = null })
+                    "file"  -> MediaFileScreen(onBack  = { mediaSubPage = null })
+                }
+            }
+        }
+
+        if (showInviteScreen) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+                InviteMemberScreen(
+                    roomId    = state.room.id,
+                    onBack    = { showInviteScreen = false },
+                    onInvited = { showInviteScreen = false },
+                )
+            }
         }
     }   // Box 끝
 
@@ -451,14 +569,17 @@ fun ChatRoomContent(
         if (state.conversationCaptureOption == CaptureOption.SEPARATE) {
             val msg = state.conversationSaveMessages.getOrNull(separateIdx)
             if (msg != null) {
+                val isLast = separateIdx == state.conversationSaveMessages.size - 1
                 ScriptSaveSheet(
                     message                    = msg,
                     folders                    = localFolders,
                     onSave                     = { item ->
-                        onSaveScriptItem(item)
-                        if (separateIdx < state.conversationSaveMessages.size - 1) {
+                        if (!isLast) {
+                            pendingScriptItems = pendingScriptItems + item
                             separateIdx++
                         } else {
+                            (pendingScriptItems + item).forEach { onSaveScriptItem(it) }
+                            pendingScriptItems = emptyList()
                             onConversationSaved()
                         }
                     },
@@ -467,23 +588,17 @@ fun ChatRoomContent(
                     externalAutoSelectFolderId = newFolderAutoSelectId,
                     currentIdx                 = separateIdx + 1,
                     totalCount                 = state.conversationSaveMessages.size,
+                    isLastStep                 = isLast,
                 )
             }
         } else {
-            ConversationSaveSheet(
-                messages                   = state.conversationSaveMessages,
-                captureOption              = state.conversationCaptureOption,
+            val combinedText = state.conversationSaveMessages.joinToString("\n") { it.text }
+            ScriptSaveSheet(
+                message                    = ChatMessage(id = "combined_save", text = combinedText),
                 folders                    = localFolders,
                 externalAutoSelectFolderId = newFolderAutoSelectId,
-                onSave                     = { selectedFolder ->
-                    state.conversationSaveMessages.forEach { m ->
-                        onSaveScriptItem(ScriptSaveItem(
-                            messageId      = m.id,
-                            originalText   = m.text,
-                            translatedText = m.translatedText,
-                            selectedFolder = selectedFolder,
-                        ))
-                    }
+                onSave                     = { item ->
+                    onSaveScriptItem(item)
                     onConversationSaved()
                 },
                 onDismiss                  = onDismissConversationSave,
@@ -501,7 +616,7 @@ fun ChatRoomContent(
                 roomName = state.room.name,
                 onBack   = { showNewFolderScreen = false },
                 onSave   = { name, coverUri ->
-                    val newFolder = ScriptFolder(id = name.hashCode().toString(), name = name, coverImage = coverUri ?: "")
+                    val newFolder = ScriptFolder(id = java.util.UUID.randomUUID().toString(), name = name, coverImage = coverUri ?: "")
                     localFolders          = localFolders + newFolder
                     newFolderAutoSelectId = newFolder.id
                     showNewFolderScreen   = false
@@ -886,9 +1001,14 @@ fun TextMessageBubble(
         if (isMe) {
             Row(
                 modifier          = Modifier.fillMaxWidth().padding(start = 46.dp),
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.End,
             ) {
+                Text(
+                    text     = message.timestamp.format(timeFormatter),
+                    style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                    modifier = Modifier.padding(end = 4.dp),
+                )
                 Box(
                     modifier = Modifier
                         .widthIn(max = 260.dp)
@@ -933,7 +1053,7 @@ fun TextMessageBubble(
                         style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.Bottom) {
                         Box(
                             modifier = Modifier
                                 .widthIn(max = 210.dp)
@@ -954,6 +1074,11 @@ fun TextMessageBubble(
                                 )
                             }
                         }
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text  = message.timestamp.format(timeFormatter),
+                            style = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                        )
                         if (!isAutoTranslate) {
                             Spacer(Modifier.width(4.dp))
                             TranslateIconButton(onClick = onToggleTranslation)
@@ -963,14 +1088,6 @@ fun TextMessageBubble(
             }
         }
 
-        // 시간 표시
-        Text(
-            text     = message.timestamp.format(timeFormatter),
-            style    = TextStyle(fontSize = 11.sp, color = TextSecondary),
-            modifier = Modifier.padding(start = if (!isMe) 46.dp else 0.dp, top = 2.dp),
-        )
-
-        // 번역 결과 (세로바 + 텍스트 or 로딩 점)
         if (isTranslating || (showTranslation && message.translatedText.isNotEmpty())) {
             Spacer(Modifier.height(4.dp))
             Row(
@@ -1081,9 +1198,14 @@ fun VoiceMessageBubble(
         if (isMe) {
             Row(
                 modifier              = Modifier.fillMaxWidth().padding(start = 46.dp),
-                verticalAlignment     = Alignment.Top,
+                verticalAlignment     = Alignment.Bottom,
                 horizontalArrangement = Arrangement.End,
             ) {
+                Text(
+                    text     = message.timestamp.format(timeFormatter),
+                    style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                    modifier = Modifier.padding(end = 4.dp),
+                )
                 Box(
                     modifier = Modifier
                         .widthIn(min = 200.dp, max = 260.dp)
@@ -1126,7 +1248,7 @@ fun VoiceMessageBubble(
                         style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.Bottom) {
                         Box(
                             modifier = Modifier
                                 .widthIn(min = 180.dp, max = 210.dp)
@@ -1145,6 +1267,11 @@ fun VoiceMessageBubble(
                                 onPlay          = onPlay,
                             )
                         }
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text  = message.timestamp.format(timeFormatter),
+                            style = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                        )
                         if (!isAutoTranslate) {
                             Spacer(Modifier.width(4.dp))
                             TranslateIconButton(onClick = onToggleTranslation)
@@ -1154,11 +1281,6 @@ fun VoiceMessageBubble(
             }
         }
 
-        Text(
-            text     = message.timestamp.format(timeFormatter),
-            style    = TextStyle(fontSize = 11.sp, color = TextSecondary),
-            modifier = Modifier.padding(start = if (!isMe) 46.dp else 0.dp, top = 2.dp),
-        )
     }
 }
 
@@ -1380,10 +1502,10 @@ fun MediaPanel(
     onSaveScript : () -> Unit,
 ) {
     val items = listOf(
-        Triple("사진",    R.drawable.ic_media_photo,  onPhoto),
-        Triple("카메라",  R.drawable.ic_media_camera, onCamera),
-        Triple("파일",    R.drawable.ic_media_file,   onFile),
-        Triple("대화저장", R.drawable.ic_media_link,  onSaveScript),
+        Triple("사진",    R.drawable.ic_option_photo,  onPhoto),
+        Triple("카메라",  R.drawable.ic_option_camera, onCamera),
+        Triple("파일",    R.drawable.ic_option_file,   onFile),
+        Triple("대화저장", R.drawable.ic_option_script, onSaveScript),
     )
 
     Row(
@@ -1406,12 +1528,20 @@ fun MediaPanel(
                         .background(Color(0xFFEEF4FF)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        painter            = painterResource(iconRes),
-                        contentDescription = label,
-                        modifier           = Modifier.size(26.dp),
-                        tint               = AccentBlue,
-                    )
+                    if (iconRes == R.drawable.ic_option_camera) {
+                        Image(
+                            painter            = painterResource(iconRes),
+                            contentDescription = label,
+                            modifier           = Modifier.size(26.dp),
+                        )
+                    } else {
+                        Icon(
+                            painter            = painterResource(iconRes),
+                            contentDescription = label,
+                            modifier           = Modifier.size(26.dp),
+                            tint               = AccentBlue,
+                        )
+                    }
                 }
                 Text(
                     text  = label,

@@ -1,19 +1,31 @@
 package com.everybuddy.app.data.chat
 
+import com.everybuddy.app.R
 import com.everybuddy.app.ui.chat.CaptureOption
 import java.time.LocalDateTime
 
-// ChatRoom — [변경] createdAt, unreadCount, participantIds 추가
+data class ChatParticipantUi(
+    val id                 : Long    = 0,
+    val profileImageUrl    : String? = null,
+    val profileDrawableRes : Int?    = null,
+)
+
+// ChatRoom — [변경] createdAt, unreadCount, participantIds, participants 추가
 data class ChatRoomUi(
-    val id             : String       = "",
-    val name           : String       = "",
-    val lastMessage    : String       = "",  // TODO: 서버 lastMessage 필드 추가 후 연동
-    val timestamp      : String       = "",  // TODO: createdAt 파싱 상대시간
-    val createdAt      : String       = "",  // ISO-8601 (서버 createdAt)
-    val unreadCount    : Int          = 0,   // 읽지 않은 메시지 수 → 배지 표시
-    val isMuted        : Boolean      = false,
-    val isPinned       : Boolean      = false,
-    val participantIds : List<Long>   = emptyList(),
+    val id                 : String                  = "",
+    val name               : String                  = "",
+    val lastMessage        : String                  = "",
+    val timestamp          : String                  = "",
+    val createdAt          : String                  = "",
+    val unreadCount        : Int                     = 0,
+    val isMuted            : Boolean                 = false,
+    val isPinned           : Boolean                 = false,
+    val isStarred          : Boolean                 = false,
+    val participantIds     : List<Long>              = emptyList(),
+    val profileImageUrl    : String?                 = null,
+    val profileDrawableRes : Int?                    = null,
+    // API 연동 시 서버에서 받은 참여자 프로필 목록으로 교체
+    val participants       : List<ChatParticipantUi> = emptyList(),
 )
 
 // ChatRoom(DTO) → ChatRoomUi 변환
@@ -36,6 +48,7 @@ data class ChatListUiState(
     val isLoading          : Boolean          = false,
     val isRefreshing       : Boolean          = false,
     val errorMessage       : String?          = null,
+    val isSearchOpen       : Boolean          = false,
     val searchQuery        : String           = "",
     val activeFilter       : ChatFilter       = ChatFilter.ALL,
     val contextMenuRoom    : ChatRoomUi?        = null,
@@ -116,11 +129,12 @@ private val BASE_DATE = LocalDateTime.of(2026, 1, 25, 0, 0)
 
 val dummyChatRooms: List<ChatRoomUi> = listOf(
     ChatRoomUi(
-        id          = "r_woowonjai",
-        name        = "우원재",
-        lastMessage = "난 지금 눈을 감아야 해. 내일의 나는 달라져야 해.",
-        timestamp   = "오후 11:53",
-        unreadCount = 0,
+        id                 = "r_woowonjai",
+        name               = "우원재",
+        lastMessage        = "난 지금 눈을 감아야 해. 내일의 나는 달라져야 해.",
+        timestamp          = "오후 11:53",
+        unreadCount        = 0,
+        profileDrawableRes = R.drawable.im_woo,
     ),
     ChatRoomUi(id = "r01", name = "Potter",   lastMessage = "안녕하세요!", timestamp = "방금",    unreadCount = 3),
     ChatRoomUi(id = "r02", name = "오혁",     lastMessage = "좋아요",      timestamp = "1시간 전", unreadCount = 0),

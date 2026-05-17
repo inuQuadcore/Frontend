@@ -5,7 +5,9 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -286,16 +288,47 @@ private fun RoomSelectRow(
         modifier              = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(
-            painter            = painterResource(if (isChecked) R.drawable.ic_check else R.drawable.ic_check_empty),
-            contentDescription = null,
-            modifier           = Modifier.size(22.dp),
-            tint               = if (isChecked) FmAccent else FmTextSec,
-        )
-        Text(room.name, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = FmTextPri))
+        Box(
+            modifier         = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFDDDDDD)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text  = room.name.take(1),
+                style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color(0xFF888888)),
+            )
+        }
+
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text     = room.name,
+                style    = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = FmTextPri),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (room.lastMessage.isNotEmpty()) {
+                Text(
+                    text     = room.lastMessage,
+                    style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = FmTextSec),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (room.timestamp.isNotEmpty()) {
+                Text(text = room.timestamp, style = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = FmTextSec))
+            }
+            Icon(
+                painter            = painterResource(if (isChecked) R.drawable.ic_check else R.drawable.ic_check_empty),
+                contentDescription = null,
+                modifier           = Modifier.size(22.dp),
+                tint               = if (isChecked) FmAccent else FmTextSec,
+            )
+        }
     }
 }

@@ -2,6 +2,8 @@ package com.everybuddy.app.ui.chat
 
 // ChatRoomSidebarScreen — 채팅방 우측 슬라이드 사이드바 메뉴
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -46,58 +49,47 @@ data class MediaThumb(
     val imageUrl     : String,  // TODO: 실제 이미지 URL
 )
 
-val demoMembers = listOf(
-    ChatMember(id = "me",       name = "나",    isMe = true),
-    ChatMember(id = "hong",     name = "홍길동"),
-    ChatMember(id = "kim",      name = "김길동"),
-    ChatMember(id = "park",     name = "박길동"),
-    ChatMember(
-        id             = "lee",
-        name           = "이길동",
-        profileImageUrl = "cat_profile",  // TODO: 실제 고양이 이미지로 교체
-    ),
-)
-
-val demoMediaThumbs = listOf(
-    MediaThumb("m1", "thumb_paris"),    // TODO: 파리 거리 사진
-    MediaThumb("m2", "thumb_girl_red"), // TODO: 빨간 옷 여성 사진
-    MediaThumb("m3", "thumb_cat"),      // TODO: 고양이 사진
-    MediaThumb("m4", "thumb_dog"),      // TODO: 강아지 사진
-)
-
 @Composable
 fun ChatRoomSidebarScreen(
-    roomName        : String           = "홍길동,김길동,박길동,이...",
-    members         : List<ChatMember> = demoMembers,
-    mediaThumbs     : List<MediaThumb> = demoMediaThumbs,
-    onBack          : () -> Unit       = {},
-    onRoomNameEdit  : () -> Unit       = {},
-    onPhotoVideo    : () -> Unit       = {},
-    onLink          : () -> Unit       = {},
-    onFile          : () -> Unit       = {},
-    onInviteMember  : () -> Unit       = {},
-    onDataDelete    : () -> Unit       = {},
-    onLeaveRoom     : () -> Unit       = {},
+    roomName              : String           = "",
+    members               : List<ChatMember> = emptyList(),
+    mediaThumbs           : List<MediaThumb> = emptyList(),
+    isAutoTranslate       : Boolean          = true,
+    isMuted               : Boolean          = false,
+    isStarred             : Boolean          = false,
+    onBack                : () -> Unit       = {},
+    onPhotoVideo          : () -> Unit       = {},
+    onLink                : () -> Unit       = {},
+    onFile                : () -> Unit       = {},
+    onInviteMember        : () -> Unit       = {},
+    onToggleAutoTranslate : () -> Unit       = {},
+    onToggleMute          : () -> Unit       = {},
+    onToggleStar          : () -> Unit       = {},
+    onDataDelete          : () -> Unit       = {},
+    onLeaveRoom           : () -> Unit       = {},
 ) {
-    // 토글 상태
-    var translationEnabled by remember { mutableStateOf(true) }
-    var notificationEnabled by remember { mutableStateOf(true) }
+    BackHandler(onBack = onBack)
+
+    var localRoomName by remember(roomName) { mutableStateOf(roomName) }
+    var isEditingName  by remember { mutableStateOf(false) }
+
+    val otherMembers = members.filter { !it.isMe }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(SbBg)
+            .systemBarsPadding()
             .verticalScroll(rememberScrollState()),
     ) {
 
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // TODO padding: 뒤로가기 버튼 top 12dp, horizontal 4dp
-                .padding(top = 12.dp, start = 4.dp),
+                .padding(top = 12.dp, start = 4.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                // ic_back.xml
                 Icon(
                     painter            = painterResource(R.drawable.ic_back),
                     contentDescription = "뒤로",
@@ -105,33 +97,67 @@ fun ChatRoomSidebarScreen(
                     tint               = SbTextPri,
                 )
             }
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = onToggleStar) {
+                Image(
+                    painter            = painterResource(if (isStarred) R.drawable.ic_star_filled else R.drawable.ic_star),
+                    contentDescription = "즐겨찾기",
+                    modifier           = Modifier.size(24.dp),
+                )
+            }
         }
 
         Spacer(Modifier.height(8.dp))
-        GroupProfileMosaic(
-            members  = members,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        )
+        if (otherMembers.size == 1) {
+            ProfileCircle(
+                member   = otherMembers[0],
+                size     = 80.dp,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+        } else {
+            GroupProfileMosaic(
+                members  = members,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+        }
 
         Spacer(Modifier.height(12.dp))
-        Row(
-            modifier          = Modifier.align(Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text  = roomName,
-                style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SbTextPri),
-            )
-            // ic_edit.xml — 방 이름 수정 연필 아이콘
-            Icon(
-                painter            = painterResource(R.drawable.ic_pencil),
-                contentDescription = "방 이름 수정",
-                modifier           = Modifier
-                    .size(18.dp)
-                    .clickable(onClick = onRoomNameEdit),
-                tint               = SbTextSec,
-            )
+        if (isEditingName) {
+            Row(
+                modifier          = Modifier.align(Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                BasicTextField(
+                    value         = localRoomName,
+                    onValueChange = { localRoomName = it },
+                    singleLine    = true,
+                    textStyle     = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SbTextPri),
+                )
+                Icon(
+                    painter            = painterResource(R.drawable.ic_pencil),
+                    contentDescription = "완료",
+                    modifier           = Modifier.size(18.dp).clickable { isEditingName = false },
+                    tint               = SbAccent,
+                )
+            }
+        } else {
+            Row(
+                modifier          = Modifier.align(Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text  = localRoomName,
+                    style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SbTextPri),
+                )
+                Icon(
+                    painter            = painterResource(R.drawable.ic_pencil),
+                    contentDescription = "방 이름 수정",
+                    modifier           = Modifier.size(18.dp).clickable { isEditingName = true },
+                    tint               = SbTextSec,
+                )
+            }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -139,8 +165,8 @@ fun ChatRoomSidebarScreen(
 
         SidebarToggleRow(
             label      = "실시간 번역",
-            checked    = translationEnabled,
-            onChecked  = { translationEnabled = it },
+            checked    = isAutoTranslate,
+            onChecked  = { onToggleAutoTranslate() },
         )
 
         HorizontalDivider(color = SbBorder, thickness = 8.dp)
@@ -156,7 +182,7 @@ fun ChatRoomSidebarScreen(
         // 사진 및 동영상 →
         SidebarMediaRow(
             label   = "사진 및 동영상",
-            iconRes = R.drawable.ic_media_photo,
+            iconRes = R.drawable.ic_option_photo,
             onClick = onPhotoVideo,
         )
 
@@ -176,17 +202,18 @@ fun ChatRoomSidebarScreen(
 
         // 링크 →
         SidebarMediaRow(
-            label   = "링크",
-            iconRes = R.drawable.ic_media_link,
-            onClick = { /* TODO: 링크 목록 화면 */ },
+            label    = "링크",
+            iconRes  = R.drawable.ic_option_link,
+            useImage = true,
+            onClick  = onLink,
         )
         HorizontalDivider(color = SbBorder, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
 
         // 파일 →
         SidebarMediaRow(
             label   = "파일",
-            iconRes = R.drawable.ic_media_file,
-            onClick = { /* TODO: 파일 목록 화면 */ },
+            iconRes = R.drawable.ic_option_file,
+            onClick = onFile,
         )
 
         Spacer(Modifier.height(8.dp))
@@ -240,8 +267,8 @@ fun ChatRoomSidebarScreen(
         Spacer(Modifier.height(8.dp))
         SidebarToggleRow(
             label     = "알림",
-            checked   = notificationEnabled,
-            onChecked = { notificationEnabled = it },
+            checked   = !isMuted,
+            onChecked = { onToggleMute() },
         )
         HorizontalDivider(color = SbBorder, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
 
@@ -381,15 +408,15 @@ private fun SidebarToggleRow(
 
 @Composable
 private fun SidebarMediaRow(
-    label   : String,
-    iconRes : Int,
-    onClick : () -> Unit,
+    label    : String,
+    iconRes  : Int,
+    useImage : Boolean = false,
+    onClick  : () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            // TODO padding: 미디어 행 horizontal 16dp, vertical 14dp
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment     = Alignment.CenterVertically,
@@ -398,18 +425,25 @@ private fun SidebarMediaRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(
-                painter            = painterResource(iconRes),
-                contentDescription = label,
-                modifier           = Modifier.size(20.dp),
-                tint               = SbAccent,
-            )
+            if (useImage) {
+                Image(
+                    painter            = painterResource(iconRes),
+                    contentDescription = label,
+                    modifier           = Modifier.size(20.dp),
+                )
+            } else {
+                Icon(
+                    painter            = painterResource(iconRes),
+                    contentDescription = label,
+                    modifier           = Modifier.size(20.dp),
+                    tint               = SbAccent,
+                )
+            }
             Text(
                 text  = label,
                 style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SbTextPri),
             )
         }
-        // ic_chevron_right.xml
         Icon(
             painter            = painterResource(R.drawable.ic_chevron_right),
             contentDescription = "이동",

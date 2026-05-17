@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.everybuddy.app.R
 import com.everybuddy.app.ui.chat.ScriptFolder
+import com.everybuddy.app.ui.chat.ScriptFolderThumbnail
 import com.everybuddy.app.ui.chat.ScriptItem
 import com.everybuddy.app.ui.theme.PretendardFamily
 
@@ -49,13 +51,19 @@ fun ScriptMainScreen(
     val uiState by viewModel.uiState.collectAsState()
     val items = viewModel.filteredItems
 
-    // 정렬 드롭다운
-    var sortMenuOpen by remember { mutableStateOf(false) }
+    var sortMenuOpen   by remember { mutableStateOf(false) }
+    var isSearchOpen   by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             ScriptTopBar(
-                onSearchClick       = { /* TODO: 검색창 열기 */ },
+                isSearchOpen        = isSearchOpen,
+                searchQuery         = uiState.searchQuery,
+                onSearchClick       = {
+                    isSearchOpen = !isSearchOpen
+                    if (!isSearchOpen) viewModel.updateSearchQuery("")
+                },
+                onSearchChange      = viewModel::updateSearchQuery,
                 onNotificationClick = onNotification,
             )
         },
@@ -177,9 +185,12 @@ fun ScriptMainScreen(
 
 @Composable
 private fun ScriptTopBar(
+    isSearchOpen        : Boolean  = false,
+    searchQuery         : String   = "",
     onSearchClick       : () -> Unit,
+    onSearchChange      : (String) -> Unit = {},
     onNotificationClick : () -> Unit,
-    hasNotification     : Boolean = false,
+    hasNotification     : Boolean  = false,
 ) {
     Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
         Box(
@@ -202,8 +213,8 @@ private fun ScriptTopBar(
                     modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
-                        painter            = painterResource(R.drawable.ic_search),
-                        contentDescription = "검색",
+                        painter            = painterResource(if (isSearchOpen) R.drawable.ic_back else R.drawable.ic_search),
+                        contentDescription = if (isSearchOpen) "검색 닫기" else "검색",
                         modifier           = Modifier.size(24.dp),
                         tint               = SmTextPri,
                     )
@@ -233,6 +244,34 @@ private fun ScriptTopBar(
                 }
             }
         }
+
+        AnimatedVisibility(visible = isSearchOpen) {
+            BasicTextField(
+                value         = searchQuery,
+                onValueChange = onSearchChange,
+                singleLine    = true,
+                textStyle     = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SmTextPri),
+                modifier      = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFF2F2F2))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                decorationBox = { innerTextField ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(painterResource(R.drawable.ic_search), null, Modifier.size(16.dp), tint = SmTextSec)
+                        Spacer(Modifier.width(6.dp))
+                        Box(Modifier.weight(1f)) {
+                            if (searchQuery.isEmpty()) {
+                                Text("본문 / 뜻 / 메모 검색", style = TextStyle(fontSize = 15.sp, color = SmTextSec, fontFamily = PretendardFamily))
+                            }
+                            innerTextField()
+                        }
+                    }
+                },
+            )
+        }
+
         HorizontalDivider(color = SmBorder, thickness = 0.5.dp)
     }
 }
@@ -257,13 +296,14 @@ private fun FolderThumbnailCard(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.BottomStart,
     ) {
-        // TODO: 실제 폴더 커버 이미지 로딩 (Coil AsyncImage)
-        // AsyncImage(
-        //     model          = folder.coverImage,
-        //     contentDescription = folder.name,
-        //     contentScale   = ContentScale.Crop,
-        //     modifier       = Modifier.fillMaxSize(),
-        // )
+        if (folder.coverImage.isNotEmpty()) {
+            coil.compose.AsyncImage(
+                model              = folder.coverImage,
+                contentDescription = folder.name,
+                contentScale       = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
+            )
+        }
 
         // 하단 오버레이 — 이름 + 개수
         Row(
@@ -419,13 +459,24 @@ fun ScriptItemCard(
 private fun BorderStroke(width: androidx.compose.ui.unit.Dp, color: Color) =
     androidx.compose.foundation.BorderStroke(width, color)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScriptDetailScreen(
-    item    : ScriptItem,
-    onBack  : () -> Unit,
-    onAudio : (ScriptItem) -> Unit = {},
+    item     : ScriptItem,
+    folders  : List<ScriptFolder> = emptyList(),
+    onBack   : () -> Unit,
+    onAudio  : (ScriptItem) -> Unit = {},
+    onSave   : (ScriptItem) -> Unit = {},
+    onDelete : (ScriptItem) -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
+
+    var editingTranslation by remember { mutableStateOf(false) }
+    var editedTranslation  by remember { mutableStateOf(item.translatedText) }
+    var editingMemo        by remember { mutableStateOf(false) }
+    var editedMemo         by remember { mutableStateOf(item.memo1) }
+    var showDeleteConfirm  by remember { mutableStateOf(false) }
+    var showFolderSheet    by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -461,19 +512,238 @@ fun ScriptDetailScreen(
                 }
             }
 
-            if (item.translatedText.isNotEmpty()) {
-                Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(20.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("뜻", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SmTextSec))
-                Spacer(Modifier.height(6.dp))
-                Text(item.translatedText, style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = SmTextPri, lineHeight = 24.sp))
+                Spacer(Modifier.weight(1f))
+                if (editingTranslation) {
+                    Text(
+                        "취소",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmTextSec),
+                        modifier = Modifier.clickable { editingTranslation = false; editedTranslation = item.translatedText },
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "완료",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmAccent, fontWeight = FontWeight(600)),
+                        modifier = Modifier.clickable {
+                            onSave(item.copy(translatedText = editedTranslation))
+                            editingTranslation = false
+                        },
+                    )
+                } else {
+                    Text(
+                        "수정하기",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmTextSec),
+                        modifier = Modifier.clickable { editingTranslation = true; editedTranslation = item.translatedText },
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            if (editingTranslation) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, SmAccent, RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                ) {
+                    BasicTextField(
+                        value         = editedTranslation,
+                        onValueChange = { editedTranslation = it },
+                        textStyle     = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = SmTextPri, lineHeight = 24.sp),
+                        modifier      = Modifier.fillMaxWidth(),
+                        decorationBox = { inner ->
+                            if (editedTranslation.isEmpty()) {
+                                Text("뜻을 입력하세요", style = TextStyle(fontSize = 16.sp, color = SmTextSec, fontFamily = PretendardFamily))
+                            }
+                            inner()
+                        },
+                    )
+                }
+            } else {
+                Text(
+                    text  = item.translatedText.ifEmpty { "—" },
+                    style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = if (item.translatedText.isEmpty()) SmTextSec else SmTextPri, lineHeight = 24.sp),
+                )
             }
 
-            if (item.memo1.isNotEmpty()) {
-                Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(20.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("메모", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SmTextSec))
-                Spacer(Modifier.height(6.dp))
-                Text(item.memo1, style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = SmTextPri, lineHeight = 24.sp))
+                Spacer(Modifier.weight(1f))
+                if (editingMemo) {
+                    Text(
+                        "취소",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmTextSec),
+                        modifier = Modifier.clickable { editingMemo = false; editedMemo = item.memo1 },
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "완료",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmAccent, fontWeight = FontWeight(600)),
+                        modifier = Modifier.clickable {
+                            onSave(item.copy(memo1 = editedMemo))
+                            editingMemo = false
+                        },
+                    )
+                } else {
+                    Text(
+                        "수정하기",
+                        style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = SmTextSec),
+                        modifier = Modifier.clickable { editingMemo = true; editedMemo = item.memo1 },
+                    )
+                }
             }
+            Spacer(Modifier.height(6.dp))
+            if (editingMemo) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, SmAccent, RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                ) {
+                    BasicTextField(
+                        value         = editedMemo,
+                        onValueChange = { editedMemo = it },
+                        textStyle     = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = SmTextPri, lineHeight = 24.sp),
+                        modifier      = Modifier.fillMaxWidth(),
+                        decorationBox = { inner ->
+                            if (editedMemo.isEmpty()) {
+                                Text("메모를 입력하세요", style = TextStyle(fontSize = 16.sp, color = SmTextSec, fontFamily = PretendardFamily))
+                            }
+                            inner()
+                        },
+                    )
+                }
+            } else {
+                Text(
+                    text  = item.memo1.ifEmpty { "—" },
+                    style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = if (item.memo1.isEmpty()) SmTextSec else SmTextPri, lineHeight = 24.sp),
+                )
+            }
+
+            Spacer(Modifier.weight(1f))
+
+            Button(
+                onClick  = { showFolderSheet = true },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape    = RoundedCornerShape(12.dp),
+                colors   = ButtonDefaults.buttonColors(containerColor = SmAccent),
+            ) {
+                Text("폴더에 저장하기", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
+            }
+            Spacer(Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFF5F5F5))
+                    .clickable { showDeleteConfirm = true }
+                    .padding(vertical = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("스크립트 삭제하기", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = Color(0xFFFF3333)))
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+
+    if (showFolderSheet) {
+        FolderMoveSheet(
+            currentFolderId = item.folderId,
+            folders         = folders,
+            onDismiss       = { showFolderSheet = false },
+            onConfirm       = { newFolderId ->
+                onSave(item.copy(folderId = newFolderId))
+                showFolderSheet = false
+            },
+        )
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            text             = {
+                Text(
+                    "정말 삭제하시겠습니까?",
+                    style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, color = SmTextPri),
+                )
+            },
+            confirmButton    = {
+                TextButton(onClick = { showDeleteConfirm = false; onDelete(item) }) {
+                    Text("삭제", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = Color(0xFFFF3333), fontWeight = FontWeight(600)))
+                }
+            },
+            dismissButton    = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("취소", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = SmTextSec))
+                }
+            },
+            containerColor   = Color.White,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FolderMoveSheet(
+    currentFolderId : String?,
+    folders         : List<ScriptFolder>,
+    onDismiss       : () -> Unit,
+    onConfirm       : (String?) -> Unit,
+) {
+    var selectedId by remember { mutableStateOf(currentFolderId) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor   = Color.White,
+        shape            = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        dragHandle = {
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.width(40.dp).height(4.dp).clip(CircleShape).background(Color(0xFFDDDDDD)))
+            }
+        },
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).navigationBarsPadding()) {
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "폴더 선택",
+                style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SmTextPri),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Spacer(Modifier.height(20.dp))
+            if (folders.isEmpty()) {
+                Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                    Text("저장된 폴더가 없습니다.", style = TextStyle(fontSize = 14.sp, color = SmTextSec, fontFamily = PretendardFamily))
+                }
+            } else {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(folders) { folder ->
+                        ScriptFolderThumbnail(
+                            folder     = folder,
+                            isSelected = selectedId == folder.id,
+                            onClick    = { selectedId = folder.id },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+            val changed = selectedId != currentFolderId
+            Button(
+                onClick  = { onConfirm(selectedId) },
+                enabled  = changed,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape    = RoundedCornerShape(12.dp),
+                colors   = ButtonDefaults.buttonColors(
+                    containerColor         = SmAccent,
+                    disabledContainerColor = Color(0xFFCCCCCC),
+                ),
+            ) {
+                Text("확인", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
+            }
+            Spacer(Modifier.height(12.dp))
         }
     }
 }

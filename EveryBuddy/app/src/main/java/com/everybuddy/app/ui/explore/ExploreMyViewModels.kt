@@ -6,8 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.dto.userMessage
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.AuthRepository
+import com.everybuddy.app.data.repository.BlockRepository
 import com.everybuddy.app.data.repository.DiscoverRepository
 import com.everybuddy.app.data.repository.FriendRepository
 import com.everybuddy.app.data.repository.UserRepository
@@ -98,6 +100,10 @@ class ExploreViewModel @Inject constructor(
     init { refresh() }
 
     fun selectTab(tab: Int) { _uiState.update { it.copy(selectedTab = tab) } }
+
+    fun resetCardInteractions() {
+        _uiState.update { it.copy(currentCardIndex = 0) }
+    }
 
     // 카드 인터렉션
     fun nextCard() {
@@ -259,29 +265,51 @@ class ExploreViewModel @Inject constructor(
 }
 
 // MyViewModel — 마이페이지
+data class BlockedFriendItem(
+    val userId      : Long,
+    val name        : String,
+    val nationality : String,
+    val languages   : List<String>,
+)
+
+data class RemovedFriendItem(
+    val userId      : Long,
+    val name        : String,
+    val nationality : String,
+    val languages   : List<String>,
+)
+
 data class MyUiState(
-    val profile         : MyProfile    = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.myProfile else MyProfile(),
-    val isEditMode      : Boolean      = false,
-    val editName        : String       = "",
-    val editBio         : String       = "",
-    val editBirthday    : String       = "",
-    val editGender      : String       = "",
-    val editCountry     : String       = "",
-    val toastMessage    : String?      = null,
-    val isTagEditOpen   : Boolean      = false,
-    val editingTags     : List<UserTag> = emptyList(),
-    val openLanguageCode: String?      = null,
-    val openSubMenu     : String?      = null,   // "guide" | "notice" | "settings" | "version"
-    val isSaving        : Boolean      = false,  // 저장/삭제 API 진행 중 — 버튼 중복 클릭 방지용
-    val pendingImageUri : String?      = null,   // 갤러리에서 새로 고른 이미지 URI (저장 시 multipart로 업로드)
+    val profile          : MyProfile    = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.myProfile else MyProfile(),
+    val isEditMode       : Boolean      = false,
+    val editName         : String       = "",
+    val editBio          : String       = "",
+    val editBirthday     : String       = "",
+    val editGender       : String       = "",
+    val editCountry      : String       = "",
+    val toastMessage     : String?      = null,
+    val isTagEditOpen    : Boolean      = false,
+    val editingTags      : List<UserTag> = emptyList(),
+    val openLanguageCode : String?      = null,
+    val openSubMenu      : String?      = null,   // "guide" | "notice" | "settings" | "version"
+    val isSaving         : Boolean      = false,
+    val pendingImageUri  : String?      = null,
+    val blockedFriends    : List<BlockedFriendItem>  = emptyList(),
+    val isLoadingBlocked  : Boolean                  = false,
+    val blockedError      : String?                  = null,
+    val removedFriends    : List<RemovedFriendItem>  = emptyList(),
+    val isLoadingRemoved  : Boolean                  = false,
+    val removedError      : String?                  = null,
 )
 
 @HiltViewModel
 class MyViewModel @Inject constructor(
-    @ApplicationContext private val appContext : Context,
-    private val userRepository : UserRepository,
-    private val tokenManager   : TokenManager,
-    private val authRepository : AuthRepository,
+    @ApplicationContext private val appContext    : Context,
+    private val userRepository   : UserRepository,
+    private val tokenManager     : TokenManager,
+    private val authRepository   : AuthRepository,
+    private val blockRepository  : BlockRepository,
+    private val friendRepository : FriendRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MyUiState())
@@ -515,6 +543,74 @@ class MyViewModel @Inject constructor(
                     isSaving     = false,
                     toastMessage = "네트워크 연결을 확인해주세요.",
                 ) }
+            }
+        }
+    }
+
+    fun loadBlockedUsers() {
+        _uiState.update { it.copy(isLoadingBlocked = true, blockedError = null) }
+        viewModelScope.launch {
+            when (val res = blockRepository.getBlockedUsers()) {
+                is ApiResult.Success -> {
+                    val items = res.data?.blockedUsers?.map { u ->
+                        BlockedFriendItem(
+                            userId      = u.userId,
+                            name        = u.name,
+                            nationality = countryName(u.country ?: ""),
+                            languages   = u.languages?.map { l -> UserLanguage(l.language, l.level).displayCode() } ?: emptyList(),
+                        )
+                    } ?: emptyList()
+                    _uiState.update { it.copy(blockedFriends = items, isLoadingBlocked = false) }
+                }
+                is ApiResult.Error        -> _uiState.update { it.copy(isLoadingBlocked = false, blockedError = res.userMessage()) }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(isLoadingBlocked = false, blockedError = res.userMessage()) }
+            }
+        }
+    }
+
+    fun unblockFriend(userId: Long) {
+        viewModelScope.launch {
+            when (blockRepository.unblockUser(userId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { it.copy(
+                        blockedFriends = it.blockedFriends.filter { f -> f.userId != userId },
+                    ) }
+                }
+                is ApiResult.Error, is ApiResult.NetworkError -> Unit
+            }
+        }
+    }
+
+    fun loadRemovedFriends() {
+        _uiState.update { it.copy(isLoadingRemoved = true, removedError = null) }
+        viewModelScope.launch {
+            when (val res = friendRepository.getRemovedFriends()) {
+                is ApiResult.Success -> {
+                    val items = res.data?.removedFriends?.map { u ->
+                        RemovedFriendItem(
+                            userId      = u.userId,
+                            name        = u.name,
+                            nationality = countryName(u.country ?: ""),
+                            languages   = u.languages?.map { l -> UserLanguage(l.language, l.level).displayCode() } ?: emptyList(),
+                        )
+                    } ?: emptyList()
+                    _uiState.update { it.copy(removedFriends = items, isLoadingRemoved = false) }
+                }
+                is ApiResult.Error        -> _uiState.update { it.copy(isLoadingRemoved = false, removedError = res.userMessage()) }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(isLoadingRemoved = false, removedError = res.userMessage()) }
+            }
+        }
+    }
+
+    fun restoreFriend(userId: Long) {
+        viewModelScope.launch {
+            when (friendRepository.addFriend(userId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { it.copy(
+                        removedFriends = it.removedFriends.filter { f -> f.userId != userId },
+                    ) }
+                }
+                is ApiResult.Error, is ApiResult.NetworkError -> Unit
             }
         }
     }

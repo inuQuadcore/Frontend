@@ -48,7 +48,7 @@ class ChatRoomViewModel @Inject constructor(
         }
     }
 
-    fun loadRoom(roomId: String) {
+    fun loadRoom(roomId: String, roomName: String = "") {
         if (BuildConfig.USE_DUMMY_DATA && roomId.startsWith("reply_")) {
             val friendId = roomId.removePrefix("reply_")
             val demoRoom = FriendDemoData.chatRooms.find { it.friendId == friendId }
@@ -70,7 +70,7 @@ class ChatRoomViewModel @Inject constructor(
             return
         }
         val dummyRoom = if (BuildConfig.USE_DUMMY_DATA) dummyChatRooms.find { it.id == roomId } else null
-        val room      = dummyRoom ?: ChatRoomUi(id = roomId)
+        val room      = dummyRoom ?: ChatRoomUi(id = roomId, name = roomName)
         val messages  = if (BuildConfig.USE_DUMMY_DATA) dummyMessages[roomId] ?: emptyList() else emptyList()
         _uiState.update { it.copy(room = room, messages = messages) }
     }
@@ -244,6 +244,46 @@ class ChatRoomViewModel @Inject constructor(
             delay(2000)
             _uiState.update { it.copy(savedToastVisible = false) }
         }
+    }
+
+    fun onDeleteMessage(messageId: String) {
+        _uiState.update { it.copy(messages = it.messages.filter { m -> m.id != messageId }, contextMenuMessage = null) }
+    }
+
+    fun onEditMessage(messageId: String, newText: String) {
+        _uiState.update { state ->
+            state.copy(
+                messages           = state.messages.map { if (it.id == messageId) it.copy(text = newText) else it },
+                contextMenuMessage = null,
+            )
+        }
+    }
+
+    fun onCameraCapture() {
+        val msg = ChatMessage(
+            id         = UUID.randomUUID().toString(),
+            roomId     = _uiState.value.room.id,
+            senderId   = "me",
+            senderName = "나",
+            type       = MessageType.IMAGE,
+            text       = "[카메라 사진]",
+            timestamp  = LocalDateTime.now(),
+        )
+        _uiState.update { it.copy(messages = it.messages + msg, isMediaPanelOpen = false) }
+    }
+
+    fun onFilePicked(uri: String) {
+        val msg = ChatMessage(
+            id         = UUID.randomUUID().toString(),
+            roomId     = _uiState.value.room.id,
+            senderId   = "me",
+            senderName = "나",
+            type       = MessageType.IMAGE,
+            text       = "[파일] ${uri.substringAfterLast('/')}",
+            voiceUrl   = uri,
+            timestamp  = LocalDateTime.now(),
+        )
+        _uiState.update { it.copy(messages = it.messages + msg, isMediaPanelOpen = false) }
     }
 
     fun onToggleMuteRoom() {
