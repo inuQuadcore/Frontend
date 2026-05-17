@@ -81,5 +81,13 @@ class NotificationViewModel @Inject constructor(
         viewModelScope.launch { repository.markRead(notificationId) }
     }
 
+    /** 전체 읽음 처리 — 로컬 state 먼저 갱신(optimistic), API는 백그라운드. */
+    fun markAllRead() {
+        _uiState.update { s ->
+            s.copy(notifications = s.notifications.map { it.copy(isRead = true) })
+        }
+        viewModelScope.launch { repository.markAllRead() }
+    }
+
     fun consumeError() { _uiState.update { it.copy(errorMessage = null) } }
 }

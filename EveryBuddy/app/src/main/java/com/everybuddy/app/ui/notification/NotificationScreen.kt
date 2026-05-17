@@ -61,8 +61,16 @@ fun NotificationScreen(
         snapshotFlow { shouldLoadMore }.distinctUntilChanged().collect { if (it) viewModel.loadMore() }
     }
 
+    val hasUnread = state.notifications.any { !it.isRead }
+
     Scaffold(
-        topBar         = { NotificationTopBar(onBack) },
+        topBar         = {
+            NotificationTopBar(
+                onBack         = onBack,
+                showMarkAllRead = hasUnread,
+                onMarkAllRead  = viewModel::markAllRead,
+            )
+        },
         containerColor = Color.White,
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
@@ -100,7 +108,11 @@ fun NotificationScreen(
 }
 
 @Composable
-private fun NotificationTopBar(onBack: () -> Unit) {
+private fun NotificationTopBar(
+    onBack          : () -> Unit,
+    showMarkAllRead : Boolean,
+    onMarkAllRead   : () -> Unit,
+) {
     Column {
         Spacer(Modifier.statusBarsPadding())
         Box(
@@ -131,6 +143,22 @@ private fun NotificationTopBar(onBack: () -> Unit) {
                     color      = TextPri,
                 ),
             )
+            if (showMarkAllRead) {
+                TextButton(
+                    onClick  = onMarkAllRead,
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                ) {
+                    Text(
+                        text  = "모두 읽음",
+                        style = TextStyle(
+                            fontSize   = 13.sp,
+                            fontFamily = PretendardFamily,
+                            fontWeight = FontWeight(500),
+                            color      = Accent,
+                        ),
+                    )
+                }
+            }
         }
         HorizontalDivider(color = Border, thickness = 0.5.dp)
     }
