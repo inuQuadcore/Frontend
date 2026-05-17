@@ -46,6 +46,12 @@ fun FriendMainScreen(
     val uiState     by viewModel.uiState.collectAsState()
     val statusState by statusVm.state.collectAsState()
 
+    // 탭 진입 시점마다 친구/상태메시지 갱신 (다른 탭 갔다 와도 stale 방지).
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+        statusVm.loadAll()
+    }
+
     DisposableEffect(Unit) {
         onDispose { viewModel.clearSelectedFriend() }
     }

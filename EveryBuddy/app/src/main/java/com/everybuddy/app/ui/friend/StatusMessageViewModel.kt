@@ -2,11 +2,13 @@ package com.everybuddy.app.ui.friend
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.everybuddy.app.data.cache.UserSummaryCache
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.FriendStatusMessageDto
 import com.everybuddy.app.data.dto.MyStatusMessageResponse
 import com.everybuddy.app.data.dto.toDto
 import com.everybuddy.app.data.dto.userMessage
+import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.MessageRepository
 import com.everybuddy.app.data.repository.StatusMessageRepository
@@ -15,12 +17,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class StatusUiState(
     val myStatus            : MyStatusMessageResponse?     = null,
+    val myProfileImageUrl   : String?                      = null,  // 본인 프로필 — UserSummaryCache lookup 결과
     val friendStatuses      : List<FriendStatusMessageDto>  = emptyList(),
     val isWriteScreenOpen   : Boolean                      = false,
     val isEditMode          : Boolean                      = false,
@@ -43,6 +47,8 @@ class StatusMessageViewModel @Inject constructor(
     private val statusRepo         : StatusMessageRepository,
     private val chatRoomRepository : ChatRoomRepository,
     private val messageRepository  : MessageRepository,
+    private val tokenManager       : TokenManager,
+    private val userSummaryCache   : UserSummaryCache,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(StatusUiState())
@@ -52,7 +58,17 @@ class StatusMessageViewModel @Inject constructor(
 
     fun loadAll() {
         loadMyStatus()
+        loadMyProfile()
         loadFriendStatuses(reset = true)
+    }
+
+    /** 본인 프로필 이미지 — UserSummaryCache hit 시 즉시, miss 시 GET /users/{myId}로 채워짐. */
+    private fun loadMyProfile() {
+        viewModelScope.launch {
+            val myUserId = tokenManager.userId.firstOrNull() ?: return@launch
+            val summary  = userSummaryCache.get(myUserId) ?: return@launch
+            _state.update { it.copy(myProfileImageUrl = summary.profileImageUrl) }
+        }
     }
 
     fun loadMyStatus() {

@@ -155,6 +155,7 @@ fun StatusWriteScreen(viewModel: StatusMessageViewModel) {
 fun MyStatusCard(viewModel: StatusMessageViewModel) {
     val state    by viewModel.state.collectAsState()
     val myStatus  = state.myStatus
+    val myProfile = state.myProfileImageUrl
 
     Surface(
         modifier = Modifier
@@ -173,12 +174,16 @@ fun MyStatusCard(viewModel: StatusMessageViewModel) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.Top,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFD0D0D0)),
-                )
+                if (myProfile != null) {
+                    AsyncImage(
+                        model              = myProfile,
+                        contentDescription = "내 프로필",
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.size(44.dp).clip(CircleShape).background(Color(0xFFD0D0D0)),
+                    )
+                } else {
+                    Box(modifier = Modifier.size(44.dp).clip(CircleShape).background(Color(0xFFD0D0D0)))
+                }
                 if (myStatus != null) {
                     Icon(
                         painter            = painterResource(R.drawable.ic_more_vertical),
