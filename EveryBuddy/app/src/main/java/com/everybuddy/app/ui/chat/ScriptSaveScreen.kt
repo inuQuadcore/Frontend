@@ -55,8 +55,6 @@ data class ScriptFolder(
     val coverImage : String = "",
 )
 
-val dummyScriptFolders: List<ScriptFolder> = emptyList()
-
 data class ScriptSaveItem(
     val messageId      : String,
     val originalText   : String,
@@ -76,8 +74,6 @@ data class ScriptItem(
     val memo2          : String  = "",
     val folderId       : String? = null,
 )
-
-val dummyScriptItems: List<ScriptItem> = emptyList()
 
 @Composable
 fun MessageContextMenu(

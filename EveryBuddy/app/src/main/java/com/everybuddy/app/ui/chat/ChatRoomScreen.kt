@@ -236,7 +236,7 @@ fun ChatRoomContent(
     var newFolderAutoSelectId by remember { mutableStateOf<String?>(null) }
     var separateIdx           by remember { mutableIntStateOf(0) }
     var pendingScriptItems    by remember { mutableStateOf<List<ScriptSaveItem>>(emptyList()) }
-    var localFolders          by remember { mutableStateOf(dummyScriptFolders) }
+    var localFolders          by remember { mutableStateOf(emptyList<ScriptFolder>()) }
     var editingMessageId      by remember { mutableStateOf<String?>(null) }
     var editingText           by remember { mutableStateOf("") }
     var isMenuOpen            by remember { mutableStateOf(false) }
