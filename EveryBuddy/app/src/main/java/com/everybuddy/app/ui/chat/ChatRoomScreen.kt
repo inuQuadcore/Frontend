@@ -246,12 +246,13 @@ fun ChatRoomContent(
     var mediaSubPage          by remember { mutableStateOf<String?>(null) }
     var showInviteScreen      by remember { mutableStateOf(false) }
 
-    val members = remember(state.room, state.myUserId) {
+    val members = remember(state.room.participants, state.userSummaries, state.myUserId) {
         state.room.participants.map { p ->
+            val summary = state.userSummaries[p.id]
             ChatMember(
                 id              = p.id.toString(),
-                name            = "",
-                profileImageUrl = p.profileImageUrl,
+                name            = summary?.name.orEmpty(),
+                profileImageUrl = p.profileImageUrl ?: summary?.profileImageUrl,
                 isMe            = p.id == state.myUserId,
             )
         }

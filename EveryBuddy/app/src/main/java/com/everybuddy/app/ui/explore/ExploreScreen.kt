@@ -121,7 +121,7 @@ fun ExploreScreen(
 
             PullToRefreshBox(
                 isRefreshing = uiState.isRefreshing,
-                onRefresh    = { viewModel.resetCardInteractions() },
+                onRefresh    = { viewModel.refresh() },
                 modifier     = Modifier.fillMaxSize(),
             ) {
                 when (uiState.selectedTab) {
@@ -180,7 +180,7 @@ private fun RecommendTab(
         }
 
         item {
-            val topTag = uiState.tagMatchLabel
+            val topTag = uiState.myFirstTag?.displayName ?: "관심사"
             SectionHeader(
                 title    = "나와 같은 '$topTag' 관심사를 가진 추천 친구",
                 subtitle = "관심사가 같으면 대화도 쉬워져요",
@@ -204,7 +204,7 @@ private fun RecommendTab(
         }
 
         item {
-            val lang = uiState.nativeLangLabel
+            val lang = uiState.myPrimaryLanguage?.let { languageKoLabel(it) } ?: "내 언어"
             SectionHeader(
                 title    = "${lang}를 배우고 싶어해요",
                 subtitle = "편하게 대화 나눠주실래요?",
@@ -323,7 +323,10 @@ private fun RandomCardSection(
     onPrev       : () -> Unit,
     onCardClick  : (DiscoverUser) -> Unit,
 ) {
-    if (cardSet.isEmpty()) return
+    if (cardSet.isEmpty()) {
+        EmptyRandomCards()
+        return
+    }
 
     val scope    = rememberCoroutineScope()
     val offsetX  = remember { Animatable(0f) }
@@ -797,5 +800,27 @@ private fun ExploreTopBar(
     }
 }
 
+@Composable
+private fun EmptyRandomCards() {
+    Box(
+        modifier         = Modifier.fillMaxWidth().padding(vertical = 60.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text      = "추천할 친구가 없어요\n당겨서 새로고침 해보세요",
+            style     = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextSec),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+    }
+}
 
-
+private fun languageKoLabel(code: String): String = when (code.uppercase()) {
+    "KOREAN"   -> "한국어"
+    "ENGLISH"  -> "영어"
+    "JAPANESE" -> "일본어"
+    "CHINESE"  -> "중국어"
+    "FRENCH"   -> "프랑스어"
+    "SPANISH"  -> "스페인어"
+    "CZECH"    -> "체코어"
+    else       -> code
+}

@@ -41,6 +41,8 @@ data class ExploreUiState(
     val tagMatchUsers      : List<DiscoverUser> = emptyList(),
     val tagMatchLabel      : String            = "관심사",
     val learningLangUsers  : List<DiscoverUser> = emptyList(),
+    val myFirstTag         : UserTag?          = null,   // 내 첫 번째 태그 — 관심사 섹션 헤더 + /filter?tags=
+    val myPrimaryLanguage  : String?           = null,   // 내 주 언어(level=5) — 언어 섹션 헤더 + /filter?languages=
     val nativeLangLabel    : String            = "한국어",
     val isRefreshing       : Boolean           = false,
     val filterSettings     : FilterSettings    = FilterSettings(),
@@ -105,6 +107,48 @@ class ExploreViewModel @Inject constructor(
     init {
         refresh()
         observePresence()
+        loadMyContext()
+    }
+
+    /**
+     * 내 첫 번째 태그 + 주 언어(isPrimary) 로딩 후 두 추천 섹션 채움.
+     * - tagMatchUsers: /filter?tags=<내 첫 태그>
+     * - learningLangUsers: /filter?languages=<내 주 언어>
+     */
+    private fun loadMyContext() {
+        viewModelScope.launch {
+            val userId = tokenManager.userId.first() ?: return@launch
+            val tagsRes  = userRepository.getUserTags(userId)
+            val langsRes = userRepository.getUserLanguages(userId)
+
+            val firstTagDto = (tagsRes as? ApiResult.Success)?.data?.firstOrNull()
+            val firstTagUi  = firstTagDto?.toUi()
+            val primaryLang = (langsRes as? ApiResult.Success)?.data?.languages
+                ?.firstOrNull { it.isPrimary }?.language
+
+            _uiState.update { it.copy(myFirstTag = firstTagUi, myPrimaryLanguage = primaryLang) }
+
+            firstTagUi?.let { tag -> loadTagMatchUsers(tag.tag) }
+            primaryLang?.let { lang -> loadLearningLangUsers(lang) }
+        }
+    }
+
+    private suspend fun loadTagMatchUsers(tag: String) {
+        val res = discoverRepository.discoverFilter(tags = listOf(tag))
+        if (res is ApiResult.Success) {
+            val users = res.data.users.map { it.toUi() }
+                .applyPresence(presenceRepository.onlineIds.value)
+            _uiState.update { it.copy(tagMatchUsers = users) }
+        }
+    }
+
+    private suspend fun loadLearningLangUsers(language: String) {
+        val res = discoverRepository.discoverFilter(languages = listOf(language))
+        if (res is ApiResult.Success) {
+            val users = res.data.users.map { it.toUi() }
+                .applyPresence(presenceRepository.onlineIds.value)
+            _uiState.update { it.copy(learningLangUsers = users) }
+        }
     }
 
     /** RTDB presence/ 변경 시 모든 user list의 isOnline 일괄 갱신. */
@@ -133,12 +177,12 @@ class ExploreViewModel @Inject constructor(
         _uiState.update { it.copy(currentCardIndex = 0) }
     }
 
-    // 카드 인터렉션
+    // 카드 인터렉션. 끝까지 도달하면 새 6명 fetch.
     fun nextCard() {
         val state = _uiState.value
         val next  = state.currentCardIndex + 1
         if (next >= state.cardSet.size) {
-            _uiState.update { it.copy(cardSet = state.cardSet.shuffled(), currentCardIndex = 0) }
+            refresh()
         } else {
             _uiState.update { it.copy(currentCardIndex = next) }
         }
