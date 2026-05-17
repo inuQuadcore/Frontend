@@ -153,16 +153,29 @@ class ChatRoomViewModel @Inject constructor(
     fun onSendText() {
         val text = _uiState.value.inputText.trim()
         if (text.isEmpty()) return
-        val msg = ChatMessage(
-            id         = UUID.randomUUID().toString(),
-            roomId     = _uiState.value.room.id,
-            senderId   = "me",
-            senderName = "나",
-            type       = MessageType.TEXT,
-            text       = text,
-            timestamp  = LocalDateTime.now(),
-        )
-        _uiState.update { state -> state.copy(messages = state.messages + msg, inputText = "") }
+
+        val chatRoomId = _uiState.value.room.id.toLongOrNull()
+        if (chatRoomId == null) {
+            // dummy 채팅방 (USE_DUMMY_DATA 흐름): 기존처럼 로컬 메시지 표시
+            val msg = ChatMessage(
+                id         = UUID.randomUUID().toString(),
+                roomId     = _uiState.value.room.id,
+                senderId   = "me",
+                senderName = "나",
+                type       = MessageType.TEXT,
+                text       = text,
+                timestamp  = LocalDateTime.now(),
+            )
+            _uiState.update { state -> state.copy(messages = state.messages + msg, inputText = "") }
+            return
+        }
+
+        // 입력창 즉시 비우고 송신. 본인 메시지 화면 표시는 RTDB 도착(C10) 또는 sync 재호출 때.
+        _uiState.update { it.copy(inputText = "") }
+        viewModelScope.launch {
+            messageRepository.sendTextMessage(chatRoomId, text)
+            // 성공/실패 처리는 C21 (PENDING/재시도)에서 본격화. 지금은 silent fail.
+        }
     }
 
     fun onStartRecording() {
