@@ -28,3 +28,8 @@ data class CreateChatRoomRequest(
     @SerializedName("isGroup")        val isGroup        : Boolean,
     @SerializedName("participantIds") val participantIds : List<Long>,
 )
+
+/** POST /chatrooms/{id}/participants — 그룹방 멤버 초대 요청. */
+data class InviteParticipantsRequest(
+    @SerializedName("participantIds") val participantIds : List<Long>,
+)

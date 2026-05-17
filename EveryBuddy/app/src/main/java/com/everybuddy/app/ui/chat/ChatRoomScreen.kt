@@ -179,6 +179,7 @@ fun ChatRoomScreen(
         onFolderCreated          = onFolderCreated,
         onDeleteMessage          = viewModel::onDeleteMessage,
         onEditMessage            = viewModel::onEditMessage,
+        onInviteMembers          = viewModel::inviteMembers,
         isStarred                = isStarred,
         onToggleStar             = onToggleStar,
     )
@@ -218,6 +219,7 @@ fun ChatRoomContent(
     onFolderCreated           : (ScriptFolder) -> Unit = {},
     onDeleteMessage           : (String) -> Unit       = {},
     onEditMessage             : (String, String) -> Unit = { _, _ -> },
+    onInviteMembers           : (List<Long>) -> Unit   = {},
     isStarred                 : Boolean                = false,
     onToggleStar              : () -> Unit             = {},
 ) {
@@ -545,7 +547,10 @@ fun ChatRoomContent(
                 InviteMemberScreen(
                     roomId    = state.room.id,
                     onBack    = { showInviteScreen = false },
-                    onInvited = { showInviteScreen = false },
+                    onInvited = { ids ->
+                        onInviteMembers(ids)
+                        showInviteScreen = false
+                    },
                 )
             }
         }

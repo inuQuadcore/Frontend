@@ -10,6 +10,7 @@ import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.local.formatRestLocalDateTime
 import com.everybuddy.app.data.firebase.ChatMessageListener
 import com.everybuddy.app.data.firebase.ViewingManager
+import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.MessageRepository
 import com.google.firebase.database.FirebaseDatabase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,6 +32,7 @@ class ChatRoomViewModel @Inject constructor(
     private val voiceRecorder       : VoiceRecorder,
     private val voicePlayer         : VoicePlayer,
     private val messageRepository   : MessageRepository,
+    private val chatRoomRepository  : ChatRoomRepository,
     private val messageDao          : MessageDao,
     private val tokenManager        : TokenManager,
     private val fileMessageUploader : FileMessageUploader,
@@ -373,6 +375,17 @@ class ChatRoomViewModel @Inject constructor(
 
     fun onToggleMuteRoom() {
         _uiState.update { it.copy(room = it.room.copy(isMuted = !it.room.isMuted)) }
+    }
+
+    /** 멤버 초대 — 그룹방만 동작. 1:1방은 백엔드가 403 CANNOT_INVITE_TO_DIRECT로 거부. */
+    fun inviteMembers(participantIds: List<Long>) {
+        val chatRoomId = _uiState.value.room.id.toLongOrNull() ?: return
+        if (participantIds.isEmpty()) return
+        viewModelScope.launch {
+            chatRoomRepository.inviteParticipants(chatRoomId, participantIds)
+            // 성공 시 새 멤버는 RTDB users/{me}/chatrooms/{roomId} 노드로 자동 노출.
+            // 에러 토스트는 후속 task에서 (1:1방 거부 등).
+        }
     }
 
     override fun onCleared() {

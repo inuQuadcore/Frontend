@@ -2,6 +2,7 @@ package com.everybuddy.app.data.network
 
 import com.everybuddy.app.data.dto.ChatRoom
 import com.everybuddy.app.data.dto.CreateChatRoomRequest
+import com.everybuddy.app.data.dto.InviteParticipantsRequest
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -41,5 +42,16 @@ interface ChatRoomApi {
     @DELETE("api/v1/chatrooms/{chatRoomId}/participants/me")
     suspend fun leaveChatRoom(
         @Path("chatRoomId") chatRoomId: Long,
+    ): Response<Unit>
+
+    /**
+     * POST /api/v1/chatrooms/{chatRoomId}/participants — 멤버 초대 (그룹방만).
+     * 1:1방(isGroup=false)에서 호출 시 403 CANNOT_INVITE_TO_DIRECT.
+     * 204: 성공 | 400/403/404/409/410: 각종 에러 (chatroom.md 참고).
+     */
+    @POST("api/v1/chatrooms/{chatRoomId}/participants")
+    suspend fun inviteParticipants(
+        @Path("chatRoomId") chatRoomId : Long,
+        @Body request                  : InviteParticipantsRequest,
     ): Response<Unit>
 }

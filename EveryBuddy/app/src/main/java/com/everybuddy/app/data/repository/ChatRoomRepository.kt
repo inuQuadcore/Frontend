@@ -3,6 +3,7 @@ package com.everybuddy.app.data.repository
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.ChatRoom
 import com.everybuddy.app.data.dto.CreateChatRoomRequest
+import com.everybuddy.app.data.dto.InviteParticipantsRequest
 import com.everybuddy.app.data.network.ChatRoomApi
 import com.google.gson.Gson
 import javax.inject.Inject
@@ -42,4 +43,17 @@ class ChatRoomRepository @Inject constructor(
      */
     suspend fun leaveChatRoom(chatRoomId: Long): ApiResult<Unit> =
         safeApiCall(gson, { api.leaveChatRoom(chatRoomId) }) { ApiResult.Success(Unit) }
+
+    /**
+     * 멤버 초대 — POST /api/v1/chatrooms/{chatRoomId}/participants
+     * 그룹방만 가능. 1:1방은 403 CANNOT_INVITE_TO_DIRECT (백엔드 정책).
+     * 부분 성공 없음 — 한 명이라도 실패면 전체 롤백.
+     * 재입장 멤버는 enterChatRoomAt 갱신되어 이전 메시지 격리.
+     */
+    suspend fun inviteParticipants(
+        chatRoomId     : Long,
+        participantIds : List<Long>,
+    ): ApiResult<Unit> = safeApiCall(gson, {
+        api.inviteParticipants(chatRoomId, InviteParticipantsRequest(participantIds))
+    }) { ApiResult.Success(Unit) }
 }
