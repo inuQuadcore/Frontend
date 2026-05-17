@@ -2,6 +2,7 @@ package com.everybuddy.app.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.everybuddy.app.data.cache.UserSummary
 import com.everybuddy.app.data.cache.UserSummaryCache
 import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.data.dto.ApiResult
@@ -13,12 +14,11 @@ import com.everybuddy.app.data.local.FolderDao
 import com.everybuddy.app.data.local.FolderRoomEntity
 import com.everybuddy.app.data.local.MessageDao
 import com.everybuddy.app.data.local.TokenManager
+import com.everybuddy.app.data.local.kstLocalDateTimeToEpochMs
+import com.everybuddy.app.data.local.parseRestLocalDateTime
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.ui.friend.KoreanChosung
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -104,21 +104,26 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { messageDao.deleteAllByRoom(chatRoomId) }
     }
 
-    /** N개 채팅방의 displayName 병렬 fetch + 로컬 mute/pin/star 플래그 적용 후 반환. */
+    /**
+     * 채팅방 DTO 리스트 → UI 모델 변환.
+     * - displayName/profileImageUrl/participants는 DTO의 participants 풀 객체에서 직접 추출 (toChatRoomUi 내부 처리).
+     * - 로컬 mute/pin/star 플래그 적용.
+     * - participants를 UserSummaryCache에 prefetch — 메시지 송신자 표시 시 cache hit 보장.
+     */
     private suspend fun toChatRoomUis(rooms: List<ChatRoom>): List<ChatRoomUi> {
         val myUserId = tokenManager.userId.firstOrNull() ?: 0L
-        return coroutineScope {
-            rooms.map { room ->
-                async {
-                    val displayName = ChatRoomDisplayName.resolve(room, myUserId, userSummaryCache)
-                    val idStr = room.chatRoomId.toString()
-                    room.toChatRoomUi(displayName = displayName).copy(
-                        isMuted   = roomPreferences.isMuted(idStr),
-                        isPinned  = roomPreferences.isPinned(idStr),
-                        isStarred = roomPreferences.isStarred(idStr),
-                    )
-                }
-            }.awaitAll()
+        rooms.flatMap { it.participants }.forEach { p ->
+            userSummaryCache.put(p.userId, UserSummary(p.userId, p.name, p.profileImageUrl))
+        }
+        return rooms.map { room ->
+            val idStr = room.chatRoomId.toString()
+            val lastMsgEpoch = room.lastMessageTime?.let { kstLocalDateTimeToEpochMs(parseRestLocalDateTime(it)) }
+            room.toChatRoomUi(myUserId = myUserId, lastMessageEpochMs = lastMsgEpoch).copy(
+                timestamp = lastMsgEpoch?.let(RelativeTimeFormatter::format).orEmpty(),
+                isMuted   = roomPreferences.isMuted(idStr),
+                isPinned  = roomPreferences.isPinned(idStr),
+                isStarred = roomPreferences.isStarred(idStr),
+            )
         }
     }
 

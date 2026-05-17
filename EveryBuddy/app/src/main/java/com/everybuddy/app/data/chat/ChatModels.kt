@@ -11,7 +11,6 @@ data class ChatParticipantUi(
     val profileDrawableRes : Int?    = null,
 )
 
-// ChatRoom — [변경] createdAt, unreadCount, participantIds, participants 추가
 data class ChatRoomUi(
     val id                 : String                  = "",
     val name               : String                  = "",
@@ -24,28 +23,37 @@ data class ChatRoomUi(
     val isMuted            : Boolean                 = false,
     val isPinned           : Boolean                 = false,
     val isStarred          : Boolean                 = false,
-    val participantIds     : List<Long>              = emptyList(),
-    val profileImageUrl    : String?                 = null,
+    val profileImageUrl    : String?                 = null,   // 1:1방 상대 프로필. 그룹방은 null (participants로 모자이크).
     val profileDrawableRes : Int?                    = null,
-    // API 연동 시 서버에서 받은 참여자 프로필 목록으로 교체
     val participants       : List<ChatParticipantUi> = emptyList(),
 )
 
 /**
  * ChatRoom(DTO) → ChatRoomUi 변환.
- * @param displayName 표시용 이름. ChatRoomDisplayName.resolve 결과를 전달.
- *                    빈 문자열이면 서버 roomName으로 폴백.
+ * @param myUserId 본인 ID. 1:1방 상대 추출용. 0이면 상대 추출 X (displayName도 서버 roomName으로 폴백).
+ * @param lastMessageEpochMs RTDB epoch ms 변환 결과. null이면 0L.
  */
 fun com.everybuddy.app.data.dto.ChatRoom.toChatRoomUi(
-    displayName: String = "",
-): ChatRoomUi = ChatRoomUi(
-    id             = chatRoomId.toString(),
-    name           = displayName.ifEmpty { roomName },
-    createdAt      = createdAt,
-    unreadCount    = unreadCount ?: 0,
-    isGroup        = isGroup,
-    participantIds = participantIds,
-)
+    myUserId           : Long = 0L,
+    lastMessageEpochMs : Long? = null,
+): ChatRoomUi {
+    val displayName        = ChatRoomDisplayName.resolve(this, myUserId).ifEmpty { roomName }
+    val otherInOneToOne    = if (!isGroup) participants.firstOrNull { it.userId != myUserId } else null
+    val participantUis     = participants.map {
+        ChatParticipantUi(id = it.userId, profileImageUrl = it.profileImageUrl)
+    }
+    return ChatRoomUi(
+        id              = chatRoomId.toString(),
+        name            = displayName,
+        lastMessage     = lastMessage.orEmpty(),
+        lastMessageTime = lastMessageEpochMs ?: 0L,
+        createdAt       = createdAt,
+        unreadCount     = unreadCount ?: 0,
+        isGroup         = isGroup,
+        profileImageUrl = otherInOneToOne?.profileImageUrl,
+        participants    = participantUis,
+    )
+}
 
 data class ChatFolder(
     val id          : String       = System.currentTimeMillis().toString(),

@@ -46,6 +46,11 @@ class UserSummaryCache @Inject constructor(
     /** 캐시에 있으면 반환, 없으면 null (네트워크 호출 X). */
     fun peek(userId: Long): UserSummary? = cache[userId]
 
+    /** 다른 API 응답에서 받은 user 정보를 prefetch — 이후 get() 시 cache hit. */
+    fun put(userId: Long, summary: UserSummary) {
+        cache[userId] = summary
+    }
+
     fun invalidate(userId: Long) {
         cache.remove(userId)
     }
