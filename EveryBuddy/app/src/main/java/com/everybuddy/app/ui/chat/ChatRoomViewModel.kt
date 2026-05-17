@@ -418,6 +418,18 @@ class ChatRoomViewModel @Inject constructor(
         }
     }
 
+    /** 시스템 PhotoPicker 결과 — Uri 목록을 받아 각각 업로드. */
+    fun onPhotosPicked(uris: List<Uri>) {
+        _uiState.update { it.copy(isMediaPanelOpen = false, isPhotoPickerOpen = false) }
+
+        val chatRoomId = _uiState.value.room.id.toLongOrNull() ?: return
+        if (uris.isEmpty()) return
+
+        viewModelScope.launch {
+            uris.forEach { uri -> fileMessageUploader.upload(chatRoomId, uri) }
+        }
+    }
+
     fun onToggleMuteRoom() {
         _uiState.update { it.copy(room = it.room.copy(isMuted = !it.room.isMuted)) }
     }

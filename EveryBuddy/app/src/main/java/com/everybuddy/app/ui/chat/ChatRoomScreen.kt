@@ -110,10 +110,10 @@ fun ChatRoomScreen(
         if (granted) takePictureLauncher.launch(null)
     }
 
-    val photoPermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) viewModel.onOpenPhotoPicker()
+    val multiPhotoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
+    ) { uris ->
+        if (uris.isNotEmpty()) viewModel.onPhotosPicked(uris)
     }
 
     val storagePermLauncher = rememberLauncherForActivityResult(
@@ -152,11 +152,12 @@ fun ChatRoomScreen(
         onLongPressMessage       = viewModel::onLongPressMessage,
         onDismissContextMenu     = viewModel::onDismissContextMenu,
         onOpenPhotoPicker        = {
-            val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-                Manifest.permission.READ_MEDIA_IMAGES
-            else
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            photoPermLauncher.launch(perm)
+            // 시스템 PhotoPicker는 자체 권한 처리 — 별도 권한 요청 불필요.
+            multiPhotoLauncher.launch(
+                androidx.activity.result.PickVisualMediaRequest(
+                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                )
+            )
         },
         onClosePhotoPicker       = viewModel::onClosePhotoPicker,
         onTogglePhotoSelection   = viewModel::onTogglePhotoSelection,
