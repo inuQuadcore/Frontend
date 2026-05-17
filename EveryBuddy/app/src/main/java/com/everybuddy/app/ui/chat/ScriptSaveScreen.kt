@@ -407,6 +407,7 @@ private fun SsMemoField(
 @Composable
 fun ConversationSelectScreen(
     messages      : List<ChatMessage>,
+    myUserId      : Long,
     userSummaries : Map<Long, UserSummary>,
     roomName      : String,
     onBack        : () -> Unit,
@@ -496,6 +497,7 @@ fun ConversationSelectScreen(
                 )
                 SelectableMessageList(
                     messages      = messages,
+                    myUserId      = myUserId,
                     userSummaries = userSummaries,
                     selectedRange = selectedRange,
                     onRangeSelect = { selectedRange = it },
@@ -520,6 +522,7 @@ fun ConversationSelectScreen(
 @Composable
 private fun SelectableMessageList(
     messages      : List<ChatMessage>,
+    myUserId      : Long,
     userSummaries : Map<Long, UserSummary>,
     selectedRange : IntRange?,
     onRangeSelect : (IntRange?) -> Unit,
@@ -555,7 +558,7 @@ private fun SelectableMessageList(
                 val summary = msg.senderId.toLongOrNull()?.let { userSummaries[it] }
                 SelectableMessageItem(
                     message               = msg,
-                    isMe                  = msg.senderId == "me",
+                    isMe                  = msg.senderId.toLongOrNull() == myUserId,
                     senderName            = summary?.name.orEmpty(),
                     senderProfileImageUrl = summary?.profileImageUrl,
                 )

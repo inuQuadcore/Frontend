@@ -30,8 +30,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.io.File
-import java.time.LocalDateTime
-import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
@@ -432,15 +430,7 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     fun onCameraCapture() {
-        val msg = ChatMessage(
-            id         = UUID.randomUUID().toString(),
-            roomId     = _uiState.value.room.id,
-            senderId   = "me",
-            type       = MessageType.IMAGE,
-            text       = "[카메라 사진]",
-            timestamp  = LocalDateTime.now(),
-        )
-        _uiState.update { it.copy(messages = it.messages + msg, isMediaPanelOpen = false) }
+        _uiState.update { it.copy(isMediaPanelOpen = false) }
     }
 
     fun onFilePicked(uri: String) {

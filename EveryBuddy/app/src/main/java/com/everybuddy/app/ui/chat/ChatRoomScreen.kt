@@ -129,6 +129,7 @@ fun ChatRoomScreen(
     if (state.isConversationSelectOpen) {
         ConversationSelectScreen(
             messages      = state.messages,
+            myUserId      = state.myUserId,
             userSummaries = state.userSummaries,
             roomName      = state.room.name,
             onBack   = viewModel::onDismissConversationSelect,
@@ -245,14 +246,7 @@ fun ChatRoomContent(
     var mediaSubPage          by remember { mutableStateOf<String?>(null) }
     var showInviteScreen      by remember { mutableStateOf(false) }
 
-    val members = remember(state.room) {
-        buildList {
-            add(ChatMember(id = "me", name = "나", isMe = true))
-            if (state.room.name.isNotEmpty()) {
-                add(ChatMember(id = state.room.id, name = state.room.name))
-            }
-        }
-    }
+    val members = remember(state.room) { emptyList<ChatMember>() }
 
     LaunchedEffect(state.conversationSaveMessages) { separateIdx = 0; pendingScriptItems = emptyList() }
 
@@ -366,6 +360,7 @@ fun ChatRoomContent(
 
             MessageList(
                 messages              = state.messages,
+                myUserId              = state.myUserId,
                 userSummaries         = state.userSummaries,
                 isAutoTranslate       = state.isAutoTranslate,
                 showTranslation       = state.showTranslation,
@@ -439,7 +434,6 @@ fun ChatRoomContent(
         }
 
         state.contextMenuMessage?.let { msg ->
-            // 본인 메시지 판정: senderId(String) vs myUserId(Long). dummy 메시지는 senderId="me"라 항상 false.
             val isOwn = msg.senderId.toLongOrNull() == state.myUserId
             MessageContextMenu(
                 onDismiss    = onDismissContextMenu,
@@ -861,6 +855,7 @@ fun TranslationLoadingDots(modifier: Modifier = Modifier) {
 @Composable
 fun MessageList(
     messages              : List<ChatMessage>,
+    myUserId              : Long,
     userSummaries         : Map<Long, UserSummary>,
     isAutoTranslate       : Boolean,
     showTranslation       : Map<String, Boolean>,
@@ -895,7 +890,7 @@ fun MessageList(
             }
 
             items(msgs, key = { it.id }) { msg ->
-                val isMe    = msg.senderId == "me"
+                val isMe    = msg.senderId.toLongOrNull() == myUserId
                 val showTr  = showTranslation[msg.id] ?: isAutoTranslate
                 val playing = playingMessageId == msg.id
                 val summary = msg.senderId.toLongOrNull()?.let { userSummaries[it] }
@@ -2075,42 +2070,3 @@ private fun formatDuration(seconds: Int): String {
     return "%02d:%02d".format(m, s)
 }
 
-@Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "우원재 채팅방")
-@Composable
-private fun PreviewWoowonjai() {
-    val room     = dummyChatRooms.find { it.id == "r_woowonjai" }!!
-    val messages = dummyMessages["r_woowonjai"] ?: emptyList()
-    ChatRoomContent(
-        state                 = ChatRoomUiState(room = room, messages = messages),
-        onBack                = {},
-        onInputChange         = {},
-        onSendText            = {},
-        onStartRecording      = {},
-        onStopRecording       = {},
-        onCancelRecording     = {},
-        onPlayVoice           = {},
-        onToggleTranslation   = {},
-        onToggleAutoTranslate = {},
-        onToggleMediaPanel    = {},
-    )
-}
-
-@Preview(showBackground = true, widthDp = 412, heightDp = 917, name = "우원재 채팅방 자동번역 ON")
-@Composable
-private fun PreviewWoowonajaiAutoTranslate() {
-    val room     = dummyChatRooms.find { it.id == "r_woowonjai" }!!
-    val messages = dummyMessages["r_woowonjai"] ?: emptyList()
-    ChatRoomContent(
-        state                 = ChatRoomUiState(room = room, messages = messages, isAutoTranslate = true),
-        onBack                = {},
-        onInputChange         = {},
-        onSendText            = {},
-        onStartRecording      = {},
-        onStopRecording       = {},
-        onCancelRecording     = {},
-        onPlayVoice           = {},
-        onToggleTranslation   = {},
-        onToggleAutoTranslate = {},
-        onToggleMediaPanel    = {},
-    )
-}

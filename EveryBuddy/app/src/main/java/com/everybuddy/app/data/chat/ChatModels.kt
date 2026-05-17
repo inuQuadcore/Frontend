@@ -1,6 +1,5 @@
 package com.everybuddy.app.data.chat
 
-import com.everybuddy.app.R
 import com.everybuddy.app.data.cache.UserSummary
 import com.everybuddy.app.ui.chat.CaptureOption
 import java.time.LocalDateTime
@@ -145,66 +144,4 @@ data class ChatRoomUiState(
     val isConversationSelectOpen  : Boolean              = false,
     val conversationSaveMessages  : List<ChatMessage>    = emptyList(),
     val conversationCaptureOption : CaptureOption        = CaptureOption.COMBINED,
-)
-
-private val BASE_DATE = LocalDateTime.of(2026, 1, 25, 0, 0)
-
-val dummyChatRooms: List<ChatRoomUi> = listOf(
-    ChatRoomUi(
-        id                 = "r_woowonjai",
-        name               = "우원재",
-        lastMessage        = "난 지금 눈을 감아야 해. 내일의 나는 달라져야 해.",
-        timestamp          = "오후 11:53",
-        unreadCount        = 0,
-        profileDrawableRes = R.drawable.im_woo,
-    ),
-    ChatRoomUi(id = "r01", name = "Potter",   lastMessage = "안녕하세요!", timestamp = "방금",    unreadCount = 3),
-    ChatRoomUi(id = "r02", name = "오혁",     lastMessage = "좋아요",      timestamp = "1시간 전", unreadCount = 0),
-    ChatRoomUi(id = "r03", name = "Hermione", lastMessage = "See you!",   timestamp = "어제",    unreadCount = 1),
-)
-
-val dummyMessages: Map<String, List<ChatMessage>> = mapOf(
-    "r_woowonjai" to listOf(
-        ChatMessage(
-            id = "ww_m01", roomId = "r_woowonjai",
-            senderId = "u_woowonjai",
-            type = MessageType.TEXT,
-            text = "You make me feel brand new",
-            translatedText = "네 덕분에 새 사람이 된 것 같아",
-            timestamp = BASE_DATE.withHour(19).withMinute(41),
-        ),
-        ChatMessage(
-            id = "ww_m02", roomId = "r_woowonjai",
-            senderId = "u_woowonjai",
-            type = MessageType.VOICE,
-            text = "We're livin' in a different time zone. Have a good night",
-            translatedText = "우리는 다른 시간대에 살잖아.\n잘 자.",
-            voiceUrl = "", voiceDurationSec = 24,
-            timestamp = BASE_DATE.withHour(19).withMinute(42),
-        ),
-        ChatMessage(
-            id = "ww_m03", roomId = "r_woowonjai",
-            senderId = "me",
-            type = MessageType.TEXT,
-            text = "난 지금 눈을 감아야 해. 내일의 나는 달라져야 해.",
-            timestamp = BASE_DATE.withHour(23).withMinute(51),
-        ),
-        ChatMessage(
-            id = "ww_m04", roomId = "r_woowonjai",
-            senderId = "me",
-            type = MessageType.VOICE,
-            voiceUrl = "", voiceDurationSec = 10,
-            timestamp = BASE_DATE.withHour(23).withMinute(53),
-        ),
-    ),
-    "r01" to listOf(
-        ChatMessage(id = "m01", roomId = "r01", senderId = "u01",
-            type = MessageType.TEXT, text = "Hello!", timestamp = LocalDateTime.now().minusMinutes(5)),
-        ChatMessage(id = "m02", roomId = "r01", senderId = "me",
-            type = MessageType.TEXT, text = "안녕하세요!", timestamp = LocalDateTime.now()),
-    ),
-    "r02" to listOf(
-        ChatMessage(id = "m03", roomId = "r02", senderId = "u08",
-            type = MessageType.TEXT, text = "좋아요", timestamp = LocalDateTime.now()),
-    ),
 )
