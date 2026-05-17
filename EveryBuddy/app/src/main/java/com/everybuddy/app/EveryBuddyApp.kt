@@ -5,6 +5,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import com.everybuddy.app.data.firebase.NotificationChannels
 import com.everybuddy.app.data.firebase.PresenceManager
 import com.everybuddy.app.data.repository.AuthRepository
 import dagger.hilt.android.HiltAndroidApp
@@ -19,6 +20,7 @@ class EveryBuddyApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        NotificationChannels.register(this)
         // 콜드스타트 시 Firebase 세션 복구 + presence/userChatRooms listener 재부착.
         // 로그인 이벤트(login/google) 외에는 signInToFirebase가 안 불려서 listener도 끊겨 있는 상태.
         ProcessLifecycleOwner.get().lifecycleScope.launch {

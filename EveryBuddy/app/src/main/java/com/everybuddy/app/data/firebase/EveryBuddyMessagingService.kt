@@ -53,7 +53,10 @@ class EveryBuddyMessagingService : FirebaseMessagingService() {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val channelId = getString(R.string.default_notification_channel_id)
+        // data 페이로드로 채널 분기: chatRoomId 있으면 채팅, 없으면 친구추가 (default)
+        val channelId =
+            if (data.containsKey("chatRoomId")) NotificationChannels.CHAT
+            else                                NotificationChannels.FRIEND
         val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_alarm)
             .setColor(getColor(R.color.notification_accent))
