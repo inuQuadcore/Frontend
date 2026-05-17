@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.data.dto.ApiResult
-import com.everybuddy.app.data.repository.ChatRepository
+import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.ui.friend.KoreanChosung
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -22,7 +22,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val chatRepository: ChatRepository,
+    private val chatRoomRepository: ChatRoomRepository,
 ) : ViewModel() {
 
     private val _listState = MutableStateFlow(ChatListUiState())
@@ -39,7 +39,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             _listState.update { it.copy(isLoading = true, errorMessage = null) }
 
-            when (val result = chatRepository.getChatRooms()) {
+            when (val result = chatRoomRepository.getChatRooms()) {
                 is ApiResult.Success -> {
                     val rooms = result.data
                         ?.map { it.toChatRoomUi() }
@@ -76,7 +76,7 @@ class ChatViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             _listState.update { it.copy(isRefreshing = true) }
-            when (val result = chatRepository.getChatRooms()) {
+            when (val result = chatRoomRepository.getChatRooms()) {
                 is ApiResult.Success -> {
                     val rooms = result.data?.map { it.toChatRoomUi() } ?: emptyList()
                     _listState.update { it.copy(isRefreshing = false, errorMessage = null, rooms = rooms) }
@@ -103,7 +103,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             _listState.update { it.copy(isLoading = true) }
 
-            when (val result = chatRepository.createChatRoom(roomName, participantIds)) {
+            when (val result = chatRoomRepository.createChatRoom(roomName, participantIds)) {
                 is ApiResult.Success -> {
                     val created = result.data?.toChatRoomUi()
                     if (created != null) {
