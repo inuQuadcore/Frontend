@@ -54,6 +54,11 @@ class ChatRoomViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            tokenManager.userId.firstOrNull()?.let { uid ->
+                _uiState.update { it.copy(myUserId = uid) }
+            }
+        }
+        viewModelScope.launch {
             voiceRecorder.seconds.collect { sec ->
                 _uiState.update { it.copy(recordingSeconds = sec) }
             }

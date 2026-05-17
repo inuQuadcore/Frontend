@@ -429,6 +429,8 @@ fun ChatRoomContent(
         }
 
         state.contextMenuMessage?.let { msg ->
+            // 본인 메시지 판정: senderId(String) vs myUserId(Long). dummy 메시지는 senderId="me"라 항상 false.
+            val isOwn = msg.senderId.toLongOrNull() == state.myUserId
             MessageContextMenu(
                 onDismiss    = onDismissContextMenu,
                 onCopy       = { /* TODO: 클립보드 복사 */ },
@@ -438,7 +440,7 @@ fun ChatRoomContent(
                     onDismissContextMenu()
                     onStartScriptSave(msg.id)
                 },
-                isOwnMessage = msg.senderId == "me",
+                isOwnMessage = isOwn,
                 onEdit       = {
                     editingMessageId = msg.id
                     editingText      = msg.text

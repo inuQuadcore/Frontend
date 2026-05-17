@@ -98,6 +98,7 @@ data class ChatRoomUiState(
     val room                      : ChatRoomUi           = ChatRoomUi(),
     val messages                  : List<ChatMessage>    = emptyList(),
     val inputText                 : String               = "",
+    val myUserId                  : Long                 = 0L,            // ContextMenu isOwnMessage 판정용. 0 = 미인증/로드 전.
 
     // 번역
     val isAutoTranslate           : Boolean              = false,
