@@ -41,6 +41,7 @@ fun FriendMainScreen(
     onAddFriend     : () -> Unit = {},
     onStartChat     : (DiscoverUser) -> Unit = {},
     onNotification  : () -> Unit = {},
+    hasNotification : Boolean    = false,
     onReplyToStatus : (friendId: String, friendName: String) -> Unit = { _, _ -> },
 ) {
     val uiState     by viewModel.uiState.collectAsState()
@@ -84,13 +85,14 @@ fun FriendMainScreen(
         statusState.isWriteScreenOpen  -> StatusWriteScreen(viewModel = statusVm)
         uiState.isStatusPageOpen       -> StatusMessageAllScreen(viewModel = viewModel, statusVm = statusVm)
         else                           -> FriendMainContent(
-            viewModel      = viewModel,
-            statusVm       = statusVm,
-            onFriendClick  = { viewModel.selectFriend(it) },
-            onAddFriend    = onAddFriend,
-            onNotification = onNotification,
-            isRefreshing   = uiState.isRefreshing,
-            onRefresh      = viewModel::refresh,
+            viewModel       = viewModel,
+            statusVm        = statusVm,
+            onFriendClick   = { viewModel.selectFriend(it) },
+            onAddFriend     = onAddFriend,
+            onNotification  = onNotification,
+            hasNotification = hasNotification,
+            isRefreshing    = uiState.isRefreshing,
+            onRefresh       = viewModel::refresh,
         )
     }
 
@@ -121,13 +123,14 @@ private fun FriendProfile.toDiscoverUser() = DiscoverUser(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FriendMainContent(
-    viewModel      : FriendViewModel,
-    statusVm       : StatusMessageViewModel,
-    onFriendClick  : (FriendProfile) -> Unit,
-    onAddFriend    : () -> Unit,
-    onNotification : () -> Unit = {},
-    isRefreshing   : Boolean    = false,
-    onRefresh      : () -> Unit = {},
+    viewModel       : FriendViewModel,
+    statusVm        : StatusMessageViewModel,
+    onFriendClick   : (FriendProfile) -> Unit,
+    onAddFriend     : () -> Unit,
+    onNotification  : () -> Unit = {},
+    hasNotification : Boolean    = false,
+    isRefreshing    : Boolean    = false,
+    onRefresh       : () -> Unit = {},
 ) {
     val uiState     by viewModel.uiState.collectAsState()
     val statusState by statusVm.state.collectAsState()
@@ -136,11 +139,12 @@ private fun FriendMainContent(
     Scaffold(
         topBar = {
             FriendTopBar(
-                title          = "친구",
-                showAddFriend  = true,
-                onSearch       = { viewModel.setSearchActive(true) },
-                onNotification = onNotification,
-                onAddFriend    = onAddFriend,
+                title           = "친구",
+                showAddFriend   = true,
+                onSearch        = { viewModel.setSearchActive(true) },
+                onNotification  = onNotification,
+                hasNotification = hasNotification,
+                onAddFriend     = onAddFriend,
             )
         },
         containerColor = Color.White,

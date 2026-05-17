@@ -6,6 +6,7 @@ import com.everybuddy.app.data.auth.AuthDataHolder
 import com.everybuddy.app.data.auth.FirebaseAuthManager
 import com.everybuddy.app.data.auth.GoogleAuthManager
 import com.everybuddy.app.data.auth.GoogleSignInResult
+import com.everybuddy.app.data.firebase.FcmTokenManager
 import com.everybuddy.app.data.firebase.PresenceManager
 import com.everybuddy.app.data.firebase.PresenceRepository
 import com.everybuddy.app.data.firebase.ViewingManager
@@ -31,6 +32,7 @@ class AuthRepository @Inject constructor(
     private val api                 : AuthApi,
     private val googleAuthManager   : GoogleAuthManager,
     private val firebaseAuthManager : FirebaseAuthManager,
+    private val fcmTokenManager     : FcmTokenManager,
     private val presenceManager     : PresenceManager,
     private val presenceRepository  : PresenceRepository,
     private val viewingManager      : ViewingManager,
@@ -54,6 +56,7 @@ class AuthRepository @Inject constructor(
                     userId                = body.userId,
                 )
                 signInToFirebase()
+                fcmTokenManager.register()
                 ApiResult.Success(body)
             } else {
                 parseError(res)
@@ -117,6 +120,7 @@ class AuthRepository @Inject constructor(
                     userId                = loginData.userId,
                 )
                 signInToFirebase()
+                fcmTokenManager.register()
                 ApiResult.Success(false)
             } else {
                 val tempToken = body.tempToken
@@ -142,6 +146,7 @@ class AuthRepository @Inject constructor(
                     userId                = body.userId,
                 )
                 signInToFirebase()
+                fcmTokenManager.register()
                 ApiResult.Success(body)
             } else {
                 parseError(res)
@@ -166,6 +171,7 @@ class AuthRepository @Inject constructor(
             } else {
                 ApiResult.Success(Unit)
             }
+            fcmTokenManager.delete()    // JWT 살아있을 때 백엔드에서 토큰 제거
             tokenManager.clearToken()
             viewingManager.stop()
             presenceManager.stop()
@@ -173,6 +179,7 @@ class AuthRepository @Inject constructor(
             firebaseAuthManager.signOut()
             result
         } catch (e: Exception) {
+            fcmTokenManager.delete()
             tokenManager.clearToken()   // 옵션 A: 네트워크 실패해도 로컬 토큰은 삭제 (UX 우선)
             presenceManager.stop()
             firebaseAuthManager.signOut()

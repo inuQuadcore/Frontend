@@ -39,14 +39,15 @@ private val SmBorder  = Color(0xFFE5E5E5)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScriptMainScreen(
-    viewModel      : ScriptViewModel,
-    isRefreshing   : Boolean    = false,
-    onRefresh      : () -> Unit = {},
-    onAddFolder    : () -> Unit = {},
-    onFolderClick  : (ScriptFolder) -> Unit = {},
-    onItemClick    : (ScriptItem) -> Unit = {},
-    onItemAudio    : (ScriptItem) -> Unit = {},
-    onNotification : () -> Unit = {},
+    viewModel       : ScriptViewModel,
+    isRefreshing    : Boolean    = false,
+    onRefresh       : () -> Unit = {},
+    onAddFolder     : () -> Unit = {},
+    onFolderClick   : (ScriptFolder) -> Unit = {},
+    onItemClick     : (ScriptItem) -> Unit = {},
+    onItemAudio     : (ScriptItem) -> Unit = {},
+    onNotification  : () -> Unit = {},
+    hasNotification : Boolean    = false,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val items = viewModel.filteredItems
@@ -65,6 +66,7 @@ fun ScriptMainScreen(
                 },
                 onSearchChange      = viewModel::updateSearchQuery,
                 onNotificationClick = onNotification,
+                hasNotification     = hasNotification,
             )
         },
         containerColor = Color.White,
