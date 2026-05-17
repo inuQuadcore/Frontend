@@ -180,6 +180,7 @@ fun ChatRoomScreen(
         onDeleteMessage          = viewModel::onDeleteMessage,
         onEditMessage            = viewModel::onEditMessage,
         onInviteMembers          = viewModel::inviteMembers,
+        onRetryMessage           = viewModel::retryMessage,
         isStarred                = isStarred,
         onToggleStar             = onToggleStar,
     )
@@ -220,6 +221,7 @@ fun ChatRoomContent(
     onDeleteMessage           : (String) -> Unit       = {},
     onEditMessage             : (String, String) -> Unit = { _, _ -> },
     onInviteMembers           : (List<Long>) -> Unit   = {},
+    onRetryMessage            : (String) -> Unit       = {},
     isStarred                 : Boolean                = false,
     onToggleStar              : () -> Unit             = {},
 ) {
@@ -368,6 +370,7 @@ fun ChatRoomContent(
                 onToggleTranslation   = onToggleTranslation,
                 onLongPressMessage    = onLongPressMessage,
                 onSaveScript          = { msg -> onStartScriptSave(msg.id) },
+                onRetryMessage        = onRetryMessage,
                 searchQuery           = if (isSearchMode) searchQuery else "",
                 highlightedMessageId  = highlightedMessageId,
             )
@@ -860,6 +863,7 @@ fun MessageList(
     onToggleTranslation   : (String) -> Unit,
     onLongPressMessage    : (ChatMessage) -> Unit = {},
     onSaveScript          : (ChatMessage) -> Unit,
+    onRetryMessage        : (String) -> Unit = {},
     searchQuery           : String  = "",
     highlightedMessageId  : String? = null,
 ) {
@@ -897,6 +901,7 @@ fun MessageList(
                             onToggleTranslation = { onToggleTranslation(msg.id) },
                             onSaveScript        = { onSaveScript(msg) },
                             onLongPress         = { onLongPressMessage(msg) },
+                            onRetry             = { onRetryMessage(msg.id) },
                             searchQuery         = searchQuery,
                             isHighlighted       = msg.id == highlightedMessageId,
                         )
@@ -961,6 +966,7 @@ fun TextMessageBubble(
     onToggleTranslation : () -> Unit,
     onSaveScript        : () -> Unit,
     onLongPress         : () -> Unit = {},
+    onRetry             : () -> Unit = {},
     searchQuery         : String  = "",
     isHighlighted       : Boolean = false,
 ) {
@@ -969,6 +975,7 @@ fun TextMessageBubble(
         val base = message.timestamp.format(timeFormatter)
         if (message.editedAt != null) "$base · 수정됨" else base
     }
+    val isFailed = message.status == "FAILED"
 
     val shakeOffset = remember { Animatable(0f) }
     LaunchedEffect(isHighlighted) {
@@ -1015,6 +1022,13 @@ fun TextMessageBubble(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.End,
             ) {
+                if (isFailed) {
+                    Text(
+                        text     = "전송 실패 · 재시도",
+                        style    = TextStyle(fontSize = 9.sp, color = Color(0xFFE53935), fontFamily = PretendardFamily),
+                        modifier = Modifier.clickable { onRetry() }.padding(end = 6.dp),
+                    )
+                }
                 Text(
                     text     = timeText,
                     style    = TextStyle(fontSize = 9.sp, color = TextSecondary),

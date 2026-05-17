@@ -10,6 +10,7 @@ import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.local.formatRestLocalDateTime
 import com.everybuddy.app.data.firebase.ChatMessageListener
 import com.everybuddy.app.data.firebase.ViewingManager
+import com.everybuddy.app.data.local.ChatMessageEntity
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.MessageRepository
 import com.google.firebase.database.FirebaseDatabase
@@ -160,12 +161,50 @@ class ChatRoomViewModel @Inject constructor(
         if (text.isEmpty()) return
 
         val chatRoomId = _uiState.value.room.id.toLongOrNull() ?: return
+        val myUserId   = _uiState.value.myUserId
 
-        // 입력창 즉시 비우고 송신. 본인 메시지 화면 표시는 RTDB push로 들어옴.
         _uiState.update { it.copy(inputText = "") }
         viewModelScope.launch {
-            messageRepository.sendTextMessage(chatRoomId, text)
-            // 성공/실패 처리는 C21 (PENDING/재시도)에서 본격화. 지금은 silent fail.
+            when (val result = messageRepository.sendTextMessage(chatRoomId, text)) {
+                is ApiResult.Success -> { /* RTDB push로 본인 메시지 도착 */ }
+                is ApiResult.Error, is ApiResult.NetworkError -> {
+                    insertFailedTextMessage(chatRoomId, myUserId, text)
+                }
+            }
+        }
+    }
+
+    /** 송신 실패 메시지를 Room에 FAILED status로 저장. 음수 tempId로 PK 충돌 회피. */
+    private suspend fun insertFailedTextMessage(chatRoomId: Long, senderId: Long, text: String) {
+        val tempId = -System.currentTimeMillis()
+        messageDao.upsert(
+            ChatMessageEntity(
+                messageId   = tempId,
+                chatRoomId  = chatRoomId,
+                senderId    = senderId,
+                senderName  = "",                                // RTDB와 다르게 채워두지 않음 — UI는 본인 메시지로 렌더링
+                messageType = "TEXT",
+                content     = text,
+                sendAt      = java.time.LocalDateTime.now(com.everybuddy.app.data.local.KST),
+                status      = "FAILED",
+            )
+        )
+    }
+
+    /** FAILED 메시지 재시도. 기존 FAILED row 삭제 후 다시 송신. */
+    fun retryMessage(messageId: String) {
+        val tempId = messageId.toLongOrNull()?.takeIf { it < 0 } ?: return
+        val msg    = _uiState.value.messages.firstOrNull { it.id == messageId } ?: return
+        val chatRoomId = _uiState.value.room.id.toLongOrNull() ?: return
+
+        viewModelScope.launch {
+            messageDao.delete(tempId)
+            when (val result = messageRepository.sendTextMessage(chatRoomId, msg.text)) {
+                is ApiResult.Success -> { /* RTDB로 도착 */ }
+                is ApiResult.Error, is ApiResult.NetworkError -> {
+                    insertFailedTextMessage(chatRoomId, _uiState.value.myUserId, msg.text)
+                }
+            }
         }
     }
 
