@@ -2,6 +2,7 @@ package com.everybuddy.app.ui.notification
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,8 +42,9 @@ private val UnreadBg = Color(0xFFF0F6FF)
 
 @Composable
 fun NotificationScreen(
-    onBack    : () -> Unit,
-    viewModel : NotificationViewModel = hiltViewModel(),
+    onBack         : () -> Unit,
+    onFriendClick  : (Long) -> Unit = {},
+    viewModel      : NotificationViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onBack)
     val state by viewModel.uiState.collectAsState()
@@ -71,7 +73,13 @@ fun NotificationScreen(
                 state.notifications.isEmpty()    -> EmptyText("새 알림이 없습니다.")
                 else                             -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                     items(state.notifications, key = { it.notificationId }) { notif ->
-                        NotificationRow(notif)
+                        NotificationRow(
+                            notif   = notif,
+                            onClick = {
+                                viewModel.markRead(notif.notificationId)
+                                onFriendClick(notif.fromUserId)
+                            },
+                        )
                         HorizontalDivider(
                             modifier  = Modifier.padding(horizontal = 16.dp),
                             color     = Border,
@@ -139,11 +147,12 @@ private fun EmptyText(text: String) {
 }
 
 @Composable
-private fun NotificationRow(notif: Notification) {
+private fun NotificationRow(notif: Notification, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(if (notif.isRead) Color.White else UnreadBg)
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment     = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp),

@@ -104,7 +104,14 @@ fun MainScreen(onLogout: () -> Unit = {}) {
     var showNewFolderInScript by remember { mutableStateOf(false) }
 
     if (showNotification) {
-        NotificationScreen(onBack = { showNotification = false })
+        NotificationScreen(
+            onBack         = { showNotification = false },
+            onFriendClick  = { userId ->
+                showNotification = false
+                selectedTab     = MainTab.FRIEND
+                friendVm.selectFriendByUserId(userId)
+            },
+        )
         return
     }
 
