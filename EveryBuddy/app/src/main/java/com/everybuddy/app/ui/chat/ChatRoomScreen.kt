@@ -246,7 +246,17 @@ fun ChatRoomContent(
     var mediaSubPage          by remember { mutableStateOf<String?>(null) }
     var showInviteScreen      by remember { mutableStateOf(false) }
 
-    val members = remember(state.room) { emptyList<ChatMember>() }
+    val members = remember(state.room.participants, state.userSummaries, state.myUserId) {
+        state.room.participants.map { p ->
+            val summary = state.userSummaries[p.id]
+            ChatMember(
+                id              = p.id.toString(),
+                name            = summary?.name.orEmpty(),
+                profileImageUrl = p.profileImageUrl ?: summary?.profileImageUrl,
+                isMe            = p.id == state.myUserId,
+            )
+        }
+    }
 
     LaunchedEffect(state.conversationSaveMessages) { separateIdx = 0; pendingScriptItems = emptyList() }
 

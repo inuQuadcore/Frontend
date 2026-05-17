@@ -318,6 +318,9 @@ private fun GroupProfileMosaic(
         modifier = modifier.size(80.dp),
     ) {
         when (displayMembers.size) {
+            0 -> {
+                Box(modifier = Modifier.size(80.dp).clip(CircleShape).background(Color(0xFFCCCCCC)))
+            }
             1 -> {
                 ProfileCircle(member = displayMembers[0], size = 80.dp, modifier = Modifier.align(Alignment.Center))
             }
