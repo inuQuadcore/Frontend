@@ -359,22 +359,15 @@ private fun ProfileCircle(
     size     : androidx.compose.ui.unit.Dp,
     modifier : Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(Color(0xFFCCCCCC)),  // 플레이스홀더 배경
-    ) {
-        if (member.profileImageUrl != null) {
-            // TODO: 실제 프로필 이미지 로딩 (Coil AsyncImage)
-            // AsyncImage(
-            //     model              = member.profileImageUrl,
-            //     contentDescription = member.name,
-            //     contentScale       = ContentScale.Crop,
-            //     modifier           = Modifier.fillMaxSize(),
-            // )
-        }
-        // 이미지 없을 때는 배경색만 (이미지 속 회색 원)
+    if (member.profileImageUrl != null) {
+        coil.compose.AsyncImage(
+            model              = member.profileImageUrl,
+            contentDescription = member.name,
+            contentScale       = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier           = modifier.size(size).clip(CircleShape).background(Color(0xFFCCCCCC)),
+        )
+    } else {
+        Box(modifier = modifier.size(size).clip(CircleShape).background(Color(0xFFCCCCCC)))
     }
 }
 
@@ -496,21 +489,15 @@ private fun MemberRow(member: ChatMember) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // 프로필 이미지
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(Color(0xFFCCCCCC)),
-        ) {
-            if (member.profileImageUrl != null) {
-                // TODO: 실제 프로필 이미지 (Coil AsyncImage)
-                // AsyncImage(
-                //     model              = member.profileImageUrl,
-                //     contentDescription = member.name,
-                //     contentScale       = ContentScale.Crop,
-                //     modifier           = Modifier.fillMaxSize(),
-                // )
-            }
+        if (member.profileImageUrl != null) {
+            coil.compose.AsyncImage(
+                model              = member.profileImageUrl,
+                contentDescription = member.name,
+                contentScale       = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier           = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFCCCCCC)),
+            )
+        } else {
+            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFCCCCCC)))
         }
         Text(
             text  = member.name,

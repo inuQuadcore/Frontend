@@ -125,8 +125,9 @@ fun ChatRoomScreen(
 
     if (state.isConversationSelectOpen) {
         ConversationSelectScreen(
-            messages = state.messages,
-            roomName = state.room.name,
+            messages      = state.messages,
+            userSummaries = state.userSummaries,
+            roomName      = state.room.name,
             onBack   = viewModel::onDismissConversationSelect,
             onSave   = viewModel::onConversationSelected,
         )
@@ -362,6 +363,7 @@ fun ChatRoomContent(
 
             MessageList(
                 messages              = state.messages,
+                userSummaries         = state.userSummaries,
                 isAutoTranslate       = state.isAutoTranslate,
                 showTranslation       = state.showTranslation,
                 translatingMessageIds = state.translatingMessageIds,
@@ -856,6 +858,7 @@ fun TranslationLoadingDots(modifier: Modifier = Modifier) {
 @Composable
 fun MessageList(
     messages              : List<ChatMessage>,
+    userSummaries         : Map<Long, com.everybuddy.app.data.cache.UserSummary>,
     isAutoTranslate       : Boolean,
     showTranslation       : Map<String, Boolean>,
     translatingMessageIds : Set<String>,
@@ -892,12 +895,17 @@ fun MessageList(
                 val isMe    = msg.senderId == "me"
                 val showTr  = showTranslation[msg.id] ?: isAutoTranslate
                 val playing = playingMessageId == msg.id
+                val summary = msg.senderId.toLongOrNull()?.let { userSummaries[it] }
+                val senderName            = summary?.name.orEmpty()
+                val senderProfileImageUrl = summary?.profileImageUrl
 
                 when (msg.type) {
                     MessageType.TEXT ->
                         TextMessageBubble(
                             message             = msg,
                             isMe                = isMe,
+                            senderName            = senderName,
+                            senderProfileImageUrl = senderProfileImageUrl,
                             isAutoTranslate     = isAutoTranslate,
                             showTranslation     = showTr,
                             isTranslating       = msg.id in translatingMessageIds,
@@ -913,6 +921,8 @@ fun MessageList(
                         VoiceMessageBubble(
                             message             = msg,
                             isMe                = isMe,
+                            senderName            = senderName,
+                            senderProfileImageUrl = senderProfileImageUrl,
                             isAutoTranslate     = isAutoTranslate,
                             isPlaying           = playing,
                             showTranslation     = showTr,
@@ -928,6 +938,25 @@ fun MessageList(
                 }
             }
         }
+    }
+}
+
+/** 메시지 옆 송신자 아바타. profileImageUrl 있으면 Coil로 로드, 없으면 회색 placeholder. */
+@Composable
+private fun SenderAvatar(
+    profileImageUrl    : String?,
+    contentDescription : String,
+    size               : androidx.compose.ui.unit.Dp,
+) {
+    if (profileImageUrl != null) {
+        coil.compose.AsyncImage(
+            model              = profileImageUrl,
+            contentDescription = contentDescription,
+            contentScale       = ContentScale.Crop,
+            modifier           = Modifier.size(size).clip(CircleShape),
+        )
+    } else {
+        Box(modifier = Modifier.size(size).clip(CircleShape).background(Color(0xFFCCCCCC)))
     }
 }
 
@@ -963,6 +992,8 @@ fun DateDivider(label: String) {
 fun TextMessageBubble(
     message             : ChatMessage,
     isMe                : Boolean,
+    senderName            : String  = "",
+    senderProfileImageUrl : String? = null,
     isAutoTranslate     : Boolean,
     showTranslation     : Boolean,
     isTranslating       : Boolean,
@@ -1063,21 +1094,16 @@ fun TextMessageBubble(
                 modifier          = Modifier.fillMaxWidth().padding(end = 38.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                if (message.senderId == "u_woowonjai") {
-                    Image(
-                        painter            = painterResource(R.drawable.im_woo),
-                        contentDescription = message.senderName,
-                        contentScale       = ContentScale.Crop,
-                        modifier           = Modifier.size(38.dp).clip(CircleShape),
-                    )
-                } else {
-                    Box(modifier = Modifier.size(38.dp).clip(CircleShape).background(Color(0xFFCCCCCC)))
-                }
+                SenderAvatar(
+                    profileImageUrl    = senderProfileImageUrl,
+                    contentDescription = senderName,
+                    size               = 38.dp,
+                )
                 Spacer(Modifier.width(8.dp))
 
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(
-                        text     = message.senderName,
+                        text     = senderName,
                         style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
@@ -1205,6 +1231,8 @@ fun TranslateIconButton(onClick: () -> Unit) {
 fun VoiceMessageBubble(
     message             : ChatMessage,
     isMe                : Boolean,
+    senderName            : String  = "",
+    senderProfileImageUrl : String? = null,
     isAutoTranslate     : Boolean,
     isPlaying           : Boolean,
     showTranslation     : Boolean,
@@ -1262,21 +1290,16 @@ fun VoiceMessageBubble(
                 modifier          = Modifier.fillMaxWidth().padding(end = 38.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                if (message.senderId == "u_woowonjai") {
-                    Image(
-                        painter            = painterResource(R.drawable.im_woo),
-                        contentDescription = message.senderName,
-                        contentScale       = ContentScale.Crop,
-                        modifier           = Modifier.size(38.dp).clip(CircleShape),
-                    )
-                } else {
-                    Box(modifier = Modifier.size(38.dp).clip(CircleShape).background(Color(0xFFCCCCCC)))
-                }
+                SenderAvatar(
+                    profileImageUrl    = senderProfileImageUrl,
+                    contentDescription = senderName,
+                    size               = 38.dp,
+                )
                 Spacer(Modifier.width(8.dp))
 
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(
-                        text     = message.senderName,
+                        text     = senderName,
                         style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
                         modifier = Modifier.padding(bottom = 3.dp),
                     )

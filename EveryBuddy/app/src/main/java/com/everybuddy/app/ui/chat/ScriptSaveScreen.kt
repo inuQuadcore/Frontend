@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.everybuddy.app.R
+import com.everybuddy.app.data.cache.UserSummary
 import com.everybuddy.app.data.chat.ChatMessage
 import com.everybuddy.app.data.chat.MessageType
 import com.everybuddy.app.ui.theme.EveryBuddyTheme
@@ -405,10 +406,11 @@ private fun SsMemoField(
 
 @Composable
 fun ConversationSelectScreen(
-    messages : List<ChatMessage>,
-    roomName : String,
-    onBack   : () -> Unit,
-    onSave   : (List<ChatMessage>, CaptureOption) -> Unit,
+    messages      : List<ChatMessage>,
+    userSummaries : Map<Long, UserSummary>,
+    roomName      : String,
+    onBack        : () -> Unit,
+    onSave        : (List<ChatMessage>, CaptureOption) -> Unit,
 ) {
     var selectedRange     by remember { mutableStateOf<IntRange?>(null) }
     var captureOptionOpen by remember { mutableStateOf(false) }
@@ -494,6 +496,7 @@ fun ConversationSelectScreen(
                 )
                 SelectableMessageList(
                     messages      = messages,
+                    userSummaries = userSummaries,
                     selectedRange = selectedRange,
                     onRangeSelect = { selectedRange = it },
                     modifier      = Modifier.fillMaxSize(),
@@ -517,6 +520,7 @@ fun ConversationSelectScreen(
 @Composable
 private fun SelectableMessageList(
     messages      : List<ChatMessage>,
+    userSummaries : Map<Long, UserSummary>,
     selectedRange : IntRange?,
     onRangeSelect : (IntRange?) -> Unit,
     modifier      : Modifier = Modifier,
@@ -547,14 +551,26 @@ private fun SelectableMessageList(
                         } else Modifier
                     ),
             ) {
-                SelectableMessageItem(messages[index], messages[index].senderId == "me")
+                val msg = messages[index]
+                val summary = msg.senderId.toLongOrNull()?.let { userSummaries[it] }
+                SelectableMessageItem(
+                    message               = msg,
+                    isMe                  = msg.senderId == "me",
+                    senderName            = summary?.name.orEmpty(),
+                    senderProfileImageUrl = summary?.profileImageUrl,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun SelectableMessageItem(message: ChatMessage, isMe: Boolean) {
+private fun SelectableMessageItem(
+    message               : ChatMessage,
+    isMe                  : Boolean,
+    senderName            : String  = "",
+    senderProfileImageUrl : String? = null,
+) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
 
     Column(
@@ -563,10 +579,19 @@ private fun SelectableMessageItem(message: ChatMessage, isMe: Boolean) {
     ) {
         if (!isMe) {
             Row(verticalAlignment = Alignment.Top) {
-                Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFCCCCCC)))
+                if (senderProfileImageUrl != null) {
+                    AsyncImage(
+                        model              = senderProfileImageUrl,
+                        contentDescription = senderName,
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.size(36.dp).clip(CircleShape),
+                    )
+                } else {
+                    Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFCCCCCC)))
+                }
                 Spacer(Modifier.width(8.dp))
                 Column {
-                    Text(message.senderName, style = TextStyle(fontSize = 12.sp, color = SsTextSec), modifier = Modifier.padding(bottom = 3.dp))
+                    Text(senderName, style = TextStyle(fontSize = 12.sp, color = SsTextSec), modifier = Modifier.padding(bottom = 3.dp))
                     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Box(
                             modifier = Modifier
@@ -888,7 +913,6 @@ private val _previewMsg = ChatMessage(
     id             = "m01",
     roomId         = "r01",
     senderId       = "u01",
-    senderName     = "Olivia",
     type           = MessageType.TEXT,
     text           = "Hi! I'm trying to learn Korean. Would you like to chat and practice together?",
     translatedText = "안녕하세요! 한국어를 배우려고 하고 있어요. 같이 대화하면서 연습해볼래요?",

@@ -436,7 +436,6 @@ class ChatRoomViewModel @Inject constructor(
             id         = UUID.randomUUID().toString(),
             roomId     = _uiState.value.room.id,
             senderId   = "me",
-            senderName = "나",
             type       = MessageType.IMAGE,
             text       = "[카메라 사진]",
             timestamp  = LocalDateTime.now(),

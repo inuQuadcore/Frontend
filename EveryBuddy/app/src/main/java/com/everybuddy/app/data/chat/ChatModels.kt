@@ -83,7 +83,6 @@ data class ChatMessage(
     val id               : String          = "",
     val roomId           : String          = "",
     val senderId         : String          = "",
-    val senderName       : String          = "",
     val type             : MessageType     = MessageType.TEXT,
     val text             : String          = "",
     val voiceUrl         : String          = "",
@@ -160,7 +159,7 @@ val dummyMessages: Map<String, List<ChatMessage>> = mapOf(
     "r_woowonjai" to listOf(
         ChatMessage(
             id = "ww_m01", roomId = "r_woowonjai",
-            senderId = "u_woowonjai", senderName = "우원재",
+            senderId = "u_woowonjai",
             type = MessageType.TEXT,
             text = "You make me feel brand new",
             translatedText = "네 덕분에 새 사람이 된 것 같아",
@@ -168,7 +167,7 @@ val dummyMessages: Map<String, List<ChatMessage>> = mapOf(
         ),
         ChatMessage(
             id = "ww_m02", roomId = "r_woowonjai",
-            senderId = "u_woowonjai", senderName = "우원재",
+            senderId = "u_woowonjai",
             type = MessageType.VOICE,
             text = "We're livin' in a different time zone. Have a good night",
             translatedText = "우리는 다른 시간대에 살잖아.\n잘 자.",
@@ -177,27 +176,27 @@ val dummyMessages: Map<String, List<ChatMessage>> = mapOf(
         ),
         ChatMessage(
             id = "ww_m03", roomId = "r_woowonjai",
-            senderId = "me", senderName = "나",
+            senderId = "me",
             type = MessageType.TEXT,
             text = "난 지금 눈을 감아야 해. 내일의 나는 달라져야 해.",
             timestamp = BASE_DATE.withHour(23).withMinute(51),
         ),
         ChatMessage(
             id = "ww_m04", roomId = "r_woowonjai",
-            senderId = "me", senderName = "나",
+            senderId = "me",
             type = MessageType.VOICE,
             voiceUrl = "", voiceDurationSec = 10,
             timestamp = BASE_DATE.withHour(23).withMinute(53),
         ),
     ),
     "r01" to listOf(
-        ChatMessage(id = "m01", roomId = "r01", senderId = "u01", senderName = "Potter",
+        ChatMessage(id = "m01", roomId = "r01", senderId = "u01",
             type = MessageType.TEXT, text = "Hello!", timestamp = LocalDateTime.now().minusMinutes(5)),
-        ChatMessage(id = "m02", roomId = "r01", senderId = "me", senderName = "나",
+        ChatMessage(id = "m02", roomId = "r01", senderId = "me",
             type = MessageType.TEXT, text = "안녕하세요!", timestamp = LocalDateTime.now()),
     ),
     "r02" to listOf(
-        ChatMessage(id = "m03", roomId = "r02", senderId = "u08", senderName = "오혁",
+        ChatMessage(id = "m03", roomId = "r02", senderId = "u08",
             type = MessageType.TEXT, text = "좋아요", timestamp = LocalDateTime.now()),
     ),
 )
