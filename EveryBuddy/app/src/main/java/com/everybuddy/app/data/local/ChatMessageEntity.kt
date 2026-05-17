@@ -17,16 +17,17 @@ import java.time.LocalDateTime
 )
 data class ChatMessageEntity(
     @PrimaryKey val messageId   : Long,
-    val chatRoomId : Long,
-    val senderId   : Long,
-    val senderName : String,
-    val messageType: String,                          // "TEXT" | "FILE"
-    val content    : String?,
-    val sendAt     : LocalDateTime,
-    val editedAt   : LocalDateTime?  = null,
-    val status     : String          = "SENT",        // "SENT" | "PENDING" | "FAILED"
-    val fileUrl    : String?         = null,
-    val fileName   : String?         = null,
-    val fileSize   : Long?           = null,
-    val mediaType  : String?         = null,          // "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT"
+    val chatRoomId    : Long,
+    val senderId      : Long,
+    val senderName    : String,
+    val messageType   : String,                          // "TEXT" | "FILE"
+    val content       : String?,
+    val sendAt        : LocalDateTime,
+    val editedAt      : LocalDateTime?  = null,
+    val statusPreview : String?         = null,          // 상태메시지 답장 인용 텍스트. null이면 일반 메시지.
+    val status        : String          = "SENT",        // "SENT" | "PENDING" | "FAILED"
+    val fileUrl       : String?         = null,
+    val fileName      : String?         = null,
+    val fileSize      : Long?           = null,
+    val mediaType     : String?         = null,          // "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT"
 )

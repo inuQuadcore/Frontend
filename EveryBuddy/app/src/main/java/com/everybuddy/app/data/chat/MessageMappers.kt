@@ -16,19 +16,20 @@ fun Message.toChatMessageEntity(
     chatRoomId : Long,
     status     : String = "SENT",
 ): ChatMessageEntity = ChatMessageEntity(
-    messageId   = messageId,
-    chatRoomId  = chatRoomId,
-    senderId    = userId,
-    senderName  = userName,
-    messageType = messageType,
-    content     = content,
-    sendAt      = parseRestLocalDateTime(sendAt),
-    editedAt    = editedAt?.let(::parseRestLocalDateTime),
-    status      = status,
-    fileUrl     = fileUrl,
-    fileName    = fileName,
-    fileSize    = fileSize,
-    mediaType   = mediaType,
+    messageId     = messageId,
+    chatRoomId    = chatRoomId,
+    senderId      = userId,
+    senderName    = userName,
+    messageType   = messageType,
+    content       = content,
+    sendAt        = parseRestLocalDateTime(sendAt),
+    editedAt      = editedAt?.let(::parseRestLocalDateTime),
+    statusPreview = statusPreview,
+    status        = status,
+    fileUrl       = fileUrl,
+    fileName      = fileName,
+    fileSize      = fileSize,
+    mediaType     = mediaType,
 )
 
 /** Room ChatMessageEntity → UI ChatMessage. */
@@ -42,9 +43,11 @@ fun ChatMessageEntity.toChatMessage(): ChatMessage = ChatMessage(
     voiceUrl  = fileUrl.orEmpty(),
     // 음성 길이: 백엔드 응답에 duration 없음. 재생 시점에 ExoPlayer가 메타 추출.
     voiceDurationSec = 0,
-    timestamp = sendAt,
-    editedAt  = editedAt,
-    status    = status,
+    timestamp     = sendAt,
+    editedAt      = editedAt,
+    status        = status,
+    isStatusReply = statusPreview != null,
+    statusPreview = statusPreview.orEmpty(),
 )
 
 /** messageType + mediaType 조합 → UI MessageType. 미디어 enum 확장 시 여기 업데이트. */
@@ -66,18 +69,19 @@ fun DataSnapshot.toChatMessageEntity(chatRoomId: Long): ChatMessageEntity? {
     val sendAtMs    = child("sendAt").getValue(Long::class.java)   ?: 0L
     val editedAtMs  = child("editedAt").getValue(Long::class.java)
     return ChatMessageEntity(
-        messageId   = messageId,
-        chatRoomId  = chatRoomId,
-        senderId    = userId,
-        senderName  = userName,
-        messageType = messageType,
-        content     = content,
-        sendAt      = epochMsToKstLocalDateTime(sendAtMs),
-        editedAt    = editedAtMs?.let(::epochMsToKstLocalDateTime),
-        status      = "SENT",
-        fileUrl     = child("fileUrl").getValue(String::class.java),
-        fileName    = child("fileName").getValue(String::class.java),
-        fileSize    = child("fileSize").getValue(Long::class.java),
-        mediaType   = child("mediaType").getValue(String::class.java),
+        messageId     = messageId,
+        chatRoomId    = chatRoomId,
+        senderId      = userId,
+        senderName    = userName,
+        messageType   = messageType,
+        content       = content,
+        sendAt        = epochMsToKstLocalDateTime(sendAtMs),
+        editedAt      = editedAtMs?.let(::epochMsToKstLocalDateTime),
+        statusPreview = child("statusPreview").getValue(String::class.java),
+        status        = "SENT",
+        fileUrl       = child("fileUrl").getValue(String::class.java),
+        fileName      = child("fileName").getValue(String::class.java),
+        fileSize      = child("fileSize").getValue(Long::class.java),
+        mediaType     = child("mediaType").getValue(String::class.java),
     )
 }

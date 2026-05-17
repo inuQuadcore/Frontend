@@ -3,17 +3,18 @@ package com.everybuddy.app.data.dto
 import com.google.gson.annotations.SerializedName
 
 data class Message(
-    @SerializedName("messageId")   val messageId   : Long,
-    @SerializedName("userId")      val userId      : Long,
-    @SerializedName("userName")    val userName    : String,
-    @SerializedName("messageType") val messageType : String,
-    @SerializedName("content")     val content     : String? = null,
-    @SerializedName("sendAt")      val sendAt      : String,
-    @SerializedName("editedAt")    val editedAt    : String? = null,  // null이면 미수정. UI "(수정됨)" 표시 조건.
-    @SerializedName("fileUrl")     val fileUrl     : String? = null,
-    @SerializedName("fileName")    val fileName    : String? = null,
-    @SerializedName("fileSize")    val fileSize    : Long?   = null,
-    @SerializedName("mediaType")   val mediaType   : String? = null,
+    @SerializedName("messageId")     val messageId     : Long,
+    @SerializedName("userId")        val userId        : Long,
+    @SerializedName("userName")      val userName      : String,
+    @SerializedName("messageType")   val messageType   : String,
+    @SerializedName("content")       val content       : String? = null,
+    @SerializedName("sendAt")        val sendAt        : String,
+    @SerializedName("editedAt")      val editedAt      : String? = null,  // null이면 미수정. UI "(수정됨)" 표시 조건.
+    @SerializedName("statusPreview") val statusPreview : String? = null,  // null이면 일반 메시지. 값 있으면 상태메시지 답장 인용 카드 표시.
+    @SerializedName("fileUrl")       val fileUrl       : String? = null,
+    @SerializedName("fileName")      val fileName      : String? = null,
+    @SerializedName("fileSize")      val fileSize      : Long?   = null,
+    @SerializedName("mediaType")     val mediaType     : String? = null,
 )
 
 data class SyncMessagesResponse(
@@ -24,8 +25,9 @@ data class SyncMessagesResponse(
 
 // POST /api/v1/messages (multipart JSON part)
 data class SendMessageRequest(
-    @SerializedName("chatRoomId") val chatRoomId : Long,
-    @SerializedName("content")    val content    : String,
+    @SerializedName("chatRoomId")    val chatRoomId    : Long,
+    @SerializedName("content")       val content       : String,
+    @SerializedName("statusPreview") val statusPreview : String? = null,
 )
 
 data class EditMessageRequest(

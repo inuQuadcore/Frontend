@@ -2,12 +2,13 @@ package com.everybuddy.app.ui.friend
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.FriendStatusMessageDto
 import com.everybuddy.app.data.dto.MyStatusMessageResponse
 import com.everybuddy.app.data.dto.toDto
 import com.everybuddy.app.data.dto.userMessage
+import com.everybuddy.app.data.repository.ChatRoomRepository
+import com.everybuddy.app.data.repository.MessageRepository
 import com.everybuddy.app.data.repository.StatusMessageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +40,9 @@ data class StatusUiState(
 
 @HiltViewModel
 class StatusMessageViewModel @Inject constructor(
-    private val statusRepo: StatusMessageRepository,
+    private val statusRepo         : StatusMessageRepository,
+    private val chatRoomRepository : ChatRoomRepository,
+    private val messageRepository  : MessageRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(StatusUiState())
@@ -146,38 +149,23 @@ class StatusMessageViewModel @Inject constructor(
         if (_state.value.replyText.isBlank() || _state.value.isSending) return
         val replyText = _state.value.replyText.trim()
         val target    = _state.value.expandedStatus ?: return
+        val preview   = if (target.content.length > 15) target.content.take(15) + "…" else target.content
+
         viewModelScope.launch {
             _state.update { it.copy(isSending = true, replyText = "") }
 
-            if (BuildConfig.USE_DUMMY_DATA) {
-                val statusPreview = if (target.content.length > 15) target.content.take(15) + "…" else target.content
-                val friendId      = target.userId.toString()
-                val existing      = FriendDemoData.chatRooms.find { it.friendId == friendId }
-                val msg = FriendDemoData.DemoChatMsg(
-                    text                  = replyText,
-                    isMine                = true,
-                    isStatusReply         = true,
-                    originalStatusPreview = statusPreview,
-                )
-                if (existing != null) {
-                    existing.messages.add(msg)
-                } else {
-                    FriendDemoData.chatRooms.add(
-                        FriendDemoData.DemoChatRoom(
-                            id         = java.util.UUID.randomUUID().toString(),
-                            friendId   = friendId,
-                            friendName = target.userName,
-                            messages   = mutableListOf(msg),
-                        )
-                    )
+            val createResult = chatRoomRepository.createChatRoom(target.userName, listOf(target.userId))
+            if (createResult is ApiResult.Success) {
+                val chatRoomId = createResult.data?.chatRoomId
+                if (chatRoomId != null) {
+                    messageRepository.sendTextMessage(chatRoomId, replyText, statusPreview = preview)
+                    _state.update { it.copy(isSending = false, replySent = true) }
+                    delay(1500)
+                    _state.update { it.copy(replySent = false, expandedStatus = null, isReplying = false) }
+                    return@launch
                 }
             }
-            // TODO: ChatRoomRepository integration — 실제 API 전송
-
-            delay(700)
-            _state.update { it.copy(isSending = false, replySent = true) }
-            delay(1500)
-            _state.update { it.copy(replySent = false, expandedStatus = null, isReplying = false) }
+            _state.update { it.copy(isSending = false, toastMessage = createResult.userMessage()) }
         }
     }
 

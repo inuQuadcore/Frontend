@@ -12,6 +12,7 @@ import com.google.gson.annotations.SerializedName
 data class ChatRoom(
     @SerializedName("chatRoomId")     val chatRoomId     : Long,
     @SerializedName("roomName")       val roomName       : String,
+    @SerializedName("isGroup")        val isGroup        : Boolean,
     @SerializedName("createdAt")      val createdAt      : String,
     @SerializedName("participantIds") val participantIds : List<Long>,
     @SerializedName("unreadCount")    val unreadCount    : Int? = null,

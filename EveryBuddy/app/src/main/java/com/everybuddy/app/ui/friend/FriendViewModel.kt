@@ -7,9 +7,10 @@ import com.everybuddy.app.data.dto.Friend
 import com.everybuddy.app.data.dto.userMessage
 import com.everybuddy.app.data.firebase.PresenceRepository
 import com.everybuddy.app.data.repository.BlockRepository
+import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.FriendRepository
+import com.everybuddy.app.data.repository.MessageRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,6 +64,8 @@ class FriendViewModel @Inject constructor(
     private val friendRepository    : FriendRepository,
     private val blockRepository     : BlockRepository,
     private val presenceRepository  : PresenceRepository,
+    private val chatRoomRepository  : ChatRoomRepository,
+    private val messageRepository   : MessageRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FriendUiState())
@@ -184,49 +187,33 @@ class FriendViewModel @Inject constructor(
     }
 
     /**
-     * 답장 전송
-     * - 기존 채팅방이 있으면 메시지 추가
-     * - 없으면 새 채팅방 생성
-     * - 채팅방 내 상태메시지 인용 표시 (15자 제한)
+     * 상태메시지 답장 전송.
+     * 1:1방 idempotent — createChatRoom 호출하면 기존/신규 chatRoomId 받음. 클라 캐시 lookup 불필요.
+     * statusPreview는 인용 카드 표시용 — 백엔드 message API의 옵션 필드.
      */
     fun sendReply() {
-        val state = _uiState.value
+        val state  = _uiState.value
         val target = state.expandedStatus ?: return
         val text   = state.replyText.trim().ifBlank { return }
+        val preview = target.preview15()
 
-        val statusPreview = target.preview15()
-
-        val targetId     = target.authorId.toString()
-        val existingRoom = state.chatRooms.find { it.friendId == targetId }
-        if (existingRoom != null) {
-            existingRoom.messages.add(
-                FriendDemoData.DemoChatMsg(
-                    text                  = text,
-                    isMine                = true,
-                    isStatusReply         = true,
-                    originalStatusPreview = statusPreview,
-                )
-            )
-        } else {
-            state.chatRooms.add(
-                FriendDemoData.DemoChatRoom(
-                    id         = UUID.randomUUID().toString(),
-                    friendId   = targetId,
-                    friendName = target.authorName,
-                    messages   = mutableListOf(
-                        FriendDemoData.DemoChatMsg(
-                            text                  = text,
-                            isMine                = true,
-                            isStatusReply         = true,
-                            originalStatusPreview = statusPreview,
-                        )
-                    ),
-                )
-            )
-        }
-
-        _uiState.update {
-            it.copy(replySent = true, replyText = "")
+        viewModelScope.launch {
+            when (val createResult = chatRoomRepository.createChatRoom(target.authorName, listOf(target.authorId))) {
+                is ApiResult.Success -> {
+                    val chatRoomId = createResult.data?.chatRoomId
+                    if (chatRoomId == null) {
+                        _uiState.update { it.copy(toastMessage = "채팅방 생성 실패") }
+                        return@launch
+                    }
+                    when (val sendResult = messageRepository.sendTextMessage(chatRoomId, text, statusPreview = preview)) {
+                        is ApiResult.Success -> _uiState.update { it.copy(replySent = true, replyText = "") }
+                        is ApiResult.Error, is ApiResult.NetworkError ->
+                            _uiState.update { it.copy(toastMessage = sendResult.userMessage()) }
+                    }
+                }
+                is ApiResult.Error, is ApiResult.NetworkError ->
+                    _uiState.update { it.copy(toastMessage = createResult.userMessage()) }
+            }
         }
     }
 

@@ -19,7 +19,11 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, "everybuddy.db").build()
+        Room.databaseBuilder(context, AppDatabase::class.java, "everybuddy.db")
+            // 개발 단계 — schema 변경 시 기존 캐시 삭제(메시지는 서버 sync로 재구성, 폴더는 사용자가 재설정).
+            // 출시 전 정식 Migration 도입 필요.
+            .fallbackToDestructiveMigration()
+            .build()
 
     @Provides
     fun provideMessageDao(db: AppDatabase): MessageDao = db.messageDao()

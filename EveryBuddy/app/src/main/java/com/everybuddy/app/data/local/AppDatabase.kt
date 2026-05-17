@@ -10,7 +10,7 @@ import androidx.room.TypeConverters
         FolderEntity::class,
         FolderRoomEntity::class,
     ],
-    version       = 1,
+    version       = 2,                                   // v2: ChatMessageEntity.statusPreview 추가
     exportSchema  = false,
 )
 @TypeConverters(LocalDateTimeConverter::class)
