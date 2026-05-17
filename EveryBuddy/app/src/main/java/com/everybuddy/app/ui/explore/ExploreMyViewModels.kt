@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.userMessage
+import com.everybuddy.app.data.firebase.PresenceRepository
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.AuthRepository
 import com.everybuddy.app.data.repository.BlockRepository
@@ -92,12 +93,36 @@ class ExploreViewModel @Inject constructor(
     private val discoverRepository : DiscoverRepository,
     private val userRepository     : UserRepository,
     private val friendRepository   : FriendRepository,
+    private val presenceRepository : PresenceRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExploreUiState())
     val uiState: StateFlow<ExploreUiState> = _uiState.asStateFlow()
 
-    init { refresh() }
+    init {
+        refresh()
+        observePresence()
+    }
+
+    /** RTDB presence/ 변경 시 모든 user list의 isOnline 일괄 갱신. */
+    private fun observePresence() {
+        viewModelScope.launch {
+            presenceRepository.onlineIds.collect { ids ->
+                _uiState.update { state ->
+                    state.copy(
+                        cardSet           = state.cardSet.applyPresence(ids),
+                        tagMatchUsers     = state.tagMatchUsers.applyPresence(ids),
+                        learningLangUsers = state.learningLangUsers.applyPresence(ids),
+                        filterResults     = state.filterResults.applyPresence(ids),
+                        selectedUser      = state.selectedUser?.let { it.copy(isOnline = it.userId in ids) },
+                    )
+                }
+            }
+        }
+    }
+
+    private fun List<DiscoverUser>.applyPresence(ids: Set<Long>): List<DiscoverUser> =
+        map { it.copy(isOnline = it.userId in ids) }
 
     fun selectTab(tab: Int) { _uiState.update { it.copy(selectedTab = tab) } }
 

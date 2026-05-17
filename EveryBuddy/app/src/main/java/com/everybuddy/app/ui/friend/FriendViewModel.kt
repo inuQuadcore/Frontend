@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.Friend
 import com.everybuddy.app.data.dto.userMessage
+import com.everybuddy.app.data.firebase.PresenceRepository
 import com.everybuddy.app.data.repository.BlockRepository
 import com.everybuddy.app.data.repository.FriendRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -59,21 +60,42 @@ data class FriendUiState(
 
 @HiltViewModel
 class FriendViewModel @Inject constructor(
-    private val friendRepository : FriendRepository,
-    private val blockRepository  : BlockRepository,
+    private val friendRepository    : FriendRepository,
+    private val blockRepository     : BlockRepository,
+    private val presenceRepository  : PresenceRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FriendUiState())
     val uiState: StateFlow<FriendUiState> = _uiState.asStateFlow()
 
-    init { loadFriends() }
+    init {
+        loadFriends()
+        observePresence()
+    }
+
+    /** RTDB presence/ 변경 시 친구 isOnline 일괄 갱신. */
+    private fun observePresence() {
+        viewModelScope.launch {
+            presenceRepository.onlineIds.collect { ids ->
+                _uiState.update { state ->
+                    state.copy(friends = state.friends.map { it.copy(isOnline = it.id in ids) })
+                }
+            }
+        }
+    }
 
     fun loadFriends() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             when (val r = friendRepository.getFriends()) {
-                is ApiResult.Success -> _uiState.update {
-                    it.copy(friends = r.data.friends.map { f -> f.toFriendProfile() }, isLoading = false)
+                is ApiResult.Success -> {
+                    val ids = presenceRepository.onlineIds.value
+                    _uiState.update {
+                        it.copy(
+                            friends   = r.data.friends.map { f -> f.toFriendProfile(ids) },
+                            isLoading = false,
+                        )
+                    }
                 }
                 is ApiResult.Error, is ApiResult.NetworkError ->
                     _uiState.update { it.copy(isLoading = false, toastMessage = r.userMessage()) }
@@ -85,8 +107,15 @@ class FriendViewModel @Inject constructor(
         _uiState.update { it.copy(isRefreshing = true) }
         viewModelScope.launch {
             when (val r = friendRepository.getFriends()) {
-                is ApiResult.Success ->
-                    _uiState.update { it.copy(friends = r.data.friends.map { f -> f.toFriendProfile() }, isRefreshing = false) }
+                is ApiResult.Success -> {
+                    val ids = presenceRepository.onlineIds.value
+                    _uiState.update {
+                        it.copy(
+                            friends      = r.data.friends.map { f -> f.toFriendProfile(ids) },
+                            isRefreshing = false,
+                        )
+                    }
+                }
                 is ApiResult.Error, is ApiResult.NetworkError ->
                     _uiState.update { it.copy(isRefreshing = false, toastMessage = r.userMessage()) }
             }
@@ -316,9 +345,11 @@ class FriendViewModel @Inject constructor(
         }
 }
 
-// Friend(DTO) → FriendProfile(UI) 매핑.
-// isOnline은 RTDB presence/{userId} 구독으로 별도 채움 — 별도 작업으로 분리.
-private fun Friend.toFriendProfile() = FriendProfile(
+/**
+ * Friend(DTO) → FriendProfile(UI) 매핑.
+ * isOnline은 RTDB `presence/` 구독 결과에서 채움 ([PresenceRepository]).
+ */
+private fun Friend.toFriendProfile(onlineIds: Set<Long>) = FriendProfile(
     id                = userId,
     name              = name,
     profileImageUrl   = profileImageUrl,
@@ -327,6 +358,6 @@ private fun Friend.toFriendProfile() = FriendProfile(
     learningLanguages = languages.map { it.language },
     interests         = tags.map { it.tag },
     bio               = bio,
-    isOnline          = false,
+    isOnline          = userId in onlineIds,
     isFriend          = true,
 )
