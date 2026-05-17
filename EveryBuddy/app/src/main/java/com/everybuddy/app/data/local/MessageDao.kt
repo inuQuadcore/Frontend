@@ -31,6 +31,10 @@ interface MessageDao {
     """)
     fun observeRoom(chatRoomId: Long, limit: Int, offset: Int): Flow<List<ChatMessageEntity>>
 
+    /** 채팅방 전체 메시지 sendAt ASC. RTDB가 limitToLast(50)로 제한해 보내니 1000개 미만 가정. */
+    @Query("SELECT * FROM chat_messages WHERE chatRoomId = :chatRoomId ORDER BY sendAt ASC")
+    fun observeRoomAll(chatRoomId: Long): Flow<List<ChatMessageEntity>>
+
     /** SENT 상태의 마지막 sendAt — REST sync의 since 파라미터에 사용. */
     @Query("""
         SELECT sendAt FROM chat_messages

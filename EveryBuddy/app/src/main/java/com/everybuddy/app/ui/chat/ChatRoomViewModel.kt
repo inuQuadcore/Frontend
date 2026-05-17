@@ -89,9 +89,10 @@ class ChatRoomViewModel @Inject constructor(
 
         _uiState.update { it.copy(room = ChatRoomUi(id = roomId, name = roomName)) }
 
-        // Room flow collect → UI state.messages
+        // Room flow collect → UI state.messages.
+        // RTDB가 limitToLast(50)로 캐시 유입을 제한하니 채팅방당 메시지 수 적음 — 전체 load.
         viewModelScope.launch {
-            messageDao.observeRoom(chatRoomId, limit = 50, offset = 0).collect { entities ->
+            messageDao.observeRoomAll(chatRoomId).collect { entities ->
                 val messages = entities.map { it.toChatMessage() }
                 _uiState.update { it.copy(messages = messages) }
             }
