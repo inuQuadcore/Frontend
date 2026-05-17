@@ -3,7 +3,6 @@ package com.everybuddy.app.ui.chat
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.local.MessageDao
@@ -79,20 +78,7 @@ class ChatRoomViewModel @Inject constructor(
         messageListener?.detach()
         messageListener = null
 
-        val chatRoomId = roomId.toLongOrNull()
-        // toLong 실패 = dummy ID (예: "r01"). USE_DUMMY_DATA 분기 처리.
-        if (chatRoomId == null) {
-            if (BuildConfig.USE_DUMMY_DATA) {
-                val dummyRoom = dummyChatRooms.find { it.id == roomId }
-                _uiState.update {
-                    it.copy(
-                        room     = dummyRoom ?: ChatRoomUi(id = roomId, name = roomName),
-                        messages = dummyMessages[roomId] ?: emptyList(),
-                    )
-                }
-            }
-            return
-        }
+        val chatRoomId = roomId.toLongOrNull() ?: return   // 잘못된 ID — 무시
 
         _uiState.update { it.copy(room = ChatRoomUi(id = roomId, name = roomName)) }
 
@@ -165,23 +151,9 @@ class ChatRoomViewModel @Inject constructor(
         val text = _uiState.value.inputText.trim()
         if (text.isEmpty()) return
 
-        val chatRoomId = _uiState.value.room.id.toLongOrNull()
-        if (chatRoomId == null) {
-            // dummy 채팅방 (USE_DUMMY_DATA 흐름): 기존처럼 로컬 메시지 표시
-            val msg = ChatMessage(
-                id         = UUID.randomUUID().toString(),
-                roomId     = _uiState.value.room.id,
-                senderId   = "me",
-                senderName = "나",
-                type       = MessageType.TEXT,
-                text       = text,
-                timestamp  = LocalDateTime.now(),
-            )
-            _uiState.update { state -> state.copy(messages = state.messages + msg, inputText = "") }
-            return
-        }
+        val chatRoomId = _uiState.value.room.id.toLongOrNull() ?: return
 
-        // 입력창 즉시 비우고 송신. 본인 메시지 화면 표시는 RTDB 도착(C10) 또는 sync 재호출 때.
+        // 입력창 즉시 비우고 송신. 본인 메시지 화면 표시는 RTDB push로 들어옴.
         _uiState.update { it.copy(inputText = "") }
         viewModelScope.launch {
             messageRepository.sendTextMessage(chatRoomId, text)
@@ -207,23 +179,7 @@ class ChatRoomViewModel @Inject constructor(
         }
         _uiState.update { it.copy(isRecording = false, isRecordingPaused = false) }
 
-        val chatRoomId = _uiState.value.room.id.toLongOrNull()
-        if (chatRoomId == null) {
-            // dummy 채팅방: 기존 로컬 메시지 흐름 유지
-            val durationSec = _uiState.value.recordingSeconds
-            val msg = ChatMessage(
-                id               = UUID.randomUUID().toString(),
-                roomId           = _uiState.value.room.id,
-                senderId         = "me",
-                senderName       = "나",
-                type             = MessageType.VOICE,
-                voiceUrl         = filePath,
-                voiceDurationSec = durationSec,
-                timestamp        = LocalDateTime.now(),
-            )
-            _uiState.update { state -> state.copy(messages = state.messages + msg) }
-            return
-        }
+        val chatRoomId = _uiState.value.room.id.toLongOrNull() ?: return
 
         viewModelScope.launch {
             // VoiceRecorder는 MPEG_4 컨테이너 + AAC 인코딩 (.m4a)
@@ -407,22 +363,7 @@ class ChatRoomViewModel @Inject constructor(
     fun onFilePicked(uri: String) {
         _uiState.update { it.copy(isMediaPanelOpen = false) }
 
-        val chatRoomId = _uiState.value.room.id.toLongOrNull()
-        if (chatRoomId == null) {
-            // dummy 채팅방: 기존 로컬 메시지 흐름 유지
-            val msg = ChatMessage(
-                id         = UUID.randomUUID().toString(),
-                roomId     = _uiState.value.room.id,
-                senderId   = "me",
-                senderName = "나",
-                type       = MessageType.IMAGE,
-                text       = "[파일] ${uri.substringAfterLast('/')}",
-                voiceUrl   = uri,
-                timestamp  = LocalDateTime.now(),
-            )
-            _uiState.update { it.copy(messages = it.messages + msg) }
-            return
-        }
+        val chatRoomId = _uiState.value.room.id.toLongOrNull() ?: return
 
         viewModelScope.launch {
             fileMessageUploader.upload(chatRoomId, Uri.parse(uri))

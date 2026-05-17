@@ -2,7 +2,6 @@ package com.everybuddy.app.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.cache.UserSummaryCache
 import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.data.dto.ApiResult
@@ -113,10 +112,6 @@ class ChatViewModel @Inject constructor(
 
     // 채팅방 목록 로드 — GET /api/v1/chatrooms
     fun loadChatRooms() {
-        if (BuildConfig.USE_DUMMY_DATA) {
-            _listState.update { it.copy(isLoading = false, rooms = dummyChatRooms, errorMessage = null) }
-            return
-        }
         viewModelScope.launch {
             _listState.update { it.copy(isLoading = true, errorMessage = null) }
 
@@ -128,25 +123,15 @@ class ChatViewModel @Inject constructor(
                 }
 
                 is ApiResult.Error -> {
-                    // 401: JWT 만료 → 로그인 화면으로 이동 필요
-                    // TODO: 401 시 로그아웃 처리 — AppNavGraph에서 Route.LOGIN으로 navigate
+                    // TODO: 401 JWT 만료 시 로그아웃 처리
                     _listState.update {
-                        it.copy(
-                            isLoading    = false,
-                            errorMessage = result.message,
-                            rooms        = if (BuildConfig.USE_DUMMY_DATA) dummyChatRooms else emptyList(),
-                        )
+                        it.copy(isLoading = false, errorMessage = result.message, rooms = emptyList())
                     }
                 }
 
                 is ApiResult.NetworkError -> {
-                    // 네트워크 오류
                     _listState.update {
-                        it.copy(
-                            isLoading    = false,
-                            errorMessage = result.e.localizedMessage,
-                            rooms        = if (BuildConfig.USE_DUMMY_DATA) dummyChatRooms else emptyList(),
-                        )
+                        it.copy(isLoading = false, errorMessage = result.e.localizedMessage, rooms = emptyList())
                     }
                 }
             }
@@ -162,12 +147,10 @@ class ChatViewModel @Inject constructor(
                     _listState.update { it.copy(isRefreshing = false, errorMessage = null, rooms = rooms) }
                 }
                 is ApiResult.Error -> {
-                    _listState.update { it.copy(isRefreshing = false, errorMessage = result.message,
-                        rooms = if (BuildConfig.USE_DUMMY_DATA && it.rooms.isEmpty()) dummyChatRooms else it.rooms) }
+                    _listState.update { it.copy(isRefreshing = false, errorMessage = result.message) }
                 }
                 is ApiResult.NetworkError -> {
-                    _listState.update { it.copy(isRefreshing = false, errorMessage = result.e.localizedMessage,
-                        rooms = if (BuildConfig.USE_DUMMY_DATA && it.rooms.isEmpty()) dummyChatRooms else it.rooms) }
+                    _listState.update { it.copy(isRefreshing = false, errorMessage = result.e.localizedMessage) }
                 }
             }
         }
