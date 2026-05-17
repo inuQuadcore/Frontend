@@ -61,6 +61,10 @@ class ChatRoomViewModel @Inject constructor(
     /** 현재 viewing 중인 채팅방 ID. onCleared에서 leave 호출용. */
     private var viewingChatRoomId: Long? = null
 
+    /** 자동번역 watermark — 이 messageId 이상만 자동 번역 대상. 채팅방 진입 시 기존 메시지 제외 + OFF→ON 토글 시 갱신. */
+    private var autoTranslateWatermark: Long = -1
+    private var autoTranslateInitialized: Boolean = false
+
     init {
         viewModelScope.launch {
             tokenManager.userId.firstOrNull()?.let { uid ->
@@ -93,6 +97,45 @@ class ChatRoomViewModel @Inject constructor(
                 .map { state -> state.messages.mapNotNull { it.senderId.toLongOrNull() }.toSet() }
                 .distinctUntilChanged()
                 .collect { senderIds -> fetchMissingSummaries(senderIds) }
+        }
+        // 자동번역 ON 상태에서 새 메시지 도착 시 자동 번역 트리거 (텍스트 + 음성, 상대 메시지만)
+        viewModelScope.launch {
+            _uiState
+                .map { it.messages }
+                .distinctUntilChanged()
+                .collect { messages -> maybeAutoTranslate(messages) }
+        }
+    }
+
+    /**
+     * 자동번역 watermark 이상의 새 상대 메시지를 백그라운드로 번역.
+     * 첫 호출(채팅방 진입 시 Room 캐시 emit)에서는 watermark만 setting하고 skip — 기존 메시지는 대상 X.
+     */
+    private fun maybeAutoTranslate(messages: List<com.everybuddy.app.data.chat.ChatMessage>) {
+        if (!autoTranslateInitialized) {
+            autoTranslateWatermark = messages.mapNotNull { it.id.toLongOrNull() }.maxOrNull() ?: -1L
+            autoTranslateInitialized = true
+            return
+        }
+        val state = _uiState.value
+        if (!state.isAutoTranslate) return
+        val myUid = state.myUserId
+        messages.forEach { msg ->
+            val id = msg.id.toLongOrNull() ?: return@forEach
+            if (id <= autoTranslateWatermark) return@forEach
+            if (msg.senderId.toLongOrNull() == myUid) return@forEach
+            if (msg.translatedText.isNotEmpty()) return@forEach
+            if (msg.id in _uiState.value.translatingMessageIds) return@forEach
+            val hasContent = when (msg.type) {
+                MessageType.TEXT  -> msg.text.isNotBlank()
+                MessageType.VOICE -> msg.voiceUrl.isNotBlank()
+                else              -> false
+            }
+            if (!hasContent) return@forEach
+            translateMessage(msg.id, autoShow = false)
+        }
+        messages.mapNotNull { it.id.toLongOrNull() }.maxOrNull()?.let {
+            if (it > autoTranslateWatermark) autoTranslateWatermark = it
         }
     }
 
@@ -364,7 +407,13 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     fun onToggleAutoTranslate() {
-        _uiState.update { it.copy(isAutoTranslate = !it.isAutoTranslate) }
+        val turningOn = !_uiState.value.isAutoTranslate
+        if (turningOn) {
+            // OFF→ON 토글 시 watermark를 현재 최신 messageId로 갱신 — 기존 메시지는 자동 번역 대상 X
+            autoTranslateWatermark = _uiState.value.messages.mapNotNull { it.id.toLongOrNull() }.maxOrNull()
+                ?: autoTranslateWatermark
+        }
+        _uiState.update { it.copy(isAutoTranslate = turningOn) }
     }
 
     fun onToggleMediaPanel() {
