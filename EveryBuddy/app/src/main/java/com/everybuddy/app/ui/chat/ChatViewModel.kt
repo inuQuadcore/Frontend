@@ -257,8 +257,15 @@ class ChatViewModel @Inject constructor(
                 _listState.update { it.copy(rooms = updated) }
             }
             "leave" -> {
-                _listState.update { it.copy(rooms = current.rooms.filter { r -> r.id != room.id }) }
-                // TODO: DELETE /api/v1/chatrooms/{roomId}
+                val chatRoomId = room.id.toLongOrNull()
+                if (chatRoomId == null) {
+                    // dummy 채팅방: 기존 동작 (로컬에서만 제거)
+                    _listState.update { it.copy(rooms = current.rooms.filter { r -> r.id != room.id }) }
+                } else {
+                    // 낙관적 제거 + 실패 시 복구 안 함 (RTDB onChildRemoved가 추후 확정).
+                    _listState.update { it.copy(rooms = current.rooms.filter { r -> r.id != room.id }) }
+                    viewModelScope.launch { chatRoomRepository.leaveChatRoom(chatRoomId) }
+                }
             }
             "info" -> {
                 _listState.update { it.copy(infoRoom = room) }

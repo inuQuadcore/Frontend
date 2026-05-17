@@ -4,8 +4,10 @@ import com.everybuddy.app.data.dto.ChatRoom
 import com.everybuddy.app.data.dto.CreateChatRoomRequest
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
 
 interface ChatRoomApi {
 
@@ -30,4 +32,14 @@ interface ChatRoomApi {
     suspend fun createChatRoom(
         @Body request: CreateChatRoomRequest,
     ): Response<ChatRoom>
+
+    /**
+     * DELETE /api/v1/chatrooms/{chatRoomId}/participants/me — 채팅방 나가기.
+     * 본인만 빠지고 채팅방·다른 참여자는 그대로 유지.
+     * 204: 성공 (본문 없음) | 403: USER_NOT_IN_CHATROOM
+     */
+    @DELETE("api/v1/chatrooms/{chatRoomId}/participants/me")
+    suspend fun leaveChatRoom(
+        @Path("chatRoomId") chatRoomId: Long,
+    ): Response<Unit>
 }

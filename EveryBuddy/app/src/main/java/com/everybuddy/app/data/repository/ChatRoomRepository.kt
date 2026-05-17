@@ -31,4 +31,12 @@ class ChatRoomRepository @Inject constructor(
     ): ApiResult<ChatRoom> = safeApiCall(gson, {
         api.createChatRoom(CreateChatRoomRequest(roomName, participantIds))
     })
+
+    /**
+     * 채팅방 나가기 — DELETE /api/v1/chatrooms/{chatRoomId}/participants/me
+     * 본인만 빠짐. RTDB 정리는 서버 자동 (users/{me}/chatrooms/{roomId} 노드 삭제).
+     * 에러: 403(USER_NOT_IN_CHATROOM)
+     */
+    suspend fun leaveChatRoom(chatRoomId: Long): ApiResult<Unit> =
+        safeApiCall(gson, { api.leaveChatRoom(chatRoomId) }) { ApiResult.Success(Unit) }
 }
