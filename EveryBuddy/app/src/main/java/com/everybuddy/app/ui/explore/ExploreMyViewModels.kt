@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.cache.UserSummaryCache
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.userMessage
@@ -306,7 +305,7 @@ data class RemovedFriendItem(
 )
 
 data class MyUiState(
-    val profile          : MyProfile    = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.myProfile else MyProfile(),
+    val profile          : MyProfile    = MyProfile(),
     val isEditMode       : Boolean      = false,
     val editName         : String       = "",
     val editBio          : String       = "",
