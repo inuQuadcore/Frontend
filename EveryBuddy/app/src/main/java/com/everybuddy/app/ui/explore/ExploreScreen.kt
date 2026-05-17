@@ -45,10 +45,11 @@ private val C = AppColors
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
-    viewModel      : ExploreViewModel       = hiltViewModel(),
-    onOpenProfile  : (DiscoverUser) -> Unit = {},
-    onStartChat    : (DiscoverUser) -> Unit = {},
-    onNotification : () -> Unit             = {},
+    viewModel       : ExploreViewModel       = hiltViewModel(),
+    onOpenProfile   : (DiscoverUser) -> Unit = {},
+    onStartChat     : (DiscoverUser) -> Unit = {},
+    onNotification  : () -> Unit             = {},
+    hasNotification : Boolean                = false,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -79,7 +80,8 @@ fun ExploreScreen(
     Scaffold(
         topBar = {
             ExploreTopBar(
-                onNotification = onNotification,
+                onNotification  = onNotification,
+                hasNotification = hasNotification,
             )
         },
         containerColor = Color.White,
