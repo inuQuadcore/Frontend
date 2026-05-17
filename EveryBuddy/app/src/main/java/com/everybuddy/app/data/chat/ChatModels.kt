@@ -28,10 +28,16 @@ data class ChatRoomUi(
     val participants       : List<ChatParticipantUi> = emptyList(),
 )
 
-// ChatRoom(DTO) → ChatRoomUi 변환
-fun com.everybuddy.app.data.dto.ChatRoom.toChatRoomUi(): ChatRoomUi = ChatRoomUi(
+/**
+ * ChatRoom(DTO) → ChatRoomUi 변환.
+ * @param displayName 표시용 이름. ChatRoomDisplayName.resolve 결과를 전달.
+ *                    빈 문자열이면 서버 roomName으로 폴백.
+ */
+fun com.everybuddy.app.data.dto.ChatRoom.toChatRoomUi(
+    displayName: String = "",
+): ChatRoomUi = ChatRoomUi(
     id             = chatRoomId.toString(),
-    name           = roomName,
+    name           = displayName.ifEmpty { roomName },
     createdAt      = createdAt,
     unreadCount    = unreadCount ?: 0,
     participantIds = participantIds,

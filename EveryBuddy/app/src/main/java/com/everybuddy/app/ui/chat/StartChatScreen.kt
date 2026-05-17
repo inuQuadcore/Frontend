@@ -121,7 +121,7 @@ fun DirectChatScreen(
                             if (!isCreating) {
                                 isCreating = true
                                 chatVm.createChatRoom(
-                                    roomName       = friend.name,
+                                    roomName       = friend.name,             // 1:1방: 상대 이름을 박아 전송 (표시 시점엔 무시되고 자체 렌더)
                                     participantIds = listOf(friend.id),
                                     onSuccess      = { room -> onRoomCreated(room) },
                                     onError        = { msg -> toastMsg = msg; isCreating = false },

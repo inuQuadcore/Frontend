@@ -9,6 +9,7 @@ data class Message(
     @SerializedName("messageType") val messageType : String,
     @SerializedName("content")     val content     : String? = null,
     @SerializedName("sendAt")      val sendAt      : String,
+    @SerializedName("editedAt")    val editedAt    : String? = null,  // null이면 미수정. UI "(수정됨)" 표시 조건.
     @SerializedName("fileUrl")     val fileUrl     : String? = null,
     @SerializedName("fileName")    val fileName    : String? = null,
     @SerializedName("fileSize")    val fileSize    : Long?   = null,

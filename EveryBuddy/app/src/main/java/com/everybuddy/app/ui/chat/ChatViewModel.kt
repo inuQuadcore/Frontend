@@ -3,11 +3,17 @@ package com.everybuddy.app.ui.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
+import com.everybuddy.app.data.cache.UserSummaryCache
 import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.dto.ChatRoom
+import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.ui.friend.KoreanChosung
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -22,13 +28,28 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val chatRoomRepository: ChatRoomRepository,
+    private val chatRoomRepository : ChatRoomRepository,
+    private val tokenManager       : TokenManager,
+    private val userSummaryCache   : UserSummaryCache,
 ) : ViewModel() {
 
     private val _listState = MutableStateFlow(ChatListUiState())
     val listState: StateFlow<ChatListUiState> = _listState.asStateFlow()
 
     init { loadChatRooms() }
+
+    /** N개 채팅방의 displayName을 병렬 fetch 후 ChatRoomUi 리스트 반환. */
+    private suspend fun toChatRoomUis(rooms: List<ChatRoom>): List<ChatRoomUi> {
+        val myUserId = tokenManager.userId.firstOrNull() ?: 0L
+        return coroutineScope {
+            rooms.map { room ->
+                async {
+                    val displayName = ChatRoomDisplayName.resolve(room, myUserId, userSummaryCache)
+                    room.toChatRoomUi(displayName = displayName)
+                }
+            }.awaitAll()
+        }
+    }
 
     // 채팅방 목록 로드 — GET /api/v1/chatrooms
     fun loadChatRooms() {
@@ -41,9 +62,7 @@ class ChatViewModel @Inject constructor(
 
             when (val result = chatRoomRepository.getChatRooms()) {
                 is ApiResult.Success -> {
-                    val rooms = result.data
-                        ?.map { it.toChatRoomUi() }
-                        ?: emptyList()
+                    val rooms = result.data?.let { toChatRoomUis(it) } ?: emptyList()
                     _listState.update { it.copy(isLoading = false, rooms = rooms) }
                 }
 
@@ -78,7 +97,7 @@ class ChatViewModel @Inject constructor(
             _listState.update { it.copy(isRefreshing = true) }
             when (val result = chatRoomRepository.getChatRooms()) {
                 is ApiResult.Success -> {
-                    val rooms = result.data?.map { it.toChatRoomUi() } ?: emptyList()
+                    val rooms = result.data?.let { toChatRoomUis(it) } ?: emptyList()
                     _listState.update { it.copy(isRefreshing = false, errorMessage = null, rooms = rooms) }
                 }
                 is ApiResult.Error -> {
@@ -94,6 +113,7 @@ class ChatViewModel @Inject constructor(
     }
 
     // 채팅방 생성 — POST /api/v1/chatrooms
+    // roomName: 항상 필수. 1:1방은 호출자가 상대 이름을, 그룹방은 사용자 입력값을 전달.
     fun createChatRoom(
         roomName       : String,
         participantIds : List<Long>,
@@ -105,7 +125,8 @@ class ChatViewModel @Inject constructor(
 
             when (val result = chatRoomRepository.createChatRoom(roomName, participantIds)) {
                 is ApiResult.Success -> {
-                    val created = result.data?.toChatRoomUi()
+                    val createdDto = result.data
+                    val created = createdDto?.let { toChatRoomUis(listOf(it)).firstOrNull() }
                     if (created != null) {
                         // 목록 맨 앞에 추가
                         _listState.update { state ->

@@ -22,6 +22,7 @@ class ChatRoomRepository @Inject constructor(
 
     /**
      * 채팅방 생성 — POST /api/v1/chatrooms
+     * roomName: 항상 필수 (NotBlank). 1:1방은 호출자가 상대 이름을, 그룹방은 사용자 입력값을 전달.
      * 에러: 400(errors.roomName / errors.participantIds) | 401 | 404(유저없음)
      */
     suspend fun createChatRoom(
