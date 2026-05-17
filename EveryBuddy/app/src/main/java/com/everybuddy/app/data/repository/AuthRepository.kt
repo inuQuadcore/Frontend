@@ -180,6 +180,18 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    // 콜드스타트 진입점. JWT 있고 Firebase 세션이 이미 살아있으면 listener만 재부착.
+    // 세션이 없으면 signInToFirebase로 full path (custom token 재발급 포함).
+    suspend fun ensureFirebaseSession() {
+        val userId = tokenManager.userId.firstOrNull() ?: return
+        if (firebaseAuthManager.isSignedIn()) {
+            presenceManager.start(userId)
+            presenceRepository.start()
+        } else {
+            signInToFirebase()
+        }
+    }
+
     // JWT 발급 직후 Firebase Custom Token으로 signIn — RTDB write 권한 확보용.
     // 실패해도 앱 로그인 자체는 막지 않음 (Firebase는 채팅/presence 전용 도메인).
     private suspend fun signInToFirebase() {
