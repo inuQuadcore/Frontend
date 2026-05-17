@@ -17,6 +17,7 @@ import com.everybuddy.app.data.network.FriendApi
 import com.everybuddy.app.data.network.MessageApi
 import com.everybuddy.app.data.network.NotificationApi
 import com.everybuddy.app.data.network.StatusMessageApi
+import com.everybuddy.app.data.network.TranslateApi
 import com.everybuddy.app.data.network.TokenAuthenticator
 import com.everybuddy.app.data.network.UserApi
 import com.google.gson.Gson
@@ -195,4 +196,8 @@ object NetworkModule {
     @Provides @Singleton
     fun provideNotificationApi(retrofit: Retrofit): NotificationApi =
         retrofit.create(NotificationApi::class.java)
+
+    @Provides @Singleton
+    fun provideTranslateApi(retrofit: Retrofit): TranslateApi =
+        retrofit.create(TranslateApi::class.java)
 }
