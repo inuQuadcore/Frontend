@@ -965,6 +965,10 @@ fun TextMessageBubble(
     isHighlighted       : Boolean = false,
 ) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
+    val timeText = remember(message.timestamp, message.editedAt) {
+        val base = message.timestamp.format(timeFormatter)
+        if (message.editedAt != null) "$base · 수정됨" else base
+    }
 
     val shakeOffset = remember { Animatable(0f) }
     LaunchedEffect(isHighlighted) {
@@ -1012,7 +1016,7 @@ fun TextMessageBubble(
                 horizontalArrangement = Arrangement.End,
             ) {
                 Text(
-                    text     = message.timestamp.format(timeFormatter),
+                    text     = timeText,
                     style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
                     modifier = Modifier.padding(end = 4.dp),
                 )
@@ -1083,7 +1087,7 @@ fun TextMessageBubble(
                         }
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text  = message.timestamp.format(timeFormatter),
+                            text  = timeText,
                             style = TextStyle(fontSize = 9.sp, color = TextSecondary),
                         )
                         if (!isAutoTranslate) {
@@ -1193,6 +1197,10 @@ fun VoiceMessageBubble(
     onLongPress         : () -> Unit = {},
 ) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
+    val timeText = remember(message.timestamp, message.editedAt) {
+        val base = message.timestamp.format(timeFormatter)
+        if (message.editedAt != null) "$base · 수정됨" else base
+    }
     val bubbleBg  = if (isMe) BubbleMyVoice else BubbleWhite
     val textColor = if (isMe) Color.White else TextPrimary
 
@@ -1209,7 +1217,7 @@ fun VoiceMessageBubble(
                 horizontalArrangement = Arrangement.End,
             ) {
                 Text(
-                    text     = message.timestamp.format(timeFormatter),
+                    text     = timeText,
                     style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
                     modifier = Modifier.padding(end = 4.dp),
                 )
@@ -1276,7 +1284,7 @@ fun VoiceMessageBubble(
                         }
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text  = message.timestamp.format(timeFormatter),
+                            text  = timeText,
                             style = TextStyle(fontSize = 9.sp, color = TextSecondary),
                         )
                         if (!isAutoTranslate) {
