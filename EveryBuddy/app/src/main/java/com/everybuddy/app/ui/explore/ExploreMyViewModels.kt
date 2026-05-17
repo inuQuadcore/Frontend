@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.BuildConfig
+import com.everybuddy.app.data.cache.UserSummaryCache
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.userMessage
 import com.everybuddy.app.data.firebase.PresenceRepository
@@ -330,11 +331,12 @@ data class MyUiState(
 @HiltViewModel
 class MyViewModel @Inject constructor(
     @ApplicationContext private val appContext    : Context,
-    private val userRepository   : UserRepository,
-    private val tokenManager     : TokenManager,
-    private val authRepository   : AuthRepository,
-    private val blockRepository  : BlockRepository,
-    private val friendRepository : FriendRepository,
+    private val userRepository     : UserRepository,
+    private val tokenManager       : TokenManager,
+    private val authRepository     : AuthRepository,
+    private val blockRepository    : BlockRepository,
+    private val friendRepository   : FriendRepository,
+    private val userSummaryCache   : UserSummaryCache,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MyUiState())
@@ -463,6 +465,8 @@ class MyViewModel @Inject constructor(
 
             when (res) {
                 is ApiResult.Success      -> {
+                    // 본인 이름/프로필 변경 즉시 채팅방 등 모든 화면 반영 — UserSummaryCache invalidate
+                    tokenManager.userId.first()?.let { userSummaryCache.invalidate(it) }
                     loadMyProfile()   // 서버 응답으로 동기화
                     _uiState.update { it.copy(
                         isEditMode      = false,

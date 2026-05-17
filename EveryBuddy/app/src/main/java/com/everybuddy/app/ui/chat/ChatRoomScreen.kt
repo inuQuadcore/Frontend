@@ -52,8 +52,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.everybuddy.app.data.cache.UserSummary
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -858,7 +861,7 @@ fun TranslationLoadingDots(modifier: Modifier = Modifier) {
 @Composable
 fun MessageList(
     messages              : List<ChatMessage>,
-    userSummaries         : Map<Long, com.everybuddy.app.data.cache.UserSummary>,
+    userSummaries         : Map<Long, UserSummary>,
     isAutoTranslate       : Boolean,
     showTranslation       : Map<String, Boolean>,
     translatingMessageIds : Set<String>,
@@ -946,10 +949,10 @@ fun MessageList(
 private fun SenderAvatar(
     profileImageUrl    : String?,
     contentDescription : String,
-    size               : androidx.compose.ui.unit.Dp,
+    size               : Dp,
 ) {
     if (profileImageUrl != null) {
-        coil.compose.AsyncImage(
+        AsyncImage(
             model              = profileImageUrl,
             contentDescription = contentDescription,
             contentScale       = ContentScale.Crop,

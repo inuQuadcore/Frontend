@@ -4,6 +4,8 @@ package com.everybuddy.app.ui.chat
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -360,10 +362,10 @@ private fun ProfileCircle(
     modifier : Modifier = Modifier,
 ) {
     if (member.profileImageUrl != null) {
-        coil.compose.AsyncImage(
+        AsyncImage(
             model              = member.profileImageUrl,
             contentDescription = member.name,
-            contentScale       = androidx.compose.ui.layout.ContentScale.Crop,
+            contentScale       = ContentScale.Crop,
             modifier           = modifier.size(size).clip(CircleShape).background(Color(0xFFCCCCCC)),
         )
     } else {
@@ -490,10 +492,10 @@ private fun MemberRow(member: ChatMember) {
     ) {
         // 프로필 이미지
         if (member.profileImageUrl != null) {
-            coil.compose.AsyncImage(
+            AsyncImage(
                 model              = member.profileImageUrl,
                 contentDescription = member.name,
-                contentScale       = androidx.compose.ui.layout.ContentScale.Crop,
+                contentScale       = ContentScale.Crop,
                 modifier           = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFCCCCCC)),
             )
         } else {
