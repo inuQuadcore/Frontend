@@ -151,7 +151,7 @@ data class FilterSettings(
 
 data class MyProfile(
     val userId          : Long    = 1L,
-    val name            : String  = "홍길동",
+    val name            : String  = "",
     val profileImageUrl : String? = null,   // TODO: Coil
     val age             : Int     = 23,
     val gender          : String  = "여성",

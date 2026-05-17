@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.everybuddy.app.R
 import com.everybuddy.app.ui.chat.ScriptFolder
+import com.everybuddy.app.ui.chat.ScriptFolderThumbnail
 import com.everybuddy.app.ui.chat.ScriptItem
 import com.everybuddy.app.ui.theme.PretendardFamily
 
@@ -458,9 +459,11 @@ fun ScriptItemCard(
 private fun BorderStroke(width: androidx.compose.ui.unit.Dp, color: Color) =
     androidx.compose.foundation.BorderStroke(width, color)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScriptDetailScreen(
     item     : ScriptItem,
+    folders  : List<ScriptFolder> = emptyList(),
     onBack   : () -> Unit,
     onAudio  : (ScriptItem) -> Unit = {},
     onSave   : (ScriptItem) -> Unit = {},
@@ -473,6 +476,7 @@ fun ScriptDetailScreen(
     var editingMemo        by remember { mutableStateOf(false) }
     var editedMemo         by remember { mutableStateOf(item.memo1) }
     var showDeleteConfirm  by remember { mutableStateOf(false) }
+    var showFolderSheet    by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -620,14 +624,40 @@ fun ScriptDetailScreen(
 
             Spacer(Modifier.weight(1f))
 
-            Text(
-                text     = "스크립트 삭제하기",
-                style    = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = Color(0xFFFF3333)),
+            Button(
+                onClick  = { showFolderSheet = true },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape    = RoundedCornerShape(12.dp),
+                colors   = ButtonDefaults.buttonColors(containerColor = SmAccent),
+            ) {
+                Text("폴더에 저장하기", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
+            }
+            Spacer(Modifier.height(10.dp))
+            Box(
                 modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFF5F5F5))
                     .clickable { showDeleteConfirm = true }
-                    .padding(vertical = 12.dp),
-            )
+                    .padding(vertical = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("스크립트 삭제하기", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = Color(0xFFFF3333)))
+            }
+            Spacer(Modifier.height(16.dp))
         }
+    }
+
+    if (showFolderSheet) {
+        FolderMoveSheet(
+            currentFolderId = item.folderId,
+            folders         = folders,
+            onDismiss       = { showFolderSheet = false },
+            onConfirm       = { newFolderId ->
+                onSave(item.copy(folderId = newFolderId))
+                showFolderSheet = false
+            },
+        )
     }
 
     if (showDeleteConfirm) {
@@ -651,6 +681,70 @@ fun ScriptDetailScreen(
             },
             containerColor   = Color.White,
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FolderMoveSheet(
+    currentFolderId : String?,
+    folders         : List<ScriptFolder>,
+    onDismiss       : () -> Unit,
+    onConfirm       : (String?) -> Unit,
+) {
+    var selectedId by remember { mutableStateOf(currentFolderId) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor   = Color.White,
+        shape            = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        dragHandle = {
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.width(40.dp).height(4.dp).clip(CircleShape).background(Color(0xFFDDDDDD)))
+            }
+        },
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).navigationBarsPadding()) {
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "폴더 선택",
+                style    = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = SmTextPri),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Spacer(Modifier.height(20.dp))
+            if (folders.isEmpty()) {
+                Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                    Text("저장된 폴더가 없습니다.", style = TextStyle(fontSize = 14.sp, color = SmTextSec, fontFamily = PretendardFamily))
+                }
+            } else {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(folders) { folder ->
+                        ScriptFolderThumbnail(
+                            folder     = folder,
+                            isSelected = selectedId == folder.id,
+                            onClick    = { selectedId = folder.id },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+            val changed = selectedId != currentFolderId
+            Button(
+                onClick  = { onConfirm(selectedId) },
+                enabled  = changed,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape    = RoundedCornerShape(12.dp),
+                colors   = ButtonDefaults.buttonColors(
+                    containerColor         = SmAccent,
+                    disabledContainerColor = Color(0xFFCCCCCC),
+                ),
+            ) {
+                Text("확인", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
+            }
+            Spacer(Modifier.height(12.dp))
+        }
     }
 }
 

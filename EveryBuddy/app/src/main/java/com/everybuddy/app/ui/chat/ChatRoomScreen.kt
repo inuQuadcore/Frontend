@@ -95,15 +95,11 @@ fun ChatRoomScreen(
 
     val takePictureLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicturePreview()
-    ) { /* bitmap captured — TODO: send as image message */ }
-
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { /* uri selected — TODO: display in PhotoPickerSheet */ }
+    ) { bitmap -> if (bitmap != null) viewModel.onCameraCapture() }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
-    ) { /* uri selected — TODO: send as file message */ }
+    ) { uri -> if (uri != null) viewModel.onFilePicked(uri.toString()) }
 
     val cameraPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -114,7 +110,7 @@ fun ChatRoomScreen(
     val photoPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) photoPickerLauncher.launch("image/*")
+        if (granted) viewModel.onOpenPhotoPicker()
     }
 
     val storagePermLauncher = rememberLauncherForActivityResult(
@@ -178,6 +174,8 @@ fun ChatRoomScreen(
             storagePermLauncher.launch(perm)
         },
         onFolderCreated          = onFolderCreated,
+        onDeleteMessage          = viewModel::onDeleteMessage,
+        onEditMessage            = viewModel::onEditMessage,
     )
 }
 
@@ -213,17 +211,22 @@ fun ChatRoomContent(
     onOpenCamera              : () -> Unit             = {},
     onOpenFile                : () -> Unit             = {},
     onFolderCreated           : (ScriptFolder) -> Unit = {},
+    onDeleteMessage           : (String) -> Unit       = {},
+    onEditMessage             : (String, String) -> Unit = { _, _ -> },
 ) {
     var showNewFolderScreen   by remember { mutableStateOf(false) }
     var newFolderAutoSelectId by remember { mutableStateOf<String?>(null) }
     var separateIdx           by remember { mutableIntStateOf(0) }
+    var pendingScriptItems    by remember { mutableStateOf<List<ScriptSaveItem>>(emptyList()) }
     var localFolders          by remember { mutableStateOf(dummyScriptFolders) }
+    var editingMessageId      by remember { mutableStateOf<String?>(null) }
+    var editingText           by remember { mutableStateOf("") }
     var isMenuOpen            by remember { mutableStateOf(false) }
     var isSearchMode          by remember { mutableStateOf(false) }
     var searchQuery           by remember { mutableStateOf("") }
     var currentMatchIdx       by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(state.conversationSaveMessages) { separateIdx = 0 }
+    LaunchedEffect(state.conversationSaveMessages) { separateIdx = 0; pendingScriptItems = emptyList() }
 
     val listState  = rememberLazyListState()
     val scope      = rememberCoroutineScope()
@@ -415,7 +418,51 @@ fun ChatRoomContent(
                     onDismissContextMenu()
                     onStartScriptSave(msg.id)
                 },
+                isOwnMessage = msg.senderId == "me",
+                onEdit       = {
+                    editingMessageId = msg.id
+                    editingText      = msg.text
+                },
+                onDelete     = { onDeleteMessage(msg.id) },
             )
+        }
+
+        if (editingMessageId != null) {
+            Box(
+                modifier         = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)).clickable { editingMessageId = null },
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Surface(
+                    modifier        = Modifier.fillMaxWidth().clickable {},
+                    color           = Color.White,
+                    shadowElevation = 8.dp,
+                ) {
+                    Column(modifier = Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text("메시지 수정", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = TextPrimary), modifier = Modifier.padding(bottom = 8.dp))
+                        BasicTextField(
+                            value         = editingText,
+                            onValueChange = { editingText = it },
+                            modifier      = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFFF2F2F2)).padding(12.dp),
+                            textStyle     = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { editingMessageId = null }) {
+                                Text("취소", style = TextStyle(fontSize = 14.sp, color = TextSecondary))
+                            }
+                            TextButton(onClick = {
+                                val id = editingMessageId
+                                if (id != null && editingText.isNotBlank()) {
+                                    onEditMessage(id, editingText)
+                                    editingMessageId = null
+                                }
+                            }) {
+                                Text("완료", style = TextStyle(fontSize = 14.sp, color = AccentBlue, fontWeight = FontWeight(600)))
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         AnimatedVisibility(
@@ -477,14 +524,17 @@ fun ChatRoomContent(
         if (state.conversationCaptureOption == CaptureOption.SEPARATE) {
             val msg = state.conversationSaveMessages.getOrNull(separateIdx)
             if (msg != null) {
+                val isLast = separateIdx == state.conversationSaveMessages.size - 1
                 ScriptSaveSheet(
                     message                    = msg,
                     folders                    = localFolders,
                     onSave                     = { item ->
-                        onSaveScriptItem(item)
-                        if (separateIdx < state.conversationSaveMessages.size - 1) {
+                        if (!isLast) {
+                            pendingScriptItems = pendingScriptItems + item
                             separateIdx++
                         } else {
+                            (pendingScriptItems + item).forEach { onSaveScriptItem(it) }
+                            pendingScriptItems = emptyList()
                             onConversationSaved()
                         }
                     },
@@ -493,6 +543,7 @@ fun ChatRoomContent(
                     externalAutoSelectFolderId = newFolderAutoSelectId,
                     currentIdx                 = separateIdx + 1,
                     totalCount                 = state.conversationSaveMessages.size,
+                    isLastStep                 = isLast,
                 )
             }
         } else {

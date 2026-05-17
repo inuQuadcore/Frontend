@@ -8,6 +8,7 @@ import com.everybuddy.app.BuildConfig
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.AuthRepository
+import com.everybuddy.app.data.repository.BlockRepository
 import com.everybuddy.app.data.repository.DiscoverRepository
 import com.everybuddy.app.data.repository.FriendRepository
 import com.everybuddy.app.data.repository.UserRepository
@@ -259,29 +260,39 @@ class ExploreViewModel @Inject constructor(
 }
 
 // MyViewModel — 마이페이지
+data class BlockedFriendItem(
+    val userId      : Long,
+    val name        : String,
+    val nationality : String,
+    val languages   : List<String>,
+)
+
 data class MyUiState(
-    val profile         : MyProfile    = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.myProfile else MyProfile(),
-    val isEditMode      : Boolean      = false,
-    val editName        : String       = "",
-    val editBio         : String       = "",
-    val editBirthday    : String       = "",
-    val editGender      : String       = "",
-    val editCountry     : String       = "",
-    val toastMessage    : String?      = null,
-    val isTagEditOpen   : Boolean      = false,
-    val editingTags     : List<UserTag> = emptyList(),
-    val openLanguageCode: String?      = null,
-    val openSubMenu     : String?      = null,   // "guide" | "notice" | "settings" | "version"
-    val isSaving        : Boolean      = false,  // 저장/삭제 API 진행 중 — 버튼 중복 클릭 방지용
-    val pendingImageUri : String?      = null,   // 갤러리에서 새로 고른 이미지 URI (저장 시 multipart로 업로드)
+    val profile          : MyProfile    = if (BuildConfig.USE_DUMMY_DATA) ExploreDemo.myProfile else MyProfile(),
+    val isEditMode       : Boolean      = false,
+    val editName         : String       = "",
+    val editBio          : String       = "",
+    val editBirthday     : String       = "",
+    val editGender       : String       = "",
+    val editCountry      : String       = "",
+    val toastMessage     : String?      = null,
+    val isTagEditOpen    : Boolean      = false,
+    val editingTags      : List<UserTag> = emptyList(),
+    val openLanguageCode : String?      = null,
+    val openSubMenu      : String?      = null,   // "guide" | "notice" | "settings" | "version"
+    val isSaving         : Boolean      = false,
+    val pendingImageUri  : String?      = null,
+    val blockedFriends   : List<BlockedFriendItem> = emptyList(),
+    val isLoadingBlocked : Boolean      = false,
 )
 
 @HiltViewModel
 class MyViewModel @Inject constructor(
-    @ApplicationContext private val appContext : Context,
-    private val userRepository : UserRepository,
-    private val tokenManager   : TokenManager,
-    private val authRepository : AuthRepository,
+    @ApplicationContext private val appContext   : Context,
+    private val userRepository  : UserRepository,
+    private val tokenManager    : TokenManager,
+    private val authRepository  : AuthRepository,
+    private val blockRepository : BlockRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MyUiState())
@@ -515,6 +526,42 @@ class MyViewModel @Inject constructor(
                     isSaving     = false,
                     toastMessage = "네트워크 연결을 확인해주세요.",
                 ) }
+            }
+        }
+    }
+
+    fun loadBlockedUsers() {
+        if (_uiState.value.isLoadingBlocked) return
+        _uiState.update { it.copy(isLoadingBlocked = true) }
+        viewModelScope.launch {
+            when (val res = blockRepository.getBlockedUsers()) {
+                is ApiResult.Success -> {
+                    val items = res.data.blockedUsers.map { u ->
+                        BlockedFriendItem(
+                            userId      = u.userId,
+                            name        = u.name,
+                            nationality = countryName(u.country),
+                            languages   = u.languages.map { l -> UserLanguage(l.language, l.level).displayCode() },
+                        )
+                    }
+                    _uiState.update { it.copy(blockedFriends = items, isLoadingBlocked = false) }
+                }
+                is ApiResult.Error, is ApiResult.NetworkError -> {
+                    _uiState.update { it.copy(isLoadingBlocked = false) }
+                }
+            }
+        }
+    }
+
+    fun unblockFriend(userId: Long) {
+        viewModelScope.launch {
+            when (blockRepository.unblockUser(userId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { it.copy(
+                        blockedFriends = it.blockedFriends.filter { f -> f.userId != userId },
+                    ) }
+                }
+                is ApiResult.Error, is ApiResult.NetworkError -> Unit
             }
         }
     }

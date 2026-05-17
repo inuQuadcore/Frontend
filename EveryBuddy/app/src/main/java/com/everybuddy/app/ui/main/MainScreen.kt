@@ -203,8 +203,10 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                     isChatRoomOpen = false
                     when {
                         selectedScriptItem != null -> {
+                            val scriptUiStateDetail by scriptViewModel.uiState.collectAsState()
                             ScriptDetailScreen(
                                 item     = selectedScriptItem!!,
+                                folders  = scriptUiStateDetail.folders,
                                 onBack   = { selectedScriptItem = null },
                                 onSave   = { updatedItem ->
                                     scriptViewModel.updateItem(updatedItem)
