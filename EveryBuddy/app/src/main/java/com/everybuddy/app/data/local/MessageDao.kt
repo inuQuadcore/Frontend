@@ -22,6 +22,10 @@ interface MessageDao {
     @Query("DELETE FROM chat_messages WHERE messageId IN (:messageIds)")
     suspend fun deleteAll(messageIds: List<Long>)
 
+    /** 채팅방 나가기/강퇴 시 호출 — 재초대 후 옛 메시지 누수 방지. */
+    @Query("DELETE FROM chat_messages WHERE chatRoomId = :chatRoomId")
+    suspend fun deleteAllByRoom(chatRoomId: Long)
+
     /** 채팅방의 메시지를 sendAt 오름차순으로 limit/offset 페이지네이션. */
     @Query("""
         SELECT * FROM chat_messages

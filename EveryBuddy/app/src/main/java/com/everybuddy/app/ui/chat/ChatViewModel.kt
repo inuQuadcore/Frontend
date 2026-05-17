@@ -11,6 +11,7 @@ import com.everybuddy.app.data.firebase.UserChatRoomsListener
 import com.everybuddy.app.data.local.ChatRoomPreferences
 import com.everybuddy.app.data.local.FolderDao
 import com.everybuddy.app.data.local.FolderRoomEntity
+import com.everybuddy.app.data.local.MessageDao
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.ui.friend.KoreanChosung
@@ -36,6 +37,7 @@ class ChatViewModel @Inject constructor(
     private val tokenManager       : TokenManager,
     private val userSummaryCache   : UserSummaryCache,
     private val folderDao          : FolderDao,
+    private val messageDao         : MessageDao,
     private val roomPreferences    : ChatRoomPreferences,
 ) : ViewModel() {
 
@@ -97,6 +99,9 @@ class ChatViewModel @Inject constructor(
     private fun removeRoom(chatRoomId: Long) {
         val idStr = chatRoomId.toString()
         _listState.update { state -> state.copy(rooms = state.rooms.filter { it.id != idStr }) }
+        // Room의 옛 메시지 정리 — 재초대 후 enterChatRoomAt 이전 메시지 누수 방지.
+        // 본인 나가기/외부 강퇴 모두 RTDB onChildRemoved로 들어와 한 경로로 처리.
+        viewModelScope.launch { messageDao.deleteAllByRoom(chatRoomId) }
     }
 
     /** N개 채팅방의 displayName 병렬 fetch + 로컬 mute/pin/star 플래그 적용 후 반환. */
