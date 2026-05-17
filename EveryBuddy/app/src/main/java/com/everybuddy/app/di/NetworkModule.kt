@@ -45,6 +45,7 @@ object TokenKeys {
     val ACCESS_TOKEN_EXPIRES_AT   = stringPreferencesKey("access_token_expires_at")
     val REFRESH_TOKEN_EXPIRES_AT  = stringPreferencesKey("refresh_token_expires_at")
     val USER_ID                   = stringPreferencesKey("user_id")
+    val LAST_ATTENDANCE_DATE      = stringPreferencesKey("last_attendance_date")  // "yyyy-MM-dd" — 출석 API 마지막 호출일
 }
 
 @Module

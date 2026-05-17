@@ -98,7 +98,13 @@ class UserRepository @Inject constructor(
         imageMimeType : String  = "image/jpeg",
     ): ApiResult<UserProfileResponse> {
         val requestJson = gson.toJson(
-            UpdateProfileRequest(name, birthday, gender, country, bio)
+            UpdateProfileRequest(
+                name     = name,
+                bio      = bio,
+                gender   = gender,
+                country  = country,
+                birthday = birthday,
+            )
         ).toRequestBody("application/json".toMediaType())
 
         val imagePart = profileImage?.let {
@@ -117,4 +123,11 @@ class UserRepository @Inject constructor(
      */
     suspend fun deleteMyAccount(): ApiResult<Unit> =
         safeApiCall(gson, { api.deleteMyAccount() }) { ApiResult.Success(Unit) }
+
+    /**
+     * 출석 기록 — POST /api/v1/users/me/attendance
+     * 같은 날 여러 번 호출해도 서버에서 no-op 처리.
+     */
+    suspend fun markAttendance(): ApiResult<Unit> =
+        safeApiCall(gson, { api.markAttendance() }) { ApiResult.Success(Unit) }
 }

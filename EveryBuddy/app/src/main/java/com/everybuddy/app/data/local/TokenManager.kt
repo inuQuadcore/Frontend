@@ -18,6 +18,7 @@ class TokenManager @Inject constructor(
     val accessTokenExpiresAt:  Flow<String?> = dataStore.data.map { it[TokenKeys.ACCESS_TOKEN_EXPIRES_AT] }
     val refreshTokenExpiresAt: Flow<String?> = dataStore.data.map { it[TokenKeys.REFRESH_TOKEN_EXPIRES_AT] }
     val userId:                Flow<Long?>   = dataStore.data.map { it[TokenKeys.USER_ID]?.toLongOrNull() }
+    val lastAttendanceDate:    Flow<String?> = dataStore.data.map { it[TokenKeys.LAST_ATTENDANCE_DATE] }
 
     suspend fun saveToken(
         accessToken           : String,
@@ -42,6 +43,11 @@ class TokenManager @Inject constructor(
             prefs.remove(TokenKeys.ACCESS_TOKEN_EXPIRES_AT)
             prefs.remove(TokenKeys.REFRESH_TOKEN_EXPIRES_AT)
             prefs.remove(TokenKeys.USER_ID)
+            prefs.remove(TokenKeys.LAST_ATTENDANCE_DATE)
         }
+    }
+
+    suspend fun saveLastAttendanceDate(date: String) {
+        dataStore.edit { it[TokenKeys.LAST_ATTENDANCE_DATE] = date }
     }
 }

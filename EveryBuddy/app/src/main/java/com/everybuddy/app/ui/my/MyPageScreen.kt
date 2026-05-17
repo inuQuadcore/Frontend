@@ -3,6 +3,8 @@ package com.everybuddy.app.ui.my
 // MyPageScreen — 마이페이지
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -37,9 +39,13 @@ fun MyPageScreen(
     onLogout       : () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val logoutComplete by viewModel.logoutComplete.collectAsState()
 
     LaunchedEffect(uiState.toastMessage) {
         if (uiState.toastMessage != null) { delay(2000); viewModel.consumeToast() }
+    }
+    LaunchedEffect(logoutComplete) {
+        if (logoutComplete) onLogout()
     }
 
     when {
@@ -50,11 +56,12 @@ fun MyPageScreen(
             currentLevel = uiState.profile.learningLanguages.find {
                 it.language.equals(uiState.openLanguageCode, ignoreCase = true)
             }?.level ?: 1,
+            isSaving = uiState.isSaving,
             onSave   = { level -> viewModel.saveLanguageLevel(uiState.openLanguageCode!!, level) },
             onBack   = viewModel::closeLanguage,
         )
         uiState.openSubMenu != null  -> SubMenuScreen(key = uiState.openSubMenu!!, viewModel = viewModel, onBack = viewModel::closeSubMenu)
-        else -> MyPageContent(viewModel = viewModel, onNotification = onNotification, onLogout = onLogout)
+        else -> MyPageContent(viewModel = viewModel, onNotification = onNotification)
     }
 }
 
@@ -63,7 +70,6 @@ fun MyPageScreen(
 private fun MyPageContent(
     viewModel      : MyViewModel,
     onNotification : () -> Unit = {},
-    onLogout       : () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val profile = uiState.profile
@@ -125,15 +131,27 @@ private fun MyPageContent(
                             Icon(painterResource(R.drawable.ic_location), "국적", Modifier.size(14.dp), tint = C.TextSec)
                             Text(profile.countryName(), style = TextStyle(fontSize = 13.sp, color = C.TextSec, fontFamily = PretendardFamily))
                         }
-                        if (uiState.emailVisible) {
-                            Text(profile.email, style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
-                        }
                         Text("${profile.age}세 · ${profile.gender}", style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
                     }
                 }
 
                 Spacer(Modifier.height(12.dp))
                 Text(profile.bio, style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 22.sp), modifier = Modifier.padding(horizontal = 16.dp))
+
+                if (profile.consecutiveDays > 0) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(painterResource(R.drawable.ic_calendar), "출석", Modifier.size(14.dp), tint = C.TextSec)
+                        Text(
+                            "연속 ${profile.consecutiveDays}일 출석",
+                            style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily),
+                        )
+                    }
+                }
 
                 Spacer(Modifier.height(12.dp))
                 // [프로필 수정] 버튼
@@ -240,7 +258,7 @@ private fun MyPageContent(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showLogoutDialog = false; onLogout() }) {
+                TextButton(onClick = { showLogoutDialog = false; viewModel.logout() }) {
                     Text("확인", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = Color(0xFFE53935), fontWeight = FontWeight(600)))
                 }
             },
@@ -253,6 +271,10 @@ private fun MyPageContent(
 private fun ProfileEditScreen(viewModel: MyViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     BackHandler { viewModel.closeEdit() }
+
+    val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) viewModel.setPendingImageUri(uri.toString())
+    }
 
     var editSubPage by remember { mutableStateOf<String?>(null) }
 
@@ -304,6 +326,7 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
                         HorizontalDivider(color = C.Border, thickness = 0.5.dp)
                         Button(
                             onClick  = { viewModel.saveEdit() },
+                            enabled  = !uiState.isSaving,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).navigationBarsPadding().height(52.dp),
                             shape    = RoundedCornerShape(12.dp),
                             colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
@@ -320,10 +343,10 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
                 ) {
                     Spacer(Modifier.height(24.dp))
 
-                    Box(modifier = Modifier.size(100.dp)) {
+                    Box(modifier = Modifier.size(100.dp).clickable { imageLauncher.launch("image/*") }) {
                         Box(Modifier.size(100.dp).clip(CircleShape).background(Color(0xFFD0D0D0))) {
                             AsyncImage(
-                                model              = uiState.profile.profileImageUrl,
+                                model              = uiState.pendingImageUri ?: uiState.profile.profileImageUrl,
                                 contentDescription = uiState.profile.name,
                                 contentScale       = ContentScale.Crop,
                                 modifier           = Modifier.fillMaxSize(),
@@ -333,7 +356,11 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
                             modifier = Modifier.size(34.dp).clip(CircleShape).background(Color(0xFF888888).copy(alpha = 0.85f)).align(Alignment.BottomEnd),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(painterResource(R.drawable.ic_media_camera), "카메라", Modifier.size(18.dp), tint = Color.White)
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_media_camera),
+                                contentDescription = null,
+                                modifier = Modifier.size(50.dp)
+                            )
                         }
                     }
 
@@ -346,7 +373,11 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
                         Triple("이름", uiState.editName,              { editSubPage = "name" }),
                         Triple("생일", uiState.editBirthday,          { editSubPage = "birthday" }),
                         Triple("성별", uiState.editGender,            { editSubPage = "gender" }),
-                        Triple("국적", uiState.profile.countryName(), { editSubPage = "country" }),
+                        Triple(
+                            "국적",
+                            "${countryFlag(uiState.editCountry)} ${countryName(uiState.editCountry)}",
+                            { editSubPage = "country" },
+                        ),
                     ).forEach { (label, value, onTap) ->
                         EditInfoRow(label = label, value = value, onTap = onTap)
                     }
@@ -400,8 +431,7 @@ private fun EditInfoRow(label: String, value: String, onTap: () -> Unit) {
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
         ) {
-            val display = if (label == "국적") "🇺🇸 $value" else value
-            Text(display, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
+            Text(value, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
             Icon(painterResource(R.drawable.ic_chevron_right), "수정", Modifier.size(16.dp), tint = C.TextSec)
         }
     }
@@ -563,7 +593,7 @@ private fun DrumRollPicker(
 private fun GenderSelectSubPage(current: String, onSave: (String) -> Unit, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     var selected by remember { mutableStateOf(current) }
-    val options = listOf("남성", "여성", "선택 안 함")
+    val options = listOf("남성", "여성")
     Scaffold(
         topBar = { SubScreenTopBar(title = "성별", onBack = onBack) },
         containerColor = Color.White,
@@ -604,7 +634,13 @@ private fun GenderSelectSubPage(current: String, onSave: (String) -> Unit, onBac
 private fun CountrySelectSubPage(current: String, onSave: (String) -> Unit, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     var selected by remember { mutableStateOf(current) }
-    val options = listOf("KR" to "한국", "US" to "미국", "JP" to "일본", "CN" to "중국", "FR" to "프랑스")
+    val options = listOf(
+        "KOREA"  to "한국",
+        "USA"    to "미국",
+        "JAPAN"  to "일본",
+        "CHINA"  to "중국",
+        "FRANCE" to "프랑스",
+    )
     Scaffold(
         topBar = { SubScreenTopBar(title = "국적", onBack = onBack) },
         containerColor = Color.White,
@@ -645,6 +681,7 @@ private fun CountrySelectSubPage(current: String, onSave: (String) -> Unit, onBa
 private fun LanguageEditSubPage(
     language     : String,
     currentLevel : Int,
+    isSaving     : Boolean,
     onSave       : (Int) -> Unit,
     onBack       : () -> Unit,
 ) {
@@ -752,6 +789,7 @@ private fun LanguageEditSubPage(
                 }
                 Button(
                     onClick  = { onSave(selectedLevel) },
+                    enabled  = !isSaving,
                     modifier = Modifier.weight(1f).height(52.dp),
                     shape    = RoundedCornerShape(12.dp),
                     colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
@@ -784,8 +822,13 @@ private fun TagEditScreen(viewModel: MyViewModel) {
                     Text("태그 편집", style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri), modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                     Text(
                         "완료",
-                        style    = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.Accent, fontWeight = FontWeight(600)),
-                        modifier = Modifier.padding(horizontal = 12.dp).clickable { viewModel.saveTagEdit() },
+                        style    = TextStyle(
+                            fontSize   = 15.sp,
+                            fontFamily = PretendardFamily,
+                            color      = if (uiState.isSaving) C.TextSec else C.Accent,
+                            fontWeight = FontWeight(600),
+                        ),
+                        modifier = Modifier.padding(horizontal = 12.dp).clickable(enabled = !uiState.isSaving) { viewModel.saveTagEdit() },
                     )
                 }
                 HorizontalDivider(color = C.Border, thickness = 0.5.dp)
@@ -848,7 +891,7 @@ private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
     var soundEnabled     by remember { mutableStateOf(true) }
     var vibrationEnabled by remember { mutableStateOf(true) }
-    val emailVisible = uiState.emailVisible
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -889,30 +932,54 @@ private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
             }
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
 
-            Spacer(Modifier.height(16.dp))
-            Text("프로필", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.TextSec), modifier = Modifier.padding(horizontal = 16.dp))
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("이메일 노출", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextPri))
-                    Text(
-                        if (emailVisible) "다른 사용자에게 이메일이 표시됩니다" else "이메일이 숨김 처리됩니다",
-                        style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextSec),
-                    )
-                }
-                Switch(
-                    checked         = emailVisible,
-                    onCheckedChange = { viewModel.toggleEmailVisible() },
-                    colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = C.Accent),
-                )
-            }
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider(color = C.Border, thickness = 8.dp)
+            Text(
+                "회원 탈퇴",
+                style    = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = Color(0xFFE53935)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !uiState.isSaving) { showDeleteDialog = true }
+                    .padding(horizontal = 16.dp, vertical = 18.dp),
+            )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = C.Border, thickness = 0.5.dp)
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!uiState.isSaving) showDeleteDialog = false },
+            containerColor   = Color.White,
+            shape            = RoundedCornerShape(16.dp),
+            title = {
+                Text(
+                    "회원 탈퇴",
+                    style = TextStyle(fontSize = 17.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                )
+            },
+            text = {
+                Text(
+                    "탈퇴하시겠습니까?\n계정과 데이터는 복구할 수 없습니다.",
+                    style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextSec, lineHeight = 20.sp),
+                )
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteDialog = false },
+                    enabled = !uiState.isSaving,
+                ) {
+                    Text("취소", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = C.TextSec))
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.deleteMyAccount() },
+                    enabled = !uiState.isSaving,
+                ) {
+                    Text("탈퇴", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color(0xFFE53935)))
+                }
+            },
+        )
     }
 }
 

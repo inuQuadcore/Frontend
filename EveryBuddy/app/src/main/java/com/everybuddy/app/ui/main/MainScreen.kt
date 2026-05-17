@@ -24,10 +24,15 @@ import androidx.navigation.navArgument
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.everybuddy.app.R
 import com.everybuddy.app.ui.chat.ChatListScreen
 import com.everybuddy.app.ui.chat.ChatRoomScreen
 import com.everybuddy.app.ui.chat.ChatViewModel
+import com.everybuddy.app.ui.chat.NewFolderScreen
+import com.everybuddy.app.ui.chat.ScriptFolder
+import com.everybuddy.app.ui.chat.ScriptItem
 import com.everybuddy.app.ui.chat.ScriptSaveItem
 import com.everybuddy.app.ui.explore.ExploreScreen
 import com.everybuddy.app.ui.explore.MyViewModel
@@ -35,6 +40,8 @@ import com.everybuddy.app.ui.friend.FriendMainScreen
 import com.everybuddy.app.ui.friend.FriendViewModel
 import com.everybuddy.app.ui.my.MyPageScreen
 import com.everybuddy.app.ui.notification.NotificationScreen
+import com.everybuddy.app.ui.script.ScriptDetailScreen
+import com.everybuddy.app.ui.script.ScriptFolderScreen
 import com.everybuddy.app.ui.script.ScriptMainScreen
 import com.everybuddy.app.ui.script.ScriptViewModel
 import com.everybuddy.app.ui.theme.PretendardFamily
@@ -64,7 +71,15 @@ fun MainScreen(onLogout: () -> Unit = {}) {
     var showNotification  by remember { mutableStateOf(false) }
 
     val chatNavController = rememberNavController()
-    val scriptViewModel   : ScriptViewModel = hiltViewModel()
+    val scriptViewModel   : ScriptViewModel     = hiltViewModel()
+    val chatVm            : ChatViewModel       = hiltViewModel()
+    val attendanceVm      : AttendanceViewModel = hiltViewModel()
+
+    LaunchedEffect(Unit) { attendanceVm.markAttendanceIfNeeded() }
+
+    var selectedScriptItem    by remember { mutableStateOf<ScriptItem?>(null) }
+    var selectedScriptFolder  by remember { mutableStateOf<ScriptFolder?>(null) }
+    var showNewFolderInScript by remember { mutableStateOf(false) }
 
     if (showNotification) {
         NotificationScreen(onBack = { showNotification = false })
@@ -116,7 +131,6 @@ fun MainScreen(onLogout: () -> Unit = {}) {
             when (selectedTab) {
 
                 MainTab.CHAT -> {
-                    val chatVm: ChatViewModel = hiltViewModel()
                     NavHost(navController = chatNavController, startDestination = MainRoute.CHAT_LIST) {
                         composable(MainRoute.CHAT_LIST) {
                             isChatRoomOpen = false
@@ -153,7 +167,8 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                                         folderId       = item.selectedFolder,
                                     )
                                 },
-                                onMuteChanged = { isMuted -> chatVm.updateRoomMute(roomId, isMuted) },
+                                onMuteChanged   = { isMuted -> chatVm.updateRoomMute(roomId, isMuted) },
+                                onFolderCreated = { folder -> scriptViewModel.addFolder(folder.name, folder.coverImage.ifEmpty { null }) },
                             )
                         }
                     }
@@ -163,10 +178,16 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                     isChatRoomOpen = false
                     val friendVm: FriendViewModel = hiltViewModel()
                     FriendMainScreen(
-                        viewModel      = friendVm,
-                        onAddFriend    = { selectedTab = MainTab.EXPLORE },
-                        onStartChat    = { user -> chatNavController.navigate(MainRoute.chatRoom("chat_${user.userId}")); selectedTab = MainTab.CHAT },
-                        onNotification = { showNotification = true },
+                        viewModel       = friendVm,
+                        onAddFriend     = { selectedTab = MainTab.EXPLORE },
+                        onStartChat     = { user -> chatNavController.navigate(MainRoute.chatRoom("chat_${user.userId}")); selectedTab = MainTab.CHAT },
+                        onNotification  = { showNotification = true },
+                        onReplyToStatus = { friendId, friendName ->
+                            chatVm.addReplyRoom(friendId, friendName)
+                            isChatRoomOpen = true
+                            chatNavController.navigate(MainRoute.chatRoom("reply_$friendId"))
+                            selectedTab = MainTab.CHAT
+                        },
                     )
                 }
 
@@ -180,10 +201,50 @@ fun MainScreen(onLogout: () -> Unit = {}) {
 
                 MainTab.SCRIPT -> {
                     isChatRoomOpen = false
-                    ScriptMainScreen(
-                        viewModel      = scriptViewModel,
-                        onNotification = { showNotification = true },
-                    )
+                    when {
+                        selectedScriptItem != null -> {
+                            ScriptDetailScreen(
+                                item   = selectedScriptItem!!,
+                                onBack = { selectedScriptItem = null },
+                            )
+                        }
+                        selectedScriptFolder != null -> {
+                            val scriptUiState by scriptViewModel.uiState.collectAsState()
+                            ScriptFolderScreen(
+                                folder      = selectedScriptFolder!!,
+                                allItems    = scriptUiState.items,
+                                onBack      = { selectedScriptFolder = null },
+                                onItemClick = { item -> selectedScriptItem = item },
+                            )
+                        }
+                        else -> {
+                            val scriptUiStateMain by scriptViewModel.uiState.collectAsState()
+                            ScriptMainScreen(
+                                viewModel      = scriptViewModel,
+                                isRefreshing   = scriptUiStateMain.isRefreshing,
+                                onRefresh      = scriptViewModel::refresh,
+                                onFolderClick  = { folder -> selectedScriptFolder = folder },
+                                onItemClick    = { item -> selectedScriptItem = item },
+                                onAddFolder    = { showNewFolderInScript = true },
+                                onNotification = { showNotification = true },
+                            )
+                            if (showNewFolderInScript) {
+                                Dialog(
+                                    onDismissRequest = { showNewFolderInScript = false },
+                                    properties       = DialogProperties(usePlatformDefaultWidth = false),
+                                ) {
+                                    NewFolderScreen(
+                                        roomName = "스크립트",
+                                        onBack   = { showNewFolderInScript = false },
+                                        onSave   = { name, coverUri ->
+                                            scriptViewModel.addFolder(name, coverUri)
+                                            showNewFolderInScript = false
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
                 MainTab.MY -> {

@@ -4,6 +4,28 @@ import androidx.compose.ui.graphics.Color
 import com.everybuddy.app.ui.onboarding.InterestCategory
 import com.everybuddy.app.ui.onboarding.sampleTags
 
+// 국적 코드(KOREA/USA/JAPAN/CHINA/FRANCE/CZECH) → 표시 변환.
+// 백엔드 enum 값을 그대로 받아 변환. 알 수 없는 값은 🌐 / 코드 그대로 반환.
+fun countryFlag(code: String): String = when (code.uppercase()) {
+    "KOREA"  -> "🇰🇷"
+    "USA"    -> "🇺🇸"
+    "JAPAN"  -> "🇯🇵"
+    "CHINA"  -> "🇨🇳"
+    "FRANCE" -> "🇫🇷"
+    "CZECH"  -> "🇨🇿"
+    else     -> "🌐"
+}
+
+fun countryName(code: String): String = when (code.uppercase()) {
+    "KOREA"  -> "한국"
+    "USA"    -> "미국"
+    "JAPAN"  -> "일본"
+    "CHINA"  -> "중국"
+    "FRANCE" -> "프랑스"
+    "CZECH"  -> "체코"
+    else     -> code
+}
+
 object AppColors {
     val Accent      = Color(0xFF0167FF)
     val TextPri     = Color(0xFF000000)
@@ -29,8 +51,6 @@ data class DiscoverUser(
     val tags            : List<UserTag>      = emptyList(),
     val lastSeenAt      : String      = "",    // ISO 날짜 문자열
     val isOnline        : Boolean     = false, // lastSeenAt 기반 파생
-    val consecutiveDays : Int         = 0,     // 연속 출석일
-    val isFollowing     : Boolean     = false,
 ) {
     /** 한줄소개 15자 제한 */
     fun bioPreview15() = if (bio.length > 15) bio.take(15) + "…" else bio
@@ -45,27 +65,8 @@ data class DiscoverUser(
         return top2 to rest
     }
 
-    /** 국적 → 언어 플래그 이모지 */
-    fun countryFlag() = when (country.uppercase()) {
-        "KOREA", "KR"  -> "🇰🇷"
-        "USA", "US"    -> "🇺🇸"
-        "JAPAN", "JP"  -> "🇯🇵"
-        "CHINA", "CN"  -> "🇨🇳"
-        "FRANCE", "FR" -> "🇫🇷"
-        "CZECH", "CZ", "CS" -> "🇨🇿"
-        else -> "🌐"
-    }
-
-    /** 국적 → 국가 이름 */
-    fun countryName() = when (country.uppercase()) {
-        "KOREA", "KR"        -> "한국"
-        "USA", "US"          -> "미국"
-        "JAPAN", "JP"        -> "일본"
-        "CHINA", "CN"        -> "중국"
-        "FRANCE", "FR"       -> "프랑스"
-        "CZECH", "CZ", "CS"  -> "체코"
-        else                 -> country
-    }
+    fun countryFlag() = countryFlag(country)
+    fun countryName() = countryName(country)
 
     /** 언어 코드 표시 */
     fun languageLabels() = languages.map { it.displayCode() }
@@ -103,11 +104,32 @@ data class UserTag(
     val displayName: String = tag, // 한국어 표시명
 )
 
-enum class GenderFilter(val label: String) { FEMALE("여성"), MALE("남성"), ALL("모든 성별") }
+// 프로필 진입 시 GET /users/{id}로 보강되는 정보. DiscoverUser와 합쳐 UserProfileScreen 표시
+data class UserDetail(
+    val age             : Int,
+    val gender          : String,  // "MALE"/"FEMALE", UI에서 한글 변환
+    val consecutiveDays : Int,
+    val isFriend        : Boolean,
+) {
+    fun genderLabel(): String = when (gender.uppercase()) {
+        "MALE"   -> "남성"
+        "FEMALE" -> "여성"
+        else     -> ""
+    }
+}
+
+enum class GenderFilter(val label: String) {
+    FEMALE("여성"), MALE("남성"), ALL("모든 성별");
+
+    fun toApiCode(): String? = when (this) {
+        MALE   -> "MALE"
+        FEMALE -> "FEMALE"
+        ALL    -> null
+    }
+}
 enum class ActivityFilter(val label: String, val desc: String) {
     ONLINE("현재활동중인 친구", "지금 이 앱에서 활발히 활동 중이에요."),
     RECENT("최근 접속한 친구", "최근 24시간 이내에 접속했어요."),
-    FREQUENT("대화를 자주 하는 친구", "최근에 친구들과 메시지를 주고받았어요."),
 }
 
 data class FilterSettings(
@@ -115,7 +137,7 @@ data class FilterSettings(
     val minAge         : Int                 = 15,
     val maxAge         : Int                 = 30,
     val country        : String?             = null,   // null = 모든 국적
-    val language       : String?             = null,   // null = 모든 언어
+    val languages      : List<String>        = emptyList(),  // 서버 코드("ENGLISH" 등), 빈 리스트 = 모든 언어
     val activityFilters: Set<ActivityFilter> = emptySet(),
     val selectedTags   : List<UserTag>       = emptyList(),  // 최대 15개
     val isOnline       : Boolean             = false,
@@ -123,7 +145,7 @@ data class FilterSettings(
 ) {
     fun isEmpty() = gender == GenderFilter.ALL &&
             minAge == 15 && maxAge == 30 &&
-            country == null && language == null &&
+            country == null && languages.isEmpty() &&
             activityFilters.isEmpty() && selectedTags.isEmpty()
 }
 
@@ -131,10 +153,9 @@ data class MyProfile(
     val userId          : Long    = 1L,
     val name            : String  = "홍길동",
     val profileImageUrl : String? = null,   // TODO: Coil
-    val email           : String  = "everybuddy@gmail.com",
     val age             : Int     = 23,
     val gender          : String  = "여성",
-    val country         : String  = "US",
+    val country         : String  = "USA",
     val bio             : String  = "일본어 배우는 중이에요.\n가볍게 대화하면서 연습해요 😊",
     val learningLanguages: List<UserLanguage> = listOf(
         UserLanguage("ENGLISH", 2),
@@ -147,20 +168,11 @@ data class MyProfile(
         UserTag("CAFE_TOUR",    "HOBBY",         "☕", "카페탐방"),
         UserTag("MOVIE",        "ENTERTAINMENT", "🎬", "영화보기"),
     ),
-    val birthday        : String  = "2005.11.30",
+    val birthday        : String  = "",   // "yyyy.MM.dd" — 로드 전 빈 값
+    val consecutiveDays : Int     = 0,    // 연속 출석일. 1일 이상일 때만 뱃지 표시(0이면 숨김)
 ) {
-    fun countryFlag() = when (country.uppercase()) {
-        "US", "USA" -> "🇺🇸"
-        "KR", "KOREA" -> "🇰🇷"
-        "JP", "JAPAN" -> "🇯🇵"
-        else -> "🌐"
-    }
-    fun countryName() = when (country.uppercase()) {
-        "US", "USA" -> "미국"
-        "KR", "KOREA" -> "한국"
-        "JP", "JAPAN" -> "일본"
-        else -> country
-    }
+    fun countryFlag() = countryFlag(country)
+    fun countryName() = countryName(country)
 }
 
 object ExploreDemo {
@@ -182,63 +194,6 @@ object ExploreDemo {
             displayName = tag.label,
         )
     }
-
-    // 탐색 카드 랜덤 세트 (6개씩)
-    val randomCards = listOf(
-        DiscoverUser(
-            userId = 10, name = "Olivia", profileImageUrl = "olivia_card",
-            country = "USA", bio = "Hello! I'm from the U.S. 😊",
-            languages = listOf(UserLanguage("ENGLISH", 5), UserLanguage("KOREAN", 1)),
-            tags = listOf(UserTag("PHOTOGRAPHY","HOBBY","📷","사진찍기"), UserTag("RUNNING","HOBBY","🏃","러닝"), UserTag("TRAVEL","HOBBY","✈️","여행")),
-            isOnline = true, consecutiveDays = 7,
-        ),
-        DiscoverUser(
-            userId = 11, name = "홍현준", profileImageUrl = "user_hong",
-            country = "USA", bio = "영어 배우고 싶어요",
-            languages = listOf(UserLanguage("ENGLISH", 2), UserLanguage("JAPANESE", 1)),
-            tags = listOf(UserTag("WORKOUT","HOBBY","🏋️","운동하기"), UserTag("COOKING","HOBBY","🍳","요리"), UserTag("FOOD_TOUR","FOOD","📍","맛집탐방")),
-            isOnline = true, consecutiveDays = 5,
-        ),
-        DiscoverUser(
-            userId = 12, name = "손나은", profileImageUrl = "user_son",
-            country = "USA", bio = "영어 배우고 싶어요",
-            languages = listOf(UserLanguage("ENGLISH", 2), UserLanguage("JAPANESE", 1)),
-            tags = listOf(UserTag("HIKING","HOBBY","⛰️","등산"), UserTag("COOKING","HOBBY","🍳","요리"), UserTag("FOOD_TOUR","FOOD","📍","맛집탐방")),
-            isOnline = false, consecutiveDays = 3,
-        ),
-        DiscoverUser(
-            userId = 13, name = "Alex", profileImageUrl = "user_alex",
-            country = "CS", bio = "Ahoj! 😊",
-            languages = listOf(UserLanguage("CZECH", 5), UserLanguage("FRENCH", 3)),
-            tags = listOf(UserTag("CAMPING","HOBBY","⛺","캠핑"), UserTag("READING","HOBBY","📚","독서"), UserTag("COFFEE","FOOD","☕","커피러버")),
-            isOnline = false, consecutiveDays = 1,
-        ),
-        DiscoverUser(
-            userId = 14, name = "はるか", profileImageUrl = "user_haruka",
-            country = "JAPAN", bio = "日本語で話しましょう！",
-            languages = listOf(UserLanguage("JAPANESE", 5), UserLanguage("ENGLISH", 2)),
-            tags = listOf(UserTag("MUSIC","ENTERTAINMENT","🎵","음악감상"), UserTag("COOKING","HOBBY","🍳","요리")),
-            isOnline = true, consecutiveDays = 12,
-        ),
-        DiscoverUser(
-            userId = 15, name = "김민준", profileImageUrl = "user_kim",
-            country = "KOREA", bio = "영어 배우고 싶어요",
-            languages = listOf(UserLanguage("ENGLISH", 3), UserLanguage("JAPANESE", 1)),
-            tags = listOf(UserTag("PHOTOGRAPHY","HOBBY","📷","사진찍기"), UserTag("RUNNING","HOBBY","🏃","러닝"), UserTag("TRAVEL","HOBBY","✈️","여행")),
-            isOnline = true, consecutiveDays = 30,
-        ),
-    )
-
-    // 상위 태그 매칭 사용자 목록 (현활 → 가나다순)
-    val tagMatchUsers = randomCards.sortedWith(
-        compareByDescending<DiscoverUser> { it.isOnline }.thenBy { it.name }
-    )
-
-    // 내가 배우는 언어("ENGLISH") 배우고 싶은 사용자 목록
-    val learningLangUsers = tagMatchUsers
-
-    // 필터 적용 결과 (가나다순)
-    val filterUsers = randomCards.sortedBy { it.name }
 
     // 온보딩 국적 목록
     val countryList = listOf("모든 국적", "한국", "미국", "일본", "중국", "프랑스", "체코")
