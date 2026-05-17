@@ -11,7 +11,7 @@ import com.google.firebase.database.DataSnapshot
  * 시간은 KST LocalDateTime으로 통일 (TimeConverter helper 사용).
  */
 
-/** REST 응답 Message → Room ChatMessageEntity. */
+/** REST 응답 Message → Room ChatMessageEntity. userName은 stale 방지로 저장 안 함. */
 fun Message.toChatMessageEntity(
     chatRoomId : Long,
     status     : String = "SENT",
@@ -19,7 +19,6 @@ fun Message.toChatMessageEntity(
     messageId     = messageId,
     chatRoomId    = chatRoomId,
     senderId      = userId,
-    senderName    = userName,
     messageType   = messageType,
     content       = content,
     sendAt        = parseRestLocalDateTime(sendAt),
@@ -32,12 +31,11 @@ fun Message.toChatMessageEntity(
     mediaType     = mediaType,
 )
 
-/** Room ChatMessageEntity → UI ChatMessage. */
+/** Room ChatMessageEntity → UI ChatMessage. 송신자 이름/프로필은 UI에서 senderId로 lookup. */
 fun ChatMessageEntity.toChatMessage(): ChatMessage = ChatMessage(
     id        = messageId.toString(),
     roomId    = chatRoomId.toString(),
     senderId  = senderId.toString(),
-    senderName= senderName,
     type      = resolveType(messageType, mediaType),
     text      = content.orEmpty(),
     voiceUrl  = fileUrl.orEmpty(),
@@ -63,7 +61,7 @@ private fun resolveType(messageType: String, mediaType: String?): MessageType = 
 fun DataSnapshot.toChatMessageEntity(chatRoomId: Long): ChatMessageEntity? {
     val messageId = key?.toLongOrNull() ?: return null
     val userId      = child("userId").getValue(Long::class.java)   ?: return null
-    val userName    = child("userName").getValue(String::class.java).orEmpty()
+    // RTDB userName 노드는 표시용으로 사용 X — 송신자 이름은 senderId로 UserSummaryCache lookup.
     val messageType = child("messageType").getValue(String::class.java) ?: "TEXT"
     val content     = child("content").getValue(String::class.java)
     val sendAtMs    = child("sendAt").getValue(Long::class.java)   ?: 0L
@@ -72,7 +70,6 @@ fun DataSnapshot.toChatMessageEntity(chatRoomId: Long): ChatMessageEntity? {
         messageId     = messageId,
         chatRoomId    = chatRoomId,
         senderId      = userId,
-        senderName    = userName,
         messageType   = messageType,
         content       = content,
         sendAt        = epochMsToKstLocalDateTime(sendAtMs),

@@ -195,7 +195,6 @@ class ChatRoomViewModel @Inject constructor(
                 messageId   = tempId,
                 chatRoomId  = chatRoomId,
                 senderId    = senderId,
-                senderName  = "",                                // RTDB와 다르게 채워두지 않음 — UI는 본인 메시지로 렌더링
                 messageType = "TEXT",
                 content     = text,
                 sendAt      = java.time.LocalDateTime.now(com.everybuddy.app.data.local.KST),
