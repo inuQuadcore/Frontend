@@ -4,6 +4,13 @@ package com.everybuddy.app.ui.chat
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +26,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -32,6 +41,7 @@ import com.everybuddy.app.R
 import com.everybuddy.app.data.chat.ChatFilter
 import com.everybuddy.app.data.chat.ChatFolder
 import com.everybuddy.app.data.chat.ChatListUiState
+import com.everybuddy.app.data.chat.ChatParticipantUi
 import com.everybuddy.app.data.chat.ChatRoomUi
 import com.everybuddy.app.data.chat.dummyChatRooms
 import com.everybuddy.app.ui.theme.*
@@ -45,10 +55,13 @@ private val ClBadge     = Color(0xFF0167FF)   // unreadCount 배지 색
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
-    onRoomClick        : (ChatRoomUi) -> Unit = {},
-    onStartChat        : () -> Unit         = {},
-    onNotificationClick: () -> Unit         = {},
-    viewModel          : ChatViewModel      = hiltViewModel(),
+    onRoomClick         : (ChatRoomUi) -> Unit = {},
+    onStartChat         : () -> Unit           = {},
+    onStartDirectChat   : () -> Unit           = {},
+    onStartGroupChat    : () -> Unit           = {},
+    onNotificationClick : () -> Unit           = {},
+    onNavigateToExplore : () -> Unit           = {},
+    viewModel           : ChatViewModel        = hiltViewModel(),
 ) {
     val rawState      by viewModel.listState.collectAsState()
     val filteredRooms by viewModel.filteredRooms.collectAsState()
@@ -70,6 +83,9 @@ fun ChatListScreen(
         onSearchToggle      = viewModel::onSearchToggle,
         onSearchChange      = viewModel::onSearchQueryChange,
         onFabClick          = onStartChat,
+        onStartDirectChat   = onStartDirectChat,
+        onStartGroupChat    = onStartGroupChat,
+        onNavigateToExplore = onNavigateToExplore,
         onRetry             = viewModel::loadChatRooms,
         onContextMenu       = viewModel::onContextMenu,
         onDismissMenu       = viewModel::onDismissContextMenu,
@@ -98,7 +114,10 @@ fun ChatListContent(
     onFolderDelete      : (String) -> Unit     = {},
     onSearchToggle      : () -> Unit,
     onSearchChange      : (String) -> Unit,
-    onFabClick          : () -> Unit,
+    onFabClick             : () -> Unit,
+    onStartDirectChat      : () -> Unit    = {},
+    onStartGroupChat       : () -> Unit    = {},
+    onNavigateToExplore    : () -> Unit    = {},
     onRetry             : () -> Unit,
     onContextMenu       : (ChatRoomUi) -> Unit,
     onDismissMenu       : () -> Unit,
@@ -376,11 +395,50 @@ fun ChatListContent(
             }
         }
 
+        var isFabExpanded by remember { mutableStateOf(false) }
+        val fabRotation   by animateFloatAsState(
+            targetValue  = if (isFabExpanded) 45f else 0f,
+            animationSpec = tween(durationMillis = 250),
+            label        = "fab_rotation",
+        )
+        val dimInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+
+        if (isFabExpanded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(indication = null, interactionSource = dimInteractionSource) {
+                        isFabExpanded = false
+                    },
+            )
+        }
+
+        AnimatedVisibility(
+            visible  = isFabExpanded,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = 182.dp),
+            enter    = fadeIn(tween(200)) + scaleIn(tween(200), transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 1f)),
+            exit     = fadeOut(tween(150)) + scaleOut(tween(150), transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 1f)),
+        ) {
+            Surface(
+                shape           = RoundedCornerShape(12.dp),
+                color           = Color.White,
+                shadowElevation = 8.dp,
+                modifier        = Modifier.clickable {},
+            ) {
+                Column(modifier = Modifier.padding(vertical = 4.dp).width(IntrinsicSize.Max)) {
+                    FabMenuItem("일반채팅") { isFabExpanded = false; onStartDirectChat() }
+                    HorizontalDivider(color = ClBorder, thickness = 0.5.dp)
+                    FabMenuItem("그룹채팅") { isFabExpanded = false; onStartGroupChat() }
+                    HorizontalDivider(color = ClBorder, thickness = 0.5.dp)
+                    FabMenuItem("탐색으로 이동") { isFabExpanded = false; onNavigateToExplore() }
+                }
+            }
+        }
+
         FloatingActionButton(
-            onClick        = onFabClick,
+            onClick        = { isFabExpanded = !isFabExpanded },
             modifier       = Modifier
                 .align(Alignment.BottomEnd)
-                // TODO padding: FAB 위치 end 18dp / bottom 126dp
                 .padding(end = 18.dp, bottom = 126.dp),
             shape          = CircleShape,
             containerColor = Color(0xFF0167FF),
@@ -393,7 +451,7 @@ fun ChatListContent(
             Icon(
                 painter            = painterResource(R.drawable.ic_fab_plus),
                 contentDescription = "새 채팅",
-                modifier           = Modifier.size(24.dp),
+                modifier           = Modifier.size(24.dp).rotate(fabRotation),
                 tint               = Color.White,
             )
         }
@@ -449,15 +507,33 @@ fun ChatRoomItem(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // 아바타 (이니셜 원형)
-        Box(
-            modifier         = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFDDDDDD)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text  = room.name.take(1),
-                style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color(0xFF888888)),
-            )
+        // 아바타 (그룹=겹침 레이아웃, 1:1=프로필 이미지 또는 이니셜)
+        if (room.participants.size >= 2) {
+            GroupAvatarLayout(participants = room.participants)
+        } else {
+            Box(
+                modifier         = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFDDDDDD)),
+                contentAlignment = Alignment.Center,
+            ) {
+                when {
+                    room.profileDrawableRes != null -> Image(
+                        painter            = painterResource(room.profileDrawableRes),
+                        contentDescription = room.name,
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize().clip(CircleShape),
+                    )
+                    room.profileImageUrl != null -> coil.compose.AsyncImage(
+                        model              = room.profileImageUrl,
+                        contentDescription = room.name,
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize().clip(CircleShape),
+                    )
+                    else -> Text(
+                        text  = room.name.take(1),
+                        style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color(0xFF888888)),
+                    )
+                }
+            }
         }
 
         // 이름 + 마지막 메시지
@@ -591,6 +667,18 @@ private fun ContextMenuItem(label: String, isDestructive: Boolean, onClick: () -
 }
 
 @Composable
+private fun FabMenuItem(label: String, onClick: () -> Unit) {
+    Text(
+        text     = label,
+        style    = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = ClTextPri),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 13.dp),
+    )
+}
+
+@Composable
 private fun ChatRoomInfoScreen(room: ChatRoomUi, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     Scaffold(
@@ -617,6 +705,71 @@ private fun ChatRoomInfoScreen(room: ChatRoomUi, onBack: () -> Unit) {
             Text(
                 "내가 설정한 사진과 이름은 나에게만 보입니다.",
                 style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = ClTextSec),
+            )
+        }
+    }
+}
+
+@Composable
+private fun GroupAvatarLayout(participants: List<ChatParticipantUi>) {
+    Box(modifier = Modifier.size(48.dp)) {
+        when (participants.size) {
+            2 -> {
+                ParticipantAvatar(participants[0], 34.dp, Modifier.align(Alignment.TopStart))
+                ParticipantAvatar(participants[1], 34.dp, Modifier.align(Alignment.TopStart).offset(14.dp, 14.dp))
+            }
+            3 -> {
+                ParticipantAvatar(participants[0], 28.dp, Modifier.align(Alignment.TopStart))
+                ParticipantAvatar(participants[1], 28.dp, Modifier.align(Alignment.TopStart).offset(20.dp, 0.dp))
+                ParticipantAvatar(participants[2], 28.dp, Modifier.align(Alignment.TopStart).offset(10.dp, 20.dp))
+            }
+            else -> {
+                ParticipantAvatar(participants[0], 24.dp, Modifier.align(Alignment.TopStart))
+                ParticipantAvatar(participants[1], 24.dp, Modifier.align(Alignment.TopStart).offset(24.dp, 0.dp))
+                ParticipantAvatar(participants[2], 24.dp, Modifier.align(Alignment.TopStart).offset(0.dp, 24.dp))
+                Box(
+                    modifier         = Modifier
+                        .size(24.dp)
+                        .align(Alignment.TopStart)
+                        .offset(24.dp, 24.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFEEEEEE)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter            = painterResource(R.drawable.ic_fab_plus),
+                        contentDescription = null,
+                        modifier           = Modifier.size(10.dp),
+                        tint               = Color(0xFF888888),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ParticipantAvatar(
+    participant : ChatParticipantUi?,
+    size        : Dp,
+    modifier    : Modifier = Modifier,
+) {
+    Box(
+        modifier         = modifier.size(size).clip(CircleShape).background(Color(0xFFDDDDDD)),
+        contentAlignment = Alignment.Center,
+    ) {
+        when {
+            participant?.profileDrawableRes != null -> Image(
+                painter            = painterResource(participant.profileDrawableRes),
+                contentDescription = null,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
+            )
+            participant?.profileImageUrl != null -> coil.compose.AsyncImage(
+                model              = participant.profileImageUrl,
+                contentDescription = null,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
             )
         }
     }

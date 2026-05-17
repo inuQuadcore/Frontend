@@ -79,14 +79,17 @@ private val DateBadgeBg    = Color(0xFFDDDDDD)
 @Composable
 fun ChatRoomScreen(
     roomId                : String,
+    roomName              : String                   = "",
     onBack                : () -> Unit,
     onNavigateToScriptTab : () -> Unit               = {},
     onSaveScriptItem      : (ScriptSaveItem) -> Unit = {},
     onMuteChanged         : (Boolean) -> Unit        = {},
     onFolderCreated       : (ScriptFolder) -> Unit   = {},
+    isStarred             : Boolean                  = false,
+    onToggleStar          : () -> Unit               = {},
     viewModel             : ChatRoomViewModel         = hiltViewModel(),
 ) {
-    LaunchedEffect(roomId) { viewModel.loadRoom(roomId) }
+    LaunchedEffect(roomId) { viewModel.loadRoom(roomId, roomName) }
     val state by viewModel.uiState.collectAsState()
 
     val micPermLauncher = rememberLauncherForActivityResult(
@@ -176,6 +179,8 @@ fun ChatRoomScreen(
         onFolderCreated          = onFolderCreated,
         onDeleteMessage          = viewModel::onDeleteMessage,
         onEditMessage            = viewModel::onEditMessage,
+        isStarred                = isStarred,
+        onToggleStar             = onToggleStar,
     )
 }
 
@@ -213,6 +218,8 @@ fun ChatRoomContent(
     onFolderCreated           : (ScriptFolder) -> Unit = {},
     onDeleteMessage           : (String) -> Unit       = {},
     onEditMessage             : (String, String) -> Unit = { _, _ -> },
+    isStarred                 : Boolean                = false,
+    onToggleStar              : () -> Unit             = {},
 ) {
     var showNewFolderScreen   by remember { mutableStateOf(false) }
     var newFolderAutoSelectId by remember { mutableStateOf<String?>(null) }
@@ -225,6 +232,17 @@ fun ChatRoomContent(
     var isSearchMode          by remember { mutableStateOf(false) }
     var searchQuery           by remember { mutableStateOf("") }
     var currentMatchIdx       by remember { mutableIntStateOf(0) }
+    var mediaSubPage          by remember { mutableStateOf<String?>(null) }
+    var showInviteScreen      by remember { mutableStateOf(false) }
+
+    val members = remember(state.room) {
+        buildList {
+            add(ChatMember(id = "me", name = "나", isMe = true))
+            if (state.room.name.isNotEmpty()) {
+                add(ChatMember(id = state.room.id, name = state.room.name))
+            }
+        }
+    }
 
     LaunchedEffect(state.conversationSaveMessages) { separateIdx = 0; pendingScriptItems = emptyList() }
 
@@ -495,14 +513,41 @@ fun ChatRoomContent(
         ) {
             ChatRoomSidebarScreen(
                 roomName              = state.room.name,
+                members               = members,
+                mediaThumbs           = emptyList(),
                 isAutoTranslate       = state.isAutoTranslate,
                 isMuted               = state.room.isMuted,
+                isStarred             = isStarred,
                 onBack                = { isMenuOpen = false },
+                onPhotoVideo          = { isMenuOpen = false; mediaSubPage = "photo" },
+                onLink                = { isMenuOpen = false; mediaSubPage = "link" },
+                onFile                = { isMenuOpen = false; mediaSubPage = "file" },
+                onInviteMember        = { isMenuOpen = false; showInviteScreen = true },
                 onToggleAutoTranslate = onToggleAutoTranslate,
                 onToggleMute          = onToggleMuteRoom,
-                onDataDelete          = { /* TODO: 데이터 삭제 */ isMenuOpen = false },
-                onLeaveRoom           = { /* TODO: 채팅방 나가기 */ isMenuOpen = false },
+                onToggleStar          = onToggleStar,
+                onDataDelete          = { isMenuOpen = false },
+                onLeaveRoom           = { isMenuOpen = false },
             )
+        }
+        if (mediaSubPage != null) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+                when (mediaSubPage) {
+                    "photo" -> MediaPhotoScreen(onBack = { mediaSubPage = null })
+                    "link"  -> MediaLinkScreen(onBack  = { mediaSubPage = null })
+                    "file"  -> MediaFileScreen(onBack  = { mediaSubPage = null })
+                }
+            }
+        }
+
+        if (showInviteScreen) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+                InviteMemberScreen(
+                    roomId    = state.room.id,
+                    onBack    = { showInviteScreen = false },
+                    onInvited = { showInviteScreen = false },
+                )
+            }
         }
     }   // Box 끝
 

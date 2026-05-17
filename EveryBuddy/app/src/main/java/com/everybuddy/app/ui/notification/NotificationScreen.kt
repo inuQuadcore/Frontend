@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -36,6 +37,7 @@ data class AppNotification(
 
 @Composable
 fun NotificationScreen(onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
     // TODO: API - GET /api/v1/notifications 연동 후 실제 알림 목록으로 교체
     val items = remember {
         listOf(
@@ -48,6 +50,7 @@ fun NotificationScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             Column {
+                Spacer(Modifier.statusBarsPadding())
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()

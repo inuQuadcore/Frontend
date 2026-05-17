@@ -183,6 +183,12 @@ class ChatViewModel @Inject constructor(
                 _listState.update { it.copy(rooms = updated) }
                 // TODO: PATCH /api/v1/chatrooms/{roomId}/pin
             }
+            "toggle_star" -> {
+                val updated = current.rooms.map {
+                    if (it.id == room.id) it.copy(isStarred = !it.isStarred) else it
+                }
+                _listState.update { it.copy(rooms = updated) }
+            }
             "leave" -> {
                 _listState.update { it.copy(rooms = current.rooms.filter { r -> r.id != room.id }) }
                 // TODO: DELETE /api/v1/chatrooms/{roomId}
@@ -211,6 +217,14 @@ class ChatViewModel @Inject constructor(
         if (_listState.value.rooms.any { it.id == roomId }) return
         val newRoom = ChatRoomUi(id = roomId, name = friendName, lastMessage = "답장을 보냈습니다.", timestamp = "방금")
         _listState.update { state -> state.copy(rooms = listOf(newRoom) + state.rooms) }
+    }
+
+    fun toggleStar(roomId: String) {
+        _listState.update { state ->
+            state.copy(rooms = state.rooms.map {
+                if (it.id == roomId) it.copy(isStarred = !it.isStarred) else it
+            })
+        }
     }
 
     fun updateRoomMute(roomId: String, isMuted: Boolean) {
@@ -271,7 +285,7 @@ class ChatViewModel @Inject constructor(
                     else -> when (state.activeFilter) {
                         ChatFilter.ALL      -> true
                         ChatFilter.UNREAD   -> room.unreadCount > 0
-                        ChatFilter.FAVORITE -> room.isPinned
+                        ChatFilter.FAVORITE -> room.isStarred
                     }
                 }
                 matchQuery && matchFilter

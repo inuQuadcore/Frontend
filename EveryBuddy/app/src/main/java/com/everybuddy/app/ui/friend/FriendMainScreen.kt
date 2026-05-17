@@ -72,6 +72,7 @@ fun FriendMainScreen(
             onChat         = { onStartChat(it) },
             onAddFriend    = { viewModel.addFriendById(uiState.selectedFriend!!.id) },
             onRemoveFriend = { viewModel.removeFriendById(uiState.selectedFriend!!.id) },
+            onBlock        = { viewModel.blockFriendById(uiState.selectedFriend!!.id) },
         )
         uiState.isSearchActive         -> FriendSearchScreen(viewModel = viewModel, statusVm = statusVm)
         statusState.isWriteScreenOpen  -> StatusWriteScreen(viewModel = statusVm)

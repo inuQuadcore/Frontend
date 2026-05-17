@@ -48,7 +48,7 @@ class ChatRoomViewModel @Inject constructor(
         }
     }
 
-    fun loadRoom(roomId: String) {
+    fun loadRoom(roomId: String, roomName: String = "") {
         if (BuildConfig.USE_DUMMY_DATA && roomId.startsWith("reply_")) {
             val friendId = roomId.removePrefix("reply_")
             val demoRoom = FriendDemoData.chatRooms.find { it.friendId == friendId }
@@ -70,7 +70,7 @@ class ChatRoomViewModel @Inject constructor(
             return
         }
         val dummyRoom = if (BuildConfig.USE_DUMMY_DATA) dummyChatRooms.find { it.id == roomId } else null
-        val room      = dummyRoom ?: ChatRoomUi(id = roomId)
+        val room      = dummyRoom ?: ChatRoomUi(id = roomId, name = roomName)
         val messages  = if (BuildConfig.USE_DUMMY_DATA) dummyMessages[roomId] ?: emptyList() else emptyList()
         _uiState.update { it.copy(room = room, messages = messages) }
     }

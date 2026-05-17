@@ -97,12 +97,12 @@ fun MessageContextMenu(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier        = Modifier.widthIn(min = 160.dp).clickable {},
+            modifier        = Modifier.clickable {},
             shape           = RoundedCornerShape(12.dp),
             color           = Color.White,
             shadowElevation = 8.dp,
         ) {
-            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            Column(modifier = Modifier.padding(vertical = 4.dp).width(IntrinsicSize.Max)) {
                 val baseItems = mutableListOf(
                     Triple("복사",              SsTextPri, onCopy),
                     Triple("선택 복사",         SsTextPri, onSelectCopy),
@@ -116,11 +116,11 @@ fun MessageContextMenu(
                 baseItems.forEachIndexed { idx, (label, color, action) ->
                     Text(
                         text     = label,
-                        style    = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = color),
+                        style    = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = color),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { action(); onDismiss() }
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                            .padding(horizontal = 26.dp, vertical = 13.dp),
                     )
                     if (idx < baseItems.size - 1) {
                         HorizontalDivider(color = SsBorder, thickness = 0.5.dp)

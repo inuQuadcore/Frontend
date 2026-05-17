@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +42,7 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 private val C = AppColors
 
 // ExploreScreen
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
     viewModel      : ExploreViewModel       = hiltViewModel(),
@@ -115,17 +117,23 @@ fun ExploreScreen(
                 }
             }
 
-            when (uiState.selectedTab) {
-                0 -> RecommendTab(
-                    uiState        = uiState,
-                    viewModel      = viewModel,
-                    onOpenProfile  = { viewModel.openProfile(it); onOpenProfile(it) },
-                )
-                1 -> FilterTab(
-                    uiState       = uiState,
-                    viewModel     = viewModel,
-                    onOpenProfile = { viewModel.openProfile(it); onOpenProfile(it) },
-                )
+            PullToRefreshBox(
+                isRefreshing = uiState.isRefreshing,
+                onRefresh    = { viewModel.resetCardInteractions() },
+                modifier     = Modifier.fillMaxSize(),
+            ) {
+                when (uiState.selectedTab) {
+                    0 -> RecommendTab(
+                        uiState        = uiState,
+                        viewModel      = viewModel,
+                        onOpenProfile  = { viewModel.openProfile(it); onOpenProfile(it) },
+                    )
+                    1 -> FilterTab(
+                        uiState       = uiState,
+                        viewModel     = viewModel,
+                        onOpenProfile = { viewModel.openProfile(it); onOpenProfile(it) },
+                    )
+                }
             }
         }
     }
@@ -673,14 +681,6 @@ fun UserListItem(
         Spacer(Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
-            // 태그 3개 (온보딩 순서)
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                user.top3Tags().forEach { tag ->
-                    ExploreTag(label = "${tag.emoji} ${tag.displayName}")
-                }
-            }
-            Spacer(Modifier.height(3.dp))
-
             // 이름 + 현활뱃지
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(user.name, style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri))
@@ -710,6 +710,17 @@ fun UserListItem(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 user.languageLabels().take(4).forEach { code ->
                     Text(code, style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextSec, fontWeight = FontWeight(500)))
+                }
+            }
+
+            // 태그 3개 (언어 아래)
+            val tags = user.top3Tags()
+            if (tags.isNotEmpty()) {
+                Spacer(Modifier.height(3.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    tags.forEach { tag ->
+                        ExploreTag(label = "${tag.emoji} ${tag.displayName}")
+                    }
                 }
             }
         }

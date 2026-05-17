@@ -895,13 +895,15 @@ private data class FriendListItem(
 
 @Composable
 private fun FriendManageScreen(
-    title       : String,
-    actionLabel : String,
-    dialogText  : String,
-    friends     : List<FriendListItem>,
-    isLoading   : Boolean = false,
-    onAction    : (Long) -> Unit = {},
-    onBack      : () -> Unit,
+    title        : String,
+    actionLabel  : String,
+    dialogText   : String,
+    friends      : List<FriendListItem>,
+    isLoading    : Boolean  = false,
+    errorMessage : String?  = null,
+    onRetry      : () -> Unit = {},
+    onAction     : (Long) -> Unit = {},
+    onBack       : () -> Unit,
 ) {
     BackHandler(onBack = onBack)
     var confirmTarget by remember { mutableStateOf<FriendListItem?>(null) }
@@ -913,6 +915,18 @@ private fun FriendManageScreen(
         if (isLoading) {
             Box(Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = C.Accent)
+            }
+        } else if (errorMessage != null) {
+            Column(
+                modifier            = Modifier.padding(innerPadding).fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(errorMessage, style = TextStyle(fontSize = 14.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = onRetry) {
+                    Text("다시 시도", style = TextStyle(fontSize = 14.sp, color = C.Accent, fontFamily = PretendardFamily))
+                }
             }
         } else if (friends.isEmpty()) {
             Box(Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1008,24 +1022,19 @@ private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
         "blocked" -> {
             LaunchedEffect(Unit) { viewModel.loadBlockedUsers() }
             FriendManageScreen(
-                title       = "차단한 친구",
-                actionLabel = "차단 해제",
-                dialogText  = "차단을 해제하시겠습니까?",
-                friends     = uiState.blockedFriends.map {
+                title        = "차단한 친구",
+                actionLabel  = "차단 해제",
+                dialogText   = "차단을 해제하시겠습니까?",
+                friends      = uiState.blockedFriends.map {
                     FriendListItem(it.userId, it.name, it.nationality, it.languages)
                 },
-                isLoading   = uiState.isLoadingBlocked,
-                onAction    = { userId -> viewModel.unblockFriend(userId) },
-                onBack      = { settingsSubPage = null },
+                isLoading    = uiState.isLoadingBlocked,
+                errorMessage = uiState.blockedError,
+                onRetry      = { viewModel.loadBlockedUsers() },
+                onAction     = { userId -> viewModel.unblockFriend(userId) },
+                onBack       = { settingsSubPage = null },
             )
         }
-        "deleted" -> FriendManageScreen(
-            title       = "삭제된 친구",
-            actionLabel = "복원",
-            dialogText  = "친구를 복원하시겠습니까?",
-            friends     = emptyList(),
-            onBack      = { settingsSubPage = null },
-        )
         else -> {
 
     Scaffold(
@@ -1070,7 +1079,7 @@ private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
             Spacer(Modifier.height(24.dp))
             HorizontalDivider(color = C.Border, thickness = 8.dp)
 
-            listOf("차단한 친구" to "blocked", "삭제된 친구" to "deleted").forEach { (label, key) ->
+            listOf("차단한 친구" to "blocked").forEach { (label, key) ->
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { settingsSubPage = key }.padding(horizontal = 16.dp, vertical = 18.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1165,7 +1174,7 @@ private fun VersionScreen(onBack: () -> Unit) {
                 Image(
                     painter = painterResource(R.drawable.ic_logo),
                     contentDescription = "앱 아이콘",
-                    modifier = Modifier.size(56.dp),
+                    modifier = Modifier.size(96.dp),
                 )
             }
 
