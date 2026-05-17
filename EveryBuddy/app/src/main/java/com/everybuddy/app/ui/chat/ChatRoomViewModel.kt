@@ -3,6 +3,7 @@ package com.everybuddy.app.ui.chat
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.everybuddy.app.data.cache.UserSummaryCache
 import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.local.MessageDao
@@ -15,11 +16,16 @@ import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.MessageRepository
 import com.google.firebase.database.FirebaseDatabase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -38,6 +44,7 @@ class ChatRoomViewModel @Inject constructor(
     private val tokenManager        : TokenManager,
     private val fileMessageUploader : FileMessageUploader,
     private val viewingManager      : ViewingManager,
+    private val userSummaryCache    : UserSummaryCache,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatRoomUiState())
@@ -79,6 +86,24 @@ class ChatRoomViewModel @Inject constructor(
                 }
             }
         }
+        // 메시지에 등장하는 senderId 집합 변화 감지 → 누락된 UserSummary 병렬 fetch.
+        viewModelScope.launch {
+            _uiState
+                .map { state -> state.messages.mapNotNull { it.senderId.toLongOrNull() }.toSet() }
+                .distinctUntilChanged()
+                .collect { senderIds -> fetchMissingSummaries(senderIds) }
+        }
+    }
+
+    private suspend fun fetchMissingSummaries(senderIds: Set<Long>) {
+        val current = _uiState.value.userSummaries.keys
+        val missing = senderIds - current
+        if (missing.isEmpty()) return
+        val fetched = coroutineScope {
+            missing.map { id -> async { id to userSummaryCache.get(id) } }.awaitAll()
+        }.mapNotNull { (id, summary) -> summary?.let { id to it } }.toMap()
+        if (fetched.isEmpty()) return
+        _uiState.update { state -> state.copy(userSummaries = state.userSummaries + fetched) }
     }
 
     fun loadRoom(roomId: String, roomName: String = "", isGroup: Boolean = false) {

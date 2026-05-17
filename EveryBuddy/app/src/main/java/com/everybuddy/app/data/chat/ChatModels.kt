@@ -1,6 +1,7 @@
 package com.everybuddy.app.data.chat
 
 import com.everybuddy.app.R
+import com.everybuddy.app.data.cache.UserSummary
 import com.everybuddy.app.ui.chat.CaptureOption
 import java.time.LocalDateTime
 
@@ -99,6 +100,7 @@ data class ChatMessage(
 data class ChatRoomUiState(
     val room                      : ChatRoomUi           = ChatRoomUi(),
     val messages                  : List<ChatMessage>    = emptyList(),
+    val userSummaries             : Map<Long, UserSummary> = emptyMap(),  // senderId → UserSummary. UI는 senderId로 lookup해서 이름/프로필 표시.
     val inputText                 : String               = "",
     val myUserId                  : Long                 = 0L,            // ContextMenu isOwnMessage 판정용. 0 = 미인증/로드 전.
 
