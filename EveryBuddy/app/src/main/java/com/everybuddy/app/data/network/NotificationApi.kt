@@ -14,7 +14,7 @@ interface NotificationApi {
      * GET /api/v1/notifications?before&limit — 알림 리스트 (커서 페이지네이션, 최신순)
      * before: 이전 페이지 nextCursor. 첫 페이지는 생략. limit default 10.
      */
-    @GET("api/v1/notifications/")
+    @GET("api/v1/notifications")
     suspend fun list(
         @Query("before") before: Long? = null,
         @Query("limit")  limit : Int?  = null,
