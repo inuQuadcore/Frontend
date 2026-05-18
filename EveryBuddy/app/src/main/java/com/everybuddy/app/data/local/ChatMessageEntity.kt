@@ -36,4 +36,9 @@ data class ChatMessageEntity(
     // - 음성: sourceText(STT) + translatedText 둘 다
     val translatedText : String?        = null,
     val sourceText     : String?        = null,
+    // 미디어 로컬 영속 파일 경로 (filesDir/chat_media/{messageId}.{ext}).
+    // - 송신: 업로드 성공 시 cacheDir에서 이동해 채움.
+    // - 수신: 첫 재생/표시/번역 시 fileUrl 다운로드 후 채움.
+    // null이면 아직 다운로드 안 됨 → fileUrl로 fallback.
+    val localFilePath  : String?        = null,
 )
