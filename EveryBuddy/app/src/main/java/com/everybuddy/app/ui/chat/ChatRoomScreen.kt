@@ -158,6 +158,9 @@ fun ChatRoomScreen(
         onPauseRecording         = viewModel::onPauseRecording,
         onPlayVoice              = viewModel::onPlayVoice,
         onToggleTranslation      = viewModel::onToggleTranslation,
+        onTapImage               = viewModel::onTapImage,
+        onImageAppeared          = viewModel::onImageAppeared,
+        onCloseFullscreenImage   = viewModel::onCloseFullscreenImage,
         onToggleAutoTranslate    = viewModel::onToggleAutoTranslate,
         onToggleMuteRoom         = {
             viewModel.onToggleMuteRoom()
@@ -215,6 +218,9 @@ fun ChatRoomContent(
     onPauseRecording          : () -> Unit            = {},
     onPlayVoice               : (String) -> Unit,
     onToggleTranslation       : (String) -> Unit,
+    onTapImage                : (String) -> Unit           = {},
+    onImageAppeared           : (String) -> Unit           = {},
+    onCloseFullscreenImage    : () -> Unit                 = {},
     onToggleAutoTranslate     : () -> Unit,
     onToggleMuteRoom          : () -> Unit            = {},
     onToggleMediaPanel        : () -> Unit,
@@ -389,6 +395,8 @@ fun ChatRoomContent(
                 listState             = listState,
                 onPlayVoice           = onPlayVoice,
                 onToggleTranslation   = onToggleTranslation,
+                onTapImage            = onTapImage,
+                onImageAppeared       = onImageAppeared,
                 onLongPressMessage    = onLongPressMessage,
                 onSaveScript          = { msg -> onStartScriptSave(msg.id) },
                 onRetryMessage        = onRetryMessage,
@@ -450,6 +458,10 @@ fun ChatRoomContent(
                 onSend            = onSendSelectedPhotos,
                 onDismiss         = onClosePhotoPicker,
             )
+        }
+
+        state.fullscreenImage?.let { img ->
+            FullscreenImageViewer(image = img, onClose = onCloseFullscreenImage)
         }
 
         state.contextMenuMessage?.let { msg ->
@@ -884,6 +896,8 @@ fun MessageList(
     listState             : androidx.compose.foundation.lazy.LazyListState,
     onPlayVoice           : (String) -> Unit,
     onToggleTranslation   : (String) -> Unit,
+    onTapImage            : (String) -> Unit       = {},
+    onImageAppeared       : (String) -> Unit       = {},
     onLongPressMessage    : (ChatMessage) -> Unit = {},
     onSaveScript          : (ChatMessage) -> Unit,
     onRetryMessage        : (String) -> Unit = {},
@@ -950,8 +964,15 @@ fun MessageList(
                         )
 
                     MessageType.IMAGE ->
-                        // TODO: 이미지 메시지 UI 구현
-                        Box(modifier = Modifier.height(0.dp))
+                        ImageMessageBubble(
+                            message               = msg,
+                            isMe                  = isMe,
+                            senderName            = senderName,
+                            senderProfileImageUrl = senderProfileImageUrl,
+                            onTap                 = { onTapImage(msg.id) },
+                            onAppeared            = { onImageAppeared(msg.id) },
+                            onLongPress           = { onLongPressMessage(msg) },
+                        )
                 }
             }
         }
@@ -1426,6 +1447,145 @@ private fun VoiceBubbleContent(
                         color      = if (isMe) Color.White.copy(0.75f) else TextTranslated,
                         lineHeight  = 18.sp,
                     ),
+                )
+            }
+        }
+    }
+}
+
+// ImageMessageBubble — 이미지 메시지 말풍선 (썸네일 + 탭 시 풀스크린 진입)
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun ImageMessageBubble(
+    message               : ChatMessage,
+    isMe                  : Boolean,
+    senderName            : String  = "",
+    senderProfileImageUrl : String? = null,
+    onTap                 : () -> Unit = {},
+    onAppeared            : () -> Unit = {},
+    onLongPress           : () -> Unit = {},
+) {
+    LaunchedEffect(message.id) { onAppeared() }
+
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
+    val timeText = remember(message.timestamp) { message.timestamp.format(timeFormatter) }
+
+    // Coil 모델: localFilePath 우선, 없으면 fileUrl(=voiceUrl). 둘 다 없으면 placeholder.
+    val model: Any? = message.localFilePath
+        ?.takeIf { java.io.File(it).exists() }
+        ?.let { java.io.File(it) }
+        ?: message.voiceUrl.takeIf { it.isNotBlank() }
+
+    Column(
+        modifier            = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 3.dp),
+        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+    ) {
+        if (isMe) {
+            Row(
+                modifier              = Modifier.fillMaxWidth().padding(start = 46.dp),
+                verticalAlignment     = Alignment.Bottom,
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Text(
+                    text     = timeText,
+                    style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+                ImageThumb(model, onTap, onLongPress)
+            }
+        } else {
+            Row(
+                modifier          = Modifier.fillMaxWidth().padding(end = 38.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                SenderAvatar(
+                    profileImageUrl    = senderProfileImageUrl,
+                    contentDescription = senderName,
+                    size               = 38.dp,
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(horizontalAlignment = Alignment.Start) {
+                    Text(
+                        text     = senderName,
+                        style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
+                        modifier = Modifier.padding(bottom = 3.dp),
+                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        ImageThumb(model, onTap, onLongPress)
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text  = timeText,
+                            style = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun ImageThumb(
+    model       : Any?,
+    onTap       : () -> Unit,
+    onLongPress : () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .widthIn(max = 220.dp)
+            .heightIn(min = 80.dp, max = 280.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFFE5E5EA))
+            .combinedClickable(onClick = onTap, onLongClick = onLongPress),
+    ) {
+        if (model != null) {
+            AsyncImage(
+                model              = model,
+                contentDescription = "사진 메시지",
+                contentScale       = ContentScale.Fit,
+                modifier           = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+// FullscreenImageViewer — 이미지 메시지 탭 시 풀스크린 뷰어 (X 버튼으로 닫기)
+@Composable
+fun FullscreenImageViewer(
+    image   : String,
+    onClose : () -> Unit,
+) {
+    val model: Any = if (image.startsWith("/")) java.io.File(image) else image
+    Dialog(
+        onDismissRequest = onClose,
+        properties       = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.Black),
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model              = model,
+                contentDescription = "사진 원본",
+                contentScale       = ContentScale.Fit,
+                modifier           = Modifier.fillMaxSize(),
+            )
+            IconButton(
+                onClick  = onClose,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.5f)),
+            ) {
+                Icon(
+                    painter            = painterResource(R.drawable.ic_cancel),
+                    contentDescription = "닫기",
+                    tint               = Color.White,
                 )
             }
         }

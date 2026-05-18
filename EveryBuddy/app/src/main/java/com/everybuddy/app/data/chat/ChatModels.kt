@@ -146,4 +146,7 @@ data class ChatRoomUiState(
     val isConversationSelectOpen  : Boolean              = false,
     val conversationSaveMessages  : List<ChatMessage>    = emptyList(),
     val conversationCaptureOption : CaptureOption        = CaptureOption.COMBINED,
+
+    // 이미지 풀스크린 뷰어 — localFilePath 또는 fileUrl. null이면 닫힘.
+    val fullscreenImage           : String?              = null,
 )

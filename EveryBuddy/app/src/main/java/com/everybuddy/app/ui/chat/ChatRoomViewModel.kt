@@ -329,6 +329,39 @@ class ChatRoomViewModel @Inject constructor(
         _uiState.update { it.copy(isRecording = false, isRecordingPaused = false) }
     }
 
+    /**
+     * 이미지 메시지가 화면에 처음 노출될 때 호출 — 백그라운드로 영속화.
+     * 이미 localFilePath 있거나 fileUrl 비어있으면 noop. Coil의 디스크 캐시와 별도로
+     * 우리 filesDir에 영구 저장해 presigned 만료/오프라인 대응.
+     */
+    fun onImageAppeared(messageId: String) {
+        val msg = _uiState.value.messages.find { it.id == messageId } ?: return
+        if (!msg.localFilePath.isNullOrBlank() && File(msg.localFilePath).exists()) return
+        val url       = msg.voiceUrl.ifBlank { return }   // ChatMessage.voiceUrl == entity.fileUrl
+        val msgIdLong = messageId.toLongOrNull() ?: return
+        viewModelScope.launch {
+            val ext  = mediaFileStore.extFromUrlOrName(url, fileName = null, fallback = "jpg")
+            if (mediaFileStore.exists(msgIdLong, ext)) {
+                messageDao.updateLocalFilePath(msgIdLong, mediaFileStore.pathFor(msgIdLong, ext).absolutePath)
+                return@launch
+            }
+            mediaFileStore.downloadAndPersist(url, msgIdLong, ext)?.let { file ->
+                messageDao.updateLocalFilePath(msgIdLong, file.absolutePath)
+            }
+        }
+    }
+
+    /** 이미지 탭 — 풀스크린 뷰어 오픈. localFilePath 우선, 없으면 fileUrl. */
+    fun onTapImage(messageId: String) {
+        val msg = _uiState.value.messages.find { it.id == messageId } ?: return
+        val target = msg.localFilePath?.takeIf { File(it).exists() } ?: msg.voiceUrl.ifBlank { return }
+        _uiState.update { it.copy(fullscreenImage = target) }
+    }
+
+    fun onCloseFullscreenImage() {
+        _uiState.update { it.copy(fullscreenImage = null) }
+    }
+
     fun onPlayVoice(messageId: String) {
         if (_uiState.value.playingMessageId == messageId) { voicePlayer.stop(); return }
         val msg = _uiState.value.messages.find { it.id == messageId } ?: return
