@@ -97,7 +97,6 @@ data class ChatMessage(
     val timestamp        : LocalDateTime   = LocalDateTime.now(),
     val editedAt         : LocalDateTime?  = null,                  // null이면 미수정, 값 있으면 "(수정됨)" 표시
     val status           : String          = "SENT",                // "SENT" | "PENDING" | "FAILED" — 송신 인디케이터
-    val isTranslated     : Boolean         = false,
     val translatedText   : String          = "",
     val sourceText       : String          = "",                    // 음성 번역 응답의 STT 결과. 텍스트 메시지는 빈 문자열.
     val isStatusReply    : Boolean         = false,

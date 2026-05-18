@@ -173,10 +173,6 @@ class ExploreViewModel @Inject constructor(
 
     fun selectTab(tab: Int) { _uiState.update { it.copy(selectedTab = tab) } }
 
-    fun resetCardInteractions() {
-        _uiState.update { it.copy(currentCardIndex = 0) }
-    }
-
     // 카드 인터렉션. 끝까지 도달하면 새 6명 fetch.
     fun nextCard() {
         val state = _uiState.value

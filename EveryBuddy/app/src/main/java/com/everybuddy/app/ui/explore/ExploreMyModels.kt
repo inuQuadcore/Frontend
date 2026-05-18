@@ -186,7 +186,4 @@ object ExploreDemo {
         )
     }
 
-    // 온보딩 국적 목록
-    val countryList = listOf("모든 국적", "한국", "미국", "일본", "중국", "프랑스", "체코")
-    val languageList = listOf("모든 언어", "영어", "일본어", "한국어", "중국어", "프랑스어")
 }
