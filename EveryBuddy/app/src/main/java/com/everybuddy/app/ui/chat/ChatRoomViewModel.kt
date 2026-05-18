@@ -73,6 +73,9 @@ class ChatRoomViewModel @Inject constructor(
     private var pendingVoiceDurationSec: Int = 0
     private var pendingReplyPreview: String? = null
 
+    /** ExoPlayer STATE_READY 시 추출한 재생 길이 캐시 (messageId → sec). 세션 단위 인메모리. */
+    private val voiceDurationCache = mutableMapOf<String, Int>()
+
     init {
         viewModelScope.launch {
             tokenManager.userId.firstOrNull()?.let { uid ->
@@ -96,6 +99,22 @@ class ChatRoomViewModel @Inject constructor(
                     is PlayerState.Finished,
                     is PlayerState.Idle,
                     is PlayerState.Paused   -> _uiState.update { it.copy(playingMessageId = null) }
+                }
+            }
+        }
+        viewModelScope.launch {
+            voicePlayer.durationReady.collect { pair ->
+                if (pair == null) return@collect
+                val (msgId, sec) = pair
+                if (sec > 0 && voiceDurationCache[msgId] != sec) {
+                    voiceDurationCache[msgId] = sec
+                    _uiState.update { state ->
+                        state.copy(
+                            messages = state.messages.map { msg ->
+                                if (msg.id == msgId && msg.voiceDurationSec == 0) msg.copy(voiceDurationSec = sec) else msg
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -170,10 +189,16 @@ class ChatRoomViewModel @Inject constructor(
         val chatRoomId = roomId.toLongOrNull() ?: return   // 잘못된 ID — 무시
 
         val savedAutoTranslate = chatRoomPreferences.isAutoTranslate(roomId)
+        val savedReplyText = chatRoomPreferences.getSavedReplyText(roomId)
+        val savedReplyId   = chatRoomPreferences.getSavedReplyId(roomId)
+        val savedReply = if (savedReplyText != null && savedReplyId != null) {
+            ChatMessage(id = savedReplyId, text = savedReplyText)
+        } else null
         _uiState.update {
             it.copy(
                 room            = ChatRoomUi(id = roomId, name = roomName, isGroup = isGroup),
                 isAutoTranslate = savedAutoTranslate,
+                replyToMessage  = savedReply,
             )
         }
 
@@ -196,6 +221,13 @@ class ChatRoomViewModel @Inject constructor(
                     if (idx >= 0) {
                         messages = messages.toMutableList().also { it[idx] = it[idx].copy(statusPreview = preview, isStatusReply = false) }
                         pendingReplyPreview = null
+                    }
+                }
+                // 인메모리 캐시에서 음성 길이 패치
+                if (voiceDurationCache.isNotEmpty()) {
+                    messages = messages.map { msg ->
+                        val cached = voiceDurationCache[msg.id]
+                        if (msg.type == MessageType.VOICE && cached != null && msg.voiceDurationSec == 0) msg.copy(voiceDurationSec = cached) else msg
                     }
                 }
                 _uiState.update { it.copy(messages = messages) }
@@ -306,6 +338,7 @@ class ChatRoomViewModel @Inject constructor(
             val raw = replyMsg.text.ifBlank { "[음성 메시지]" }
             pendingReplyPreview = if (raw.length > 20) raw.take(20) + "…" else raw
         }
+        chatRoomPreferences.clearReply(_uiState.value.room.id)
         _uiState.update { it.copy(inputText = "", replyToMessage = null) }
         viewModelScope.launch {
             when (val result = messageRepository.sendTextMessage(chatRoomId, text)) {
@@ -319,10 +352,13 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     fun startReply(msg: ChatMessage) {
+        val roomId = _uiState.value.room.id
+        chatRoomPreferences.saveReply(roomId, msg.id, msg.text)
         _uiState.update { it.copy(replyToMessage = msg, contextMenuMessage = null) }
     }
 
     fun cancelReply() {
+        chatRoomPreferences.clearReply(_uiState.value.room.id)
         _uiState.update { it.copy(replyToMessage = null) }
     }
 

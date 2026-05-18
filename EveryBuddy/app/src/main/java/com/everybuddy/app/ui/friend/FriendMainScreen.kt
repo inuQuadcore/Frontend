@@ -152,7 +152,8 @@ private fun FriendMainContent(
                 onAddFriend     = onAddFriend,
             )
         },
-        containerColor = Color.White,
+        containerColor      = Color.White,
+        contentWindowInsets = WindowInsets(0),
     ) { innerPadding ->
 
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {

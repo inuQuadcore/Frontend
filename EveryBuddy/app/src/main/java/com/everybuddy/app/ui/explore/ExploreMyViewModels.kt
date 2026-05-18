@@ -59,6 +59,7 @@ data class ExploreUiState(
     val filterNextCursor   : Long?             = null,
     val isFilterLoading    : Boolean           = false,
     val isFilterLoadingMore: Boolean           = false,
+    val isFilterRefreshing : Boolean           = false,
     val isFilterScreenOpen : Boolean           = false,
     val selectedUser       : DiscoverUser?     = null,
     val selectedUserDetail : UserDetail?       = null,
@@ -354,6 +355,15 @@ class ExploreViewModel @Inject constructor(
                     isFilterLoadingMore = false,
                 ) }
             }
+        }
+    }
+
+    fun refreshFilter() {
+        val settings = _uiState.value.filterSettings
+        _uiState.update { it.copy(isFilterRefreshing = true) }
+        viewModelScope.launch {
+            fetchFilterPage(settings, lastUserId = null, isFirstPage = true)
+            _uiState.update { it.copy(isFilterRefreshing = false) }
         }
     }
 

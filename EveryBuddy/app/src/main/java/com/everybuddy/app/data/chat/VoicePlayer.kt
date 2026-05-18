@@ -43,15 +43,27 @@ class VoicePlayer @Inject constructor(
     private val _state = MutableStateFlow<PlayerState>(PlayerState.Idle)
     val state: StateFlow<PlayerState> = _state.asStateFlow()
 
+    /** (messageId → durationSec) — STATE_READY 시 1회 emit 후 null로 초기화 */
+    private val _durationReady = MutableStateFlow<Pair<String, Int>?>(null)
+    val durationReady: StateFlow<Pair<String, Int>?> = _durationReady.asStateFlow()
+
     /** url은 원격 URL 또는 로컬 절대 경로. ExoPlayer가 둘 다 처리. */
     fun play(messageId: String, url: String) {
         stop()
         val p = ExoPlayer.Builder(context).build()
         p.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) {
-                    _state.value     = PlayerState.Finished
-                    currentMessageId = null
+                when (playbackState) {
+                    Player.STATE_READY -> {
+                        val durationMs = p.duration
+                        if (durationMs > 0) {
+                            _durationReady.value = messageId to (durationMs / 1000).toInt()
+                        }
+                    }
+                    Player.STATE_ENDED -> {
+                        _state.value     = PlayerState.Finished
+                        currentMessageId = null
+                    }
                 }
             }
         })

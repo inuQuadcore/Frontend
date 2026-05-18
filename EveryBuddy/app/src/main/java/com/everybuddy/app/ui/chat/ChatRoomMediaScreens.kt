@@ -47,6 +47,7 @@ fun MediaPhotoScreen(onBack: () -> Unit) {
                 HorizontalDivider(color = MedBorder, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -83,6 +84,7 @@ fun MediaLinkScreen(onBack: () -> Unit) {
                 HorizontalDivider(color = MedBorder, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -119,6 +121,7 @@ fun MediaFileScreen(onBack: () -> Unit) {
                 HorizontalDivider(color = MedBorder, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {

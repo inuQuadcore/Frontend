@@ -117,6 +117,7 @@ private fun MyPageContent(
                 HorizontalDivider(color = C.Border, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
 
@@ -351,6 +352,7 @@ private fun ProfileEditScreen(viewModel: MyViewModel) {
                         }
                     }
                 },
+                contentWindowInsets = WindowInsets(0),
                 containerColor = Color.White,
             ) { innerPadding ->
                 Column(
@@ -460,6 +462,7 @@ private fun NameEditSubPage(current: String, onSave: (String) -> Unit, onBack: (
     var name by remember { mutableStateOf(current) }
     Scaffold(
         topBar = { SubScreenTopBar(title = "이름 수정", onBack = onBack) },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
@@ -510,6 +513,7 @@ private fun BirthdayPickerSubPage(current: String, onSave: (String) -> Unit, onB
 
     Scaffold(
         topBar = { SubScreenTopBar(title = "생년월일", onBack = onBack) },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(
@@ -612,6 +616,7 @@ private fun GenderSelectSubPage(current: String, onSave: (String) -> Unit, onBac
     val options = listOf("남성", "여성")
     Scaffold(
         topBar = { SubScreenTopBar(title = "성별", onBack = onBack) },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
@@ -659,6 +664,7 @@ private fun CountrySelectSubPage(current: String, onSave: (String) -> Unit, onBa
     )
     Scaffold(
         topBar = { SubScreenTopBar(title = "국적", onBack = onBack) },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
@@ -731,6 +737,7 @@ private fun LanguageEditSubPage(
                 HorizontalDivider(color = C.Border, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(
@@ -850,6 +857,7 @@ private fun TagEditScreen(viewModel: MyViewModel) {
                 HorizontalDivider(color = C.Border, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
@@ -936,6 +944,7 @@ private fun FriendManageScreen(
 
     Scaffold(
         topBar = { SubScreenTopBar(title = title, onBack = onBack) },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         if (isLoading) {
@@ -1067,6 +1076,7 @@ private fun SettingsScreen(viewModel: MyViewModel, onBack: () -> Unit) {
         topBar = {
             SubScreenTopBar(title = "설정", onBack = onBack)
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -1184,6 +1194,7 @@ private fun VersionScreen(onBack: () -> Unit) {
 
     Scaffold(
         topBar = { SubScreenTopBar(title = "버전정보", onBack = onBack) },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(
@@ -1232,6 +1243,7 @@ private fun GuideScreen(onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     Scaffold(
         topBar = { SubScreenTopBar(title = "에브리버디 가이드", onBack = onBack) },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(
@@ -1293,6 +1305,7 @@ private fun NoticeScreen(onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     Scaffold(
         topBar = { SubScreenTopBar(title = "공지사항", onBack = onBack) },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize())
@@ -1305,6 +1318,7 @@ private fun EmptySubScreen(title: String, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     Scaffold(
         topBar = { SubScreenTopBar(title = title, onBack = onBack) },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize())

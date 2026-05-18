@@ -134,6 +134,7 @@ fun FilterSettingScreen(
                 }
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
 

@@ -30,5 +30,22 @@ class ChatRoomPreferences @Inject constructor(
     fun setStarred(roomId: String, value: Boolean)       = prefs.edit().putBoolean(key("star",     roomId), value).apply()
     fun setAutoTranslate(roomId: String, value: Boolean) = prefs.edit().putBoolean(key("autoTrans", roomId), value).apply()
 
+    fun saveReply(roomId: String, msgId: String, text: String) {
+        prefs.edit()
+            .putString(key("replyId",   roomId), msgId)
+            .putString(key("replyText", roomId), text)
+            .apply()
+    }
+
+    fun getSavedReplyId(roomId: String): String?   = prefs.getString(key("replyId",   roomId), null)
+    fun getSavedReplyText(roomId: String): String? = prefs.getString(key("replyText", roomId), null)
+
+    fun clearReply(roomId: String) {
+        prefs.edit()
+            .remove(key("replyId",   roomId))
+            .remove(key("replyText", roomId))
+            .apply()
+    }
+
     private fun key(flag: String, roomId: String) = "$flag:$roomId"
 }

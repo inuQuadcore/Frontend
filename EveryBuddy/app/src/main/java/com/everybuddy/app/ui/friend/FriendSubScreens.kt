@@ -73,6 +73,7 @@ fun FriendSearchScreen(
                 HorizontalDivider(color = C.Border, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(
@@ -203,6 +204,7 @@ fun StatusMessageAllScreen(
                 HorizontalDivider(color = C.Border, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
 

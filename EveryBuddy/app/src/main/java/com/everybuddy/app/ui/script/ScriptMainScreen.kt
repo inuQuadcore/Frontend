@@ -70,6 +70,7 @@ fun ScriptMainScreen(
                 onSearchChange = viewModel::updateSearchQuery,
             )
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
 
@@ -471,6 +472,7 @@ fun ScriptDetailScreen(
                 HorizontalDivider(color = SmBorder, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(
@@ -810,6 +812,7 @@ fun ScriptFolderScreen(
                 HorizontalDivider(color = SmBorder, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
@@ -876,6 +879,7 @@ private fun FolderEditScreen(
                 HorizontalDivider(color = SmBorder, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         LazyColumn(

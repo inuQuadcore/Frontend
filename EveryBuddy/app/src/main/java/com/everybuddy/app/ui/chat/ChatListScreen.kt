@@ -696,6 +696,7 @@ private fun ChatRoomInfoScreen(room: ChatRoomUi, onBack: () -> Unit) {
                 HorizontalDivider(color = ClBorder, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).fillMaxSize().padding(horizontal = 16.dp, vertical = 20.dp)) {

@@ -89,7 +89,8 @@ fun ExploreScreen(
                 hasNotification = hasNotification,
             )
         },
-        containerColor = Color.White,
+        containerColor         = Color.White,
+        contentWindowInsets    = WindowInsets(0),
     ) { innerPadding ->
 
         Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
@@ -309,36 +310,41 @@ private fun FilterTab(
         }
     } else {
         // 필터 설정 후 — 결과 목록
-        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-            item {
-                Spacer(Modifier.height(8.dp))
-                // 필터 초기화 버튼
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("${uiState.filterResults.size}명", style = TextStyle(fontSize = 14.sp, color = C.TextSec, fontFamily = PretendardFamily))
-                    Text(
-                        "필터 초기화",
-                        style    = TextStyle(fontSize = 13.sp, color = C.TextRed, fontFamily = PretendardFamily),
-                        modifier = Modifier.clickable { viewModel.resetFilter() },
+        PullToRefreshBox(
+            isRefreshing = uiState.isFilterRefreshing,
+            onRefresh    = { viewModel.refreshFilter() },
+            modifier     = Modifier.fillMaxSize(),
+        ) {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier              = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment     = Alignment.CenterVertically,
+                    ) {
+                        Text("${uiState.filterResults.size}명", style = TextStyle(fontSize = 14.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                        Text(
+                            "필터 초기화",
+                            style    = TextStyle(fontSize = 13.sp, color = C.TextRed, fontFamily = PretendardFamily),
+                            modifier = Modifier.clickable { viewModel.resetFilter() },
+                        )
+                    }
+                }
+                items(uiState.filterResults) { user ->
+                    UserListItem(
+                        user    = user,
+                        onClick = { onOpenProfile(user) },
                     )
                 }
-            }
-            items(uiState.filterResults) { user ->
-                UserListItem(
-                    user    = user,
-                    onClick = { onOpenProfile(user) },
-                )
-            }
-            if (uiState.filterHasNext) {
-                item {
-                    LaunchedEffect(uiState.filterNextCursor) {
-                        viewModel.loadMoreFilterResults()
-                    }
-                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        LoadingIndicator(modifier = Modifier.size(24.dp))
+                if (uiState.filterHasNext) {
+                    item {
+                        LaunchedEffect(uiState.filterNextCursor) {
+                            viewModel.loadMoreFilterResults()
+                        }
+                        Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                            LoadingIndicator(modifier = Modifier.size(24.dp))
+                        }
                     }
                 }
             }

@@ -1299,8 +1299,6 @@ private fun ChatReplyCard(preview: String, modifier: Modifier = Modifier) {
             modifier          = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(modifier = Modifier.width(3.dp).height(20.dp).background(AccentBlue))
-            Spacer(Modifier.width(8.dp))
             Text(
                 text     = truncated,
                 style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = Color(0xFF888888)),
@@ -1373,11 +1371,11 @@ fun TranslateIconButton(onClick: () -> Unit) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
+        Image(
             painter            = painterResource(R.drawable.ic_translate),
             contentDescription = "번역",
             modifier           = Modifier.size(18.dp),
-            tint               = AccentBlue,
+            colorFilter        = androidx.compose.ui.graphics.ColorFilter.tint(AccentBlue),
         )
     }
 }
@@ -2119,7 +2117,6 @@ private fun ReplyPreviewBar(previewText: String, onCancel: () -> Unit) {
                 painter          = painterResource(R.drawable.ic_cancel),
                 contentDescription = "취소",
                 modifier         = Modifier.size(18.dp).clickable(onClick = onCancel),
-                colorFilter      = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black),
             )
         }
     }

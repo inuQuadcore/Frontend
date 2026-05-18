@@ -108,6 +108,7 @@ fun DirectChatScreen(
                 HorizontalDivider(color = ScBorder, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
@@ -234,6 +235,7 @@ fun GroupChatScreen(
                 HorizontalDivider(color = ScBorder, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
@@ -431,6 +433,7 @@ fun InviteMemberScreen(
                 HorizontalDivider(color = ScBorder, thickness = 0.5.dp)
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {

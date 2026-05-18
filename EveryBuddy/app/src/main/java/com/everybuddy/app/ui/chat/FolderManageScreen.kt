@@ -75,6 +75,7 @@ fun FolderManageScreen(
                 }
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         if (folders.isEmpty()) {
@@ -215,6 +216,7 @@ fun FolderCreateScreen(
                 }
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).fillMaxSize().verticalScroll(rememberScrollState())) {

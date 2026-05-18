@@ -476,6 +476,7 @@ fun ConversationSelectScreen(
                     }
                 }
             },
+            contentWindowInsets = WindowInsets(0),
             containerColor = Color.Transparent,
         ) { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
@@ -760,6 +761,7 @@ fun NewFolderScreen(
                 }
             }
         },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.White,
     ) { innerPadding ->
         Column(
