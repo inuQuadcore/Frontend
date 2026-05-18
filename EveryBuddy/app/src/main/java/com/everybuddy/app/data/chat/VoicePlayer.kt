@@ -43,6 +43,7 @@ class VoicePlayer @Inject constructor(
     private val _state = MutableStateFlow<PlayerState>(PlayerState.Idle)
     val state: StateFlow<PlayerState> = _state.asStateFlow()
 
+    /** url은 원격 URL 또는 로컬 절대 경로. ExoPlayer가 둘 다 처리. */
     fun play(messageId: String, url: String) {
         stop()
         val p = ExoPlayer.Builder(context).build()
@@ -54,7 +55,9 @@ class VoicePlayer @Inject constructor(
                 }
             }
         })
-        p.setMediaItem(MediaItem.fromUri(url))
+        // 로컬 경로면 file:// URI로, 그 외엔 그대로.
+        val uri = if (url.startsWith("/")) "file://$url" else url
+        p.setMediaItem(MediaItem.fromUri(uri))
         p.prepare()
         p.play()
         player           = p

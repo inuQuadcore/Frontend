@@ -6,30 +6,24 @@ import com.everybuddy.app.data.dto.TextTranslateRequest
 import com.everybuddy.app.data.dto.TextTranslateResponse
 import com.everybuddy.app.data.network.TranslateApi
 import com.google.gson.Gson
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class TranslateRepository @Inject constructor(
-    private val api          : TranslateApi,
-    private val gson         : Gson,
-    private val okHttpClient : OkHttpClient,
+    private val api  : TranslateApi,
+    private val gson : Gson,
 ) {
     suspend fun translateText(text: String): ApiResult<TextTranslateResponse> =
         safeApiCall(gson, { api.translateText(TextTranslateRequest(text)) })
 
     /**
-     * 음성 번역 — voiceUrl에서 다운로드받은 File을 multipart로 업로드.
-     * 호출자가 다운로드 책임 (다양한 캐싱/임시 파일 전략 가능).
+     * 음성 번역 — 로컬 File을 multipart로 업로드.
+     * 호출자가 파일 준비 책임 (MediaFileStore로 영속/다운로드 캐시).
      */
     suspend fun translateSpeech(audio: File): ApiResult<SpeechTranslateResponse> {
         val mediaType = guessAudioMediaType(audio.extension)
@@ -37,38 +31,6 @@ class TranslateRepository @Inject constructor(
             name     = "file",
             filename = audio.name,
             body     = audio.asRequestBody(mediaType),
-        )
-        return safeApiCall(gson, { api.translateSpeech(part) })
-    }
-
-    /**
-     * 음성 번역 — voiceUrl에서 다운로드 후 multipart 업로드.
-     * 명세상 file 필수이므로 클라가 원격 음성 파일을 받아서 다시 보내는 구조.
-     */
-    suspend fun translateSpeechFromUrl(url: String): ApiResult<SpeechTranslateResponse> {
-        val bytes = downloadBytes(url)
-            ?: return ApiResult.Error(-1, "VOICE_DOWNLOAD_FAILED", "음성 파일을 받지 못했습니다.")
-        val filename = url.substringAfterLast('/').substringBefore('?').ifBlank { "audio.m4a" }
-        return translateSpeech(bytes, filename)
-    }
-
-    private suspend fun downloadBytes(url: String): ByteArray? = withContext(Dispatchers.IO) {
-        try {
-            okHttpClient.newCall(Request.Builder().url(url).build()).execute().use { res ->
-                if (res.isSuccessful) res.body?.bytes() else null
-            }
-        } catch (e: Exception) { null }
-    }
-
-    /**
-     * 음성 번역 — voiceUrl 다운로드 없이 ByteArray 직접 업로드 (메모리 캐시 활용 케이스).
-     */
-    suspend fun translateSpeech(bytes: ByteArray, filename: String): ApiResult<SpeechTranslateResponse> {
-        val mediaType = guessAudioMediaType(filename.substringAfterLast('.', missingDelimiterValue = ""))
-        val part = MultipartBody.Part.createFormData(
-            name     = "file",
-            filename = filename,
-            body     = bytes.toRequestBody(mediaType),
         )
         return safeApiCall(gson, { api.translateSpeech(part) })
     }

@@ -48,6 +48,7 @@ class ChatRoomViewModel @Inject constructor(
     private val userSummaryCache    : UserSummaryCache,
     private val translateRepository : TranslateRepository,
     private val chatRoomPreferences : ChatRoomPreferences,
+    private val mediaFileStore      : MediaFileStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatRoomUiState())
@@ -331,8 +332,27 @@ class ChatRoomViewModel @Inject constructor(
     fun onPlayVoice(messageId: String) {
         if (_uiState.value.playingMessageId == messageId) { voicePlayer.stop(); return }
         val msg = _uiState.value.messages.find { it.id == messageId } ?: return
+        val msgIdLong = messageId.toLongOrNull() ?: return
+
+        // 로컬 영속 파일이 있으면 즉시 재생.
+        msg.localFilePath?.takeIf { File(it).exists() }?.let { local ->
+            voicePlayer.play(messageId, local)
+            return
+        }
+
+        // 없으면 voiceUrl로 다운로드 후 재생 (다음 재생부터 캐시 활용).
         val url = msg.voiceUrl.ifEmpty { return }
-        voicePlayer.play(messageId, url)
+        viewModelScope.launch {
+            val ext  = mediaFileStore.extFromUrlOrName(url, fileName = null, fallback = "m4a")
+            val file = mediaFileStore.downloadAndPersist(url, msgIdLong, ext)
+            if (file != null) {
+                messageDao.updateLocalFilePath(msgIdLong, file.absolutePath)
+                voicePlayer.play(messageId, file.absolutePath)
+            } else {
+                // 다운로드 실패 시 URL 스트리밍으로 fallback (오프라인이거나 presigned 만료 케이스).
+                voicePlayer.play(messageId, url)
+            }
+        }
     }
 
     fun onToggleTranslation(messageId: String) {
@@ -374,11 +394,24 @@ class ChatRoomViewModel @Inject constructor(
                     }
                 }
                 MessageType.VOICE -> {
-                    val url = msg.voiceUrl.ifBlank { return@launch finishTranslating(messageId) }
-                    when (val r = translateRepository.translateSpeechFromUrl(url)) {
-                        is ApiResult.Success      -> ApiResult.Success(r.data.translatedText to r.data.sourceText)
-                        is ApiResult.Error        -> r
-                        is ApiResult.NetworkError -> r
+                    // 1) localFilePath 있으면 즉시 사용.
+                    // 2) 없으면 voiceUrl로 다운로드 → 영속화 → 그 파일로 번역.
+                    val file: File? = msg.localFilePath?.let { File(it).takeIf(File::exists) }
+                        ?: run {
+                            val url = msg.voiceUrl.ifBlank { return@launch finishTranslating(messageId) }
+                            val ext = mediaFileStore.extFromUrlOrName(url, fileName = null, fallback = "m4a")
+                            mediaFileStore.downloadAndPersist(url, msgIdLong, ext)?.also { dl ->
+                                messageDao.updateLocalFilePath(msgIdLong, dl.absolutePath)
+                            }
+                        }
+                    if (file == null) {
+                        ApiResult.Error(-1, "VOICE_DOWNLOAD_FAILED", "음성 파일을 받지 못했습니다.")
+                    } else {
+                        when (val r = translateRepository.translateSpeech(file)) {
+                            is ApiResult.Success      -> ApiResult.Success(r.data.translatedText to r.data.sourceText)
+                            is ApiResult.Error        -> r
+                            is ApiResult.NetworkError -> r
+                        }
                     }
                 }
                 else -> return@launch finishTranslating(messageId)
