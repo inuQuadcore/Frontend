@@ -97,14 +97,31 @@ class ExploreViewModel @Inject constructor(
     private val friendRepository   : FriendRepository,
     private val presenceRepository : PresenceRepository,
     private val tokenManager       : TokenManager,
+    private val filterPreferences  : ExploreFilterPreferences,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExploreUiState())
     val uiState: StateFlow<ExploreUiState> = _uiState.asStateFlow()
 
     init {
+        restoreFilter()
         refresh()
         observePresence()
+    }
+
+    /** 영속 저장된 필터 복원. isApplied=true면 결과 list까지 자동 재조회. */
+    private fun restoreFilter() {
+        val saved = filterPreferences.load() ?: return
+        val applied = filterPreferences.isApplied()
+        _uiState.update { it.copy(
+            filterSettings  = saved,
+            isFilterApplied = applied,
+            selectedTab     = if (applied) 1 else it.selectedTab,
+            isFilterLoading = applied,
+        ) }
+        if (applied) {
+            viewModelScope.launch { fetchFilterPage(saved, lastUserId = null, isFirstPage = true) }
+        }
     }
 
     /** RTDB presence/ 변경 시 모든 user list의 isOnline 일괄 갱신. */
@@ -217,6 +234,7 @@ class ExploreViewModel @Inject constructor(
             isFilterLoading     = true,
             selectedTab         = 1,
         ) }
+        filterPreferences.save(settings, isApplied = true)
         viewModelScope.launch {
             fetchFilterPage(settings, lastUserId = null, isFirstPage = true)
         }
@@ -274,6 +292,7 @@ class ExploreViewModel @Inject constructor(
             filterHasNext    = false,
             isFilterApplied  = false,
         ) }
+        filterPreferences.clear()
     }
 
     fun openProfile(user: DiscoverUser) {
