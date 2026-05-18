@@ -208,18 +208,12 @@ class ExploreViewModel @Inject constructor(
         }
     }
 
+    /** PullToRefresh 진입점. 랜덤 카드 6명만 다시 받아옴 — 추천 섹션 fetch는 loadMyContext()가 책임. */
     fun refresh() {
         _uiState.update { it.copy(isRefreshing = true) }
         viewModelScope.launch {
-            val userId = tokenManager.userId.first()
-
-            val randomDeferred = async { discoverRepository.discoverRandom() }
-            val langsDeferred  = if (userId != null) async { userRepository.getUserLanguages(userId) } else null
-            val tagsDeferred   = if (userId != null) async { userRepository.getUserTags(userId) } else null
-
             val onlineIds = presenceRepository.onlineIds.value
-
-            when (val res = randomDeferred.await()) {
+            when (val res = discoverRepository.discoverRandom()) {
                 is ApiResult.Success -> _uiState.update { it.copy(
                     cardSet          = res.data.users.map { it.toUi() }.applyPresence(onlineIds),
                     currentCardIndex = 0,
@@ -227,38 +221,6 @@ class ExploreViewModel @Inject constructor(
                 ) }
                 is ApiResult.Error, is ApiResult.NetworkError ->
                     _uiState.update { it.copy(isRefreshing = false) }
-            }
-
-            val userLangs = (langsDeferred?.await() as? ApiResult.Success)?.data?.languages ?: emptyList()
-            val userTags  = (tagsDeferred?.await() as? ApiResult.Success)?.data ?: emptyList()
-
-            val primaryLang = userLangs.firstOrNull { it.isPrimary }?.language
-            val firstTagDto = userTags.firstOrNull()
-            val firstTagUi  = firstTagDto?.toUi()
-
-            if (userLangs.isNotEmpty() || userTags.isNotEmpty()) {
-                ExploreDemo.myProfile = ExploreDemo.myProfile.copy(
-                    learningLanguages = userLangs.map { UserLanguage(it.language, it.level) },
-                    tags = if (userTags.isNotEmpty()) userTags.map { it.toUi() } else ExploreDemo.myProfile.tags,
-                )
-            }
-
-            _uiState.update { it.copy(myFirstTag = firstTagUi, myPrimaryLanguage = primaryLang) }
-
-            val tagDeferred = firstTagDto?.let { async { discoverRepository.discoverFilter(tags = listOf(it.tag), size = 10) } }
-            val langDeferred = primaryLang?.let { async { discoverRepository.discoverFilter(languages = listOf(it), size = 10) } }
-
-            tagDeferred?.await()?.let { res ->
-                if (res is ApiResult.Success) {
-                    val users = res.data.users.map { it.toUi() }.applyPresence(onlineIds)
-                    _uiState.update { it.copy(tagMatchUsers = users) }
-                }
-            }
-            langDeferred?.await()?.let { res ->
-                if (res is ApiResult.Success) {
-                    val users = res.data.users.map { it.toUi() }.applyPresence(onlineIds)
-                    _uiState.update { it.copy(learningLangUsers = users) }
-                }
             }
         }
     }
