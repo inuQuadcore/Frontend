@@ -115,13 +115,6 @@ object KoreanChosung {
     }
 }
 
-fun countryCodeToFlag(code: String): String {
-    return code.uppercase().map { char ->
-        Character.toCodePoint('\uD83C', '\uDDE6' + (char - 'A') + 0x1F1E6 - 0x1F1E6)
-    }.joinToString("") { String(Character.toChars(it + 0x1F1E6 - 'A'.code + 0x1F1E6 - 0x1F1E6) ) }
-        .ifEmpty { code }  // fallback: 원래 코드
-}
-
 /** 언어코드 → 표시 텍스트 */
 fun languageLabel(code: String) = when (code.uppercase()) {
     "KR" -> "KR"

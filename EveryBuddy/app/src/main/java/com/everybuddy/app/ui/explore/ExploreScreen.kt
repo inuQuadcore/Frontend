@@ -742,36 +742,6 @@ private fun ExploreTag(label: String) {
     }
 }
 
-@Composable
-fun ExploreTagChip(label: String) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(AppColors.TagBg)
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-    ) {
-        Text(label, style = TextStyle(fontSize = 10.sp, fontFamily = PretendardFamily, color = AppColors.TagText))
-    }
-}
-
-@Composable
-fun ActiveBadge() {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFFFFF3E0))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    ) {
-        Row(
-            verticalAlignment        = Alignment.CenterVertically,
-            horizontalArrangement   = Arrangement.spacedBy(3.dp),
-        ) {
-            Box(Modifier.size(5.dp).clip(CircleShape).background(AppColors.Online))
-            Text("현재활동중", style = TextStyle(fontSize = 9.sp, color = Color(0xFFE65100), fontFamily = PretendardFamily))
-        }
-    }
-}
-
 // TopBar + BottomNavBar
 @Composable
 private fun ExploreTopBar(
