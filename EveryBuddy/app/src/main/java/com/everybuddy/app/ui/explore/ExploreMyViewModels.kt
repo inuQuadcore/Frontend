@@ -103,13 +103,14 @@ private fun UserPublicProfileResponse.toUserDetail(): UserDetail = UserDetail(
 
 @HiltViewModel
 class ExploreViewModel @Inject constructor(
-    private val discoverRepository : DiscoverRepository,
-    private val userRepository     : UserRepository,
-    private val friendRepository   : FriendRepository,
-    private val presenceRepository : PresenceRepository,
-    private val tokenManager       : TokenManager,
-    private val filterPreferences  : ExploreFilterPreferences,
+    private val discoverRepository  : DiscoverRepository,
+    private val userRepository      : UserRepository,
+    private val friendRepository    : FriendRepository,
+    private val presenceRepository  : PresenceRepository,
+    private val tokenManager        : TokenManager,
+    private val filterPreferences   : ExploreFilterPreferences,
     private val translateRepository : TranslateRepository,
+    private val blockRepository     : BlockRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExploreUiState())
@@ -429,6 +430,15 @@ class ExploreViewModel @Inject constructor(
                         s.copy(selectedUserDetail = s.selectedUserDetail?.copy(isFriend = false))
                     }
                 }
+                else -> Unit
+            }
+        }
+    }
+
+    fun blockUser(userId: Long) {
+        viewModelScope.launch {
+            when (blockRepository.blockUser(userId)) {
+                is ApiResult.Success -> closeProfile()
                 else -> Unit
             }
         }
@@ -755,9 +765,8 @@ class MyViewModel @Inject constructor(
         viewModelScope.launch {
             when (blockRepository.unblockUser(userId)) {
                 is ApiResult.Success -> {
-                    _uiState.update { it.copy(
-                        blockedFriends = it.blockedFriends.filter { f -> f.userId != userId },
-                    ) }
+                    _uiState.update { it.copy(blockedFriends = it.blockedFriends.filter { f -> f.userId != userId }) }
+                    loadBlockedUsers()
                 }
                 is ApiResult.Error, is ApiResult.NetworkError -> Unit
             }

@@ -10,6 +10,7 @@ import com.everybuddy.app.data.repository.BlockRepository
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.FriendRepository
 import com.everybuddy.app.data.repository.MessageRepository
+import com.everybuddy.app.data.repository.TranslateRepository
 import com.everybuddy.app.data.repository.UserRepository
 import com.everybuddy.app.ui.explore.UserDetail
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -50,6 +51,8 @@ data class FriendUiState(
     // 프로필 화면
     val selectedFriend      : FriendProfile?        = null,
     val selectedFriendDetail: UserDetail?           = null,
+    val translatedBio       : String?               = null,
+    val isBioTranslating    : Boolean               = false,
 
     // 팔로우 상태
     val followedFriendIds   : Set<Long>             = emptySet(),
@@ -67,6 +70,7 @@ class FriendViewModel @Inject constructor(
     private val chatRoomRepository  : ChatRoomRepository,
     private val messageRepository   : MessageRepository,
     private val userRepository      : UserRepository,
+    private val translateRepository : TranslateRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FriendUiState())
@@ -268,7 +272,7 @@ class FriendViewModel @Inject constructor(
     }
 
     fun selectFriend(friend: FriendProfile) {
-        _uiState.update { it.copy(selectedFriend = friend, selectedFriendDetail = null) }
+        _uiState.update { it.copy(selectedFriend = friend, selectedFriendDetail = null, translatedBio = null, isBioTranslating = false) }
         viewModelScope.launch {
             val res = userRepository.getUserProfile(friend.id)
             if (res is ApiResult.Success) {
@@ -285,7 +289,20 @@ class FriendViewModel @Inject constructor(
             }
         }
     }
-    fun clearSelectedFriend() { _uiState.update { it.copy(selectedFriend = null, selectedFriendDetail = null) } }
+    fun clearSelectedFriend() { _uiState.update { it.copy(selectedFriend = null, selectedFriendDetail = null, translatedBio = null, isBioTranslating = false) } }
+
+    fun translateBio(text: String) {
+        if (text.isBlank()) return
+        _uiState.update { it.copy(isBioTranslating = true) }
+        viewModelScope.launch {
+            when (val res = translateRepository.translateText(text)) {
+                is ApiResult.Success -> _uiState.update { it.copy(translatedBio = res.data?.translatedText, isBioTranslating = false) }
+                else                 -> _uiState.update { it.copy(isBioTranslating = false) }
+            }
+        }
+    }
+
+    fun clearBioTranslation() { _uiState.update { it.copy(translatedBio = null) } }
 
     /**
      * fromUserId로 친구 매칭 후 프로필 표시 (푸시 클릭 라우팅용).

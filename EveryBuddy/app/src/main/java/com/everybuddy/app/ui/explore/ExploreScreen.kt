@@ -67,6 +67,7 @@ fun ExploreScreen(
             onChat               = { onStartChat(it) },
             onAddFriend          = { viewModel.addFriend(it.userId) },
             onRemoveFriend       = { viewModel.removeFriend(it.userId) },
+            onBlock              = { viewModel.blockUser(it.userId) },
         )
         return
     }

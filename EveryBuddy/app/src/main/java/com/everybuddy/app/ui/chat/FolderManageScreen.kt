@@ -323,12 +323,20 @@ private fun RoomSelectRow(
             if (room.timestamp.isNotEmpty()) {
                 Text(text = room.timestamp, style = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = FmTextSec))
             }
-            Icon(
-                painter            = painterResource(if (isChecked) R.drawable.ic_check else R.drawable.ic_check_empty),
-                contentDescription = null,
-                modifier           = Modifier.size(22.dp),
-                tint               = if (isChecked) FmAccent else FmTextSec,
-            )
+            if (isChecked) {
+                Image(
+                    painter            = painterResource(R.drawable.ic_check),
+                    contentDescription = null,
+                    modifier           = Modifier.size(22.dp).clip(CircleShape),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, FmTextSec, CircleShape),
+                )
+            }
         }
     }
 }

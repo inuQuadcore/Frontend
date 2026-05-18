@@ -332,7 +332,8 @@ fun ChatRoomContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgGray),
+            .background(BgGray)
+            .imePadding(),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
@@ -1142,14 +1143,14 @@ fun TextMessageBubble(
                     style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
                     modifier = Modifier.padding(end = 4.dp),
                 )
-                if (message.isStatusReply && message.statusPreview.isNotEmpty()) {
+                if (message.statusPreview.isNotEmpty()) {
+                    val replyCard: @Composable () -> Unit = if (message.isStatusReply) {
+                        { StatusReplyCard(message.statusPreview, statusAuthorName, statusAuthorProfileUrl, Modifier.widthIn(max = 260.dp)) }
+                    } else {
+                        { ChatReplyCard(message.statusPreview, Modifier.widthIn(max = 260.dp)) }
+                    }
                     Column(horizontalAlignment = Alignment.End) {
-                        StatusReplyCard(
-                            preview    = message.statusPreview,
-                            name       = statusAuthorName,
-                            profileUrl = statusAuthorProfileUrl,
-                            modifier   = Modifier.widthIn(max = 260.dp),
-                        )
+                        replyCard()
                         Box(
                             modifier = Modifier
                                 .widthIn(max = 260.dp)
@@ -1201,14 +1202,14 @@ fun TextMessageBubble(
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
                     Row(verticalAlignment = Alignment.Bottom) {
-                        if (message.isStatusReply && message.statusPreview.isNotEmpty()) {
+                        if (message.statusPreview.isNotEmpty()) {
+                            val replyCard: @Composable () -> Unit = if (message.isStatusReply) {
+                                { StatusReplyCard(message.statusPreview, statusAuthorName, statusAuthorProfileUrl, Modifier.widthIn(max = 210.dp)) }
+                            } else {
+                                { ChatReplyCard(message.statusPreview, Modifier.widthIn(max = 210.dp)) }
+                            }
                             Column(horizontalAlignment = Alignment.Start) {
-                                StatusReplyCard(
-                                    preview    = message.statusPreview,
-                                    name       = statusAuthorName,
-                                    profileUrl = statusAuthorProfileUrl,
-                                    modifier   = Modifier.widthIn(max = 210.dp),
-                                )
+                                replyCard()
                                 Box(
                                     modifier = Modifier
                                         .widthIn(max = 210.dp)
@@ -1283,15 +1284,10 @@ fun TextMessageBubble(
     }
 }
 
-// StatusReplyCard — 상태메시지 답장 인용 카드 (말풍선 위에 표시, 겹침 디자인)
+// ChatReplyCard — 채팅 답장 인용 카드 (텍스트만, 프로필/이름 없음, 최대 20자)
 @Composable
-private fun StatusReplyCard(
-    preview    : String,
-    name       : String   = "",
-    profileUrl : String?  = null,
-    modifier   : Modifier = Modifier,
-) {
-    val truncated = if (preview.length > 15) preview.take(15) + "…" else preview
+private fun ChatReplyCard(preview: String, modifier: Modifier = Modifier) {
+    val truncated = if (preview.length > 20) preview.take(20) + "…" else preview
     Surface(
         shape           = RoundedCornerShape(12.dp),
         color           = Color.White,
@@ -1300,18 +1296,65 @@ private fun StatusReplyCard(
         modifier        = modifier,
     ) {
         Row(
-            modifier              = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment     = Alignment.Top,
+            modifier          = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(modifier = Modifier.width(3.dp).height(20.dp).background(AccentBlue))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text     = truncated,
+                style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = Color(0xFF888888)),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+// StatusReplyCard — 상태메시지 답장 인용 카드 (말풍선 위에 표시, 겹침 디자인)
+@Composable
+private fun StatusReplyCard(
+    preview    : String,
+    name       : String   = "",
+    profileUrl : String?  = null,
+    modifier   : Modifier = Modifier,
+) {
+    val truncated = if (preview.length > 30) preview.take(30) + "…" else preview
+    Surface(
+        shape           = RoundedCornerShape(12.dp),
+        color           = Color.White,
+        border          = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFFDDDDDD)),
+        shadowElevation = 2.dp,
+        modifier        = modifier,
+    ) {
+        Row(
+            modifier              = Modifier.padding(horizontal = 10.dp, vertical = 16.dp),
+            verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            Box(
+                modifier         = Modifier.size(32.dp).clip(CircleShape).background(Color(0xFFD0D0D0)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (!profileUrl.isNullOrBlank()) {
+                    AsyncImage(model = profileUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                } else {
+                    Icon(painterResource(R.drawable.ic_nav_my), null, Modifier.size(18.dp), tint = Color(0xFF555555))
+                }
+            }
             Column(modifier = Modifier.weight(1f)) {
+                if (name.isNotBlank()) {
+                    Text(
+                        text     = name,
+                        style    = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = TextPrimary),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                }
                 Text(
                     text     = truncated,
-                    style    = TextStyle(
-                        fontSize   = 12.sp,
-                        fontFamily = PretendardFamily,
-                        color      = Color(0xFF888888),
-                    ),
+                    style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = Color(0xFF888888)),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -2050,29 +2093,34 @@ fun ConversationSaveSheet(
 
 @Composable
 private fun ReplyPreviewBar(previewText: String, onCancel: () -> Unit) {
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF0F4FF))
+            .background(Color.White)
             .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .width(3.dp)
-                .height(28.dp)
-                .background(AccentBlue),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text     = previewText,
-            style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = TextPrimary),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(onClick = onCancel, modifier = Modifier.size(24.dp)) {
-            Icon(painterResource(R.drawable.ic_cancel), "취소", Modifier.size(16.dp), tint = TextSecondary)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFFEEEEEE))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text     = previewText,
+                style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = TextPrimary),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(8.dp))
+            Image(
+                painter          = painterResource(R.drawable.ic_cancel),
+                contentDescription = "취소",
+                modifier         = Modifier.size(18.dp).clickable(onClick = onCancel),
+                colorFilter      = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black),
+            )
         }
     }
 }

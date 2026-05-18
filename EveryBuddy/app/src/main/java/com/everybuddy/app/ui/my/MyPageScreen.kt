@@ -214,7 +214,6 @@ private fun MyPageContent(
                 val menuItems = listOf(
                     "에브리버디 가이드" to "guide",
                     "공지사항"        to "notice",
-                    "차단한 친구"     to "blocked",
                     "설정"            to "settings",
                     "버전정보"        to "version",
                 )

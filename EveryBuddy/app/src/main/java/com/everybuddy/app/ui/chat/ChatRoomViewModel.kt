@@ -71,6 +71,7 @@ class ChatRoomViewModel @Inject constructor(
 
     /** 방금 녹음 완료한 음성의 길이(초). 해당 메시지가 RTDB에서 도착하면 적용 후 0으로 리셋. */
     private var pendingVoiceDurationSec: Int = 0
+    private var pendingReplyPreview: String? = null
 
     init {
         viewModelScope.launch {
@@ -189,6 +190,14 @@ class ChatRoomViewModel @Inject constructor(
                         pendingVoiceDurationSec = 0
                     }
                 }
+                val preview = pendingReplyPreview
+                if (preview != null && myId != null) {
+                    val idx = messages.indexOfLast { it.type == MessageType.TEXT && it.senderId.toLongOrNull() == myId && it.statusPreview.isEmpty() }
+                    if (idx >= 0) {
+                        messages = messages.toMutableList().also { it[idx] = it[idx].copy(statusPreview = preview, isStatusReply = false) }
+                        pendingReplyPreview = null
+                    }
+                }
                 _uiState.update { it.copy(messages = messages) }
             }
         }
@@ -292,14 +301,17 @@ class ChatRoomViewModel @Inject constructor(
 
         val chatRoomId  = _uiState.value.room.id.toLongOrNull() ?: return
         val myUserId    = _uiState.value.myUserId
-        val replyMsg    = _uiState.value.replyToMessage
-        val replyPreview = replyMsg?.text?.let { if (it.length > 50) it.take(50) + "…" else it }
-
+        val replyMsg = _uiState.value.replyToMessage
+        if (replyMsg != null) {
+            val raw = replyMsg.text.ifBlank { "[음성 메시지]" }
+            pendingReplyPreview = if (raw.length > 20) raw.take(20) + "…" else raw
+        }
         _uiState.update { it.copy(inputText = "", replyToMessage = null) }
         viewModelScope.launch {
-            when (val result = messageRepository.sendTextMessage(chatRoomId, text, statusPreview = replyPreview)) {
+            when (val result = messageRepository.sendTextMessage(chatRoomId, text)) {
                 is ApiResult.Success -> { /* RTDB push로 본인 메시지 도착 */ }
                 is ApiResult.Error, is ApiResult.NetworkError -> {
+                    pendingReplyPreview = null
                     insertFailedTextMessage(chatRoomId, myUserId, text)
                 }
             }

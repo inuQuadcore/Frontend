@@ -73,14 +73,18 @@ fun FriendMainScreen(
 
     when {
         uiState.selectedFriend != null -> UserProfileScreen(
-            user           = uiState.selectedFriend!!.toDiscoverUser(),
-            detail         = uiState.selectedFriendDetail,
-            isFriend       = uiState.selectedFriend!!.isFriend,
-            onBack         = viewModel::clearSelectedFriend,
-            onChat         = { onStartChat(it) },
-            onAddFriend    = { viewModel.addFriendById(uiState.selectedFriend!!.id) },
-            onRemoveFriend = { viewModel.removeFriendById(uiState.selectedFriend!!.id) },
-            onBlock        = { viewModel.blockFriendById(uiState.selectedFriend!!.id) },
+            user                 = uiState.selectedFriend!!.toDiscoverUser(),
+            detail               = uiState.selectedFriendDetail,
+            isFriend             = uiState.selectedFriend!!.isFriend,
+            onBack               = viewModel::clearSelectedFriend,
+            onChat               = { onStartChat(it) },
+            onAddFriend          = { viewModel.addFriendById(uiState.selectedFriend!!.id) },
+            onRemoveFriend       = { viewModel.removeFriendById(uiState.selectedFriend!!.id) },
+            onBlock              = { viewModel.blockFriendById(uiState.selectedFriend!!.id) },
+            translatedBio        = uiState.translatedBio,
+            isBioTranslating     = uiState.isBioTranslating,
+            onTranslateBio       = { viewModel.translateBio(uiState.selectedFriend!!.bio) },
+            onClearBioTranslation= viewModel::clearBioTranslation,
         )
         uiState.isSearchActive         -> FriendSearchScreen(viewModel = viewModel, statusVm = statusVm)
         statusState.isWriteScreenOpen  -> StatusWriteScreen(viewModel = statusVm)
