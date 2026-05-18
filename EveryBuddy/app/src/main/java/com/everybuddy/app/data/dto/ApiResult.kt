@@ -13,7 +13,14 @@ data class ApiErrorResponse(
 // 모든 API 호출 결과 래퍼
 sealed class ApiResult<out T> {
     data class Success<T>(val data: T)                                     : ApiResult<T>()
-    data class Error(val code: Int, val name: String, val message: String) : ApiResult<Nothing>()
+    data class Error(
+        val code    : Int,
+        val name    : String,
+        val message : String,
+        // 필드별 검증 에러 (예: { "tags": "태그를 하나 이상 선택해주세요." }).
+        // 필드 메시지가 message보다 사용자에게 더 유용한 경우 호출처가 우선 사용.
+        val errors  : Map<String, String>? = null,
+    ) : ApiResult<Nothing>()
     data class NetworkError(val e: Throwable)                              : ApiResult<Nothing>()
 }
 

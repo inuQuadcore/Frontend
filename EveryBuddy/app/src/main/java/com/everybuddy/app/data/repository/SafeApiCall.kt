@@ -14,7 +14,7 @@ internal fun <T> Response<T>.toApiResult(
     } else {
         try {
             val err = gson.fromJson(errorBody()?.string(), ApiErrorResponse::class.java)
-            ApiResult.Error(err.code, err.name, err.message)
+            ApiResult.Error(err.code, err.name, err.message, err.errors)
         } catch (e: Exception) {
             ApiResult.Error(code(), "PARSE_ERROR", "응답 파싱 오류")
         }

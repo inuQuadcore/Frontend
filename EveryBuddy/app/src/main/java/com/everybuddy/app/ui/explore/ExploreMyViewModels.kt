@@ -686,7 +686,8 @@ class MyViewModel @Inject constructor(
                 ) }
                 is ApiResult.Error        -> _uiState.update { it.copy(
                     isSaving     = false,
-                    toastMessage = res.message,
+                    // 필드 검증 메시지(errors.tags)가 일반 message보다 사용자 친화적이라 우선 사용.
+                    toastMessage = res.errors?.get("tags") ?: res.message,
                 ) }
                 is ApiResult.NetworkError -> _uiState.update { it.copy(
                     isSaving     = false,
