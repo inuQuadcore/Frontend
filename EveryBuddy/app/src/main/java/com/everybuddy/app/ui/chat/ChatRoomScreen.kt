@@ -380,6 +380,7 @@ fun ChatRoomContent(
             MessageList(
                 messages              = state.messages,
                 myUserId              = state.myUserId,
+                members               = members,
                 userSummaries         = state.userSummaries,
                 isAutoTranslate       = state.isAutoTranslate,
                 showTranslation       = state.showTranslation,
@@ -875,6 +876,7 @@ fun TranslationLoadingDots(modifier: Modifier = Modifier) {
 fun MessageList(
     messages              : List<ChatMessage>,
     myUserId              : Long,
+    members               : List<ChatMember>,
     userSummaries         : Map<Long, UserSummary>,
     isAutoTranslate       : Boolean,
     showTranslation       : Map<String, Boolean>,
@@ -915,23 +917,29 @@ fun MessageList(
                 val summary = msg.senderId.toLongOrNull()?.let { userSummaries[it] }
                 val senderName            = summary?.name.orEmpty()
                 val senderProfileImageUrl = summary?.profileImageUrl
+                // 상태메시지 답장 인용 카드: 내가 보냈으면 상대 프로필, 상대가 보냈으면 내 프로필
+                val statusAuthor = if (isMe) members.firstOrNull { !it.isMe } else members.firstOrNull { it.isMe }
+                val statusAuthorName       = statusAuthor?.name.orEmpty()
+                val statusAuthorProfileUrl = statusAuthor?.profileImageUrl
 
                 when (msg.type) {
                     MessageType.TEXT ->
                         TextMessageBubble(
-                            message             = msg,
-                            isMe                = isMe,
-                            senderName            = senderName,
-                            senderProfileImageUrl = senderProfileImageUrl,
-                            isAutoTranslate     = isAutoTranslate,
-                            showTranslation     = showTr,
-                            isTranslating       = msg.id in translatingMessageIds,
-                            onToggleTranslation = { onToggleTranslation(msg.id) },
-                            onSaveScript        = { onSaveScript(msg) },
-                            onLongPress         = { onLongPressMessage(msg) },
-                            onRetry             = { onRetryMessage(msg.id) },
-                            searchQuery         = searchQuery,
-                            isHighlighted       = msg.id == highlightedMessageId,
+                            message                = msg,
+                            isMe                   = isMe,
+                            senderName             = senderName,
+                            senderProfileImageUrl  = senderProfileImageUrl,
+                            statusAuthorName       = statusAuthorName,
+                            statusAuthorProfileUrl = statusAuthorProfileUrl,
+                            isAutoTranslate        = isAutoTranslate,
+                            showTranslation        = showTr,
+                            isTranslating          = msg.id in translatingMessageIds,
+                            onToggleTranslation    = { onToggleTranslation(msg.id) },
+                            onSaveScript           = { onSaveScript(msg) },
+                            onLongPress            = { onLongPressMessage(msg) },
+                            onRetry                = { onRetryMessage(msg.id) },
+                            searchQuery            = searchQuery,
+                            isHighlighted          = msg.id == highlightedMessageId,
                         )
 
                     MessageType.VOICE ->
@@ -950,8 +958,13 @@ fun MessageList(
                         )
 
                     MessageType.IMAGE ->
-                        // TODO: 이미지 메시지 UI 구현
-                        Box(modifier = Modifier.height(0.dp))
+                        ImageMessageBubble(
+                            message               = msg,
+                            isMe                  = isMe,
+                            senderName            = senderName,
+                            senderProfileImageUrl = senderProfileImageUrl,
+                            onLongPress           = { onLongPressMessage(msg) },
+                        )
                 }
             }
         }
@@ -1007,19 +1020,21 @@ fun DateDivider(label: String) {
 // TextMessageBubble — 상대=왼쪽(아바타+이름+흰말풍선) / 나=오른쪽(연파랑말풍선)
 @Composable
 fun TextMessageBubble(
-    message             : ChatMessage,
-    isMe                : Boolean,
-    senderName            : String  = "",
-    senderProfileImageUrl : String? = null,
-    isAutoTranslate     : Boolean,
-    showTranslation     : Boolean,
-    isTranslating       : Boolean,
-    onToggleTranslation : () -> Unit,
-    onSaveScript        : () -> Unit,
-    onLongPress         : () -> Unit = {},
-    onRetry             : () -> Unit = {},
-    searchQuery         : String  = "",
-    isHighlighted       : Boolean = false,
+    message                  : ChatMessage,
+    isMe                     : Boolean,
+    senderName               : String  = "",
+    senderProfileImageUrl    : String? = null,
+    statusAuthorName         : String  = "",
+    statusAuthorProfileUrl   : String? = null,
+    isAutoTranslate          : Boolean,
+    showTranslation          : Boolean,
+    isTranslating            : Boolean,
+    onToggleTranslation      : () -> Unit,
+    onSaveScript             : () -> Unit,
+    onLongPress              : () -> Unit = {},
+    onRetry                  : () -> Unit = {},
+    searchQuery              : String  = "",
+    isHighlighted            : Boolean = false,
 ) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
     val timeText = remember(message.timestamp, message.editedAt) {
@@ -1069,8 +1084,8 @@ fun TextMessageBubble(
     ) {
         if (isMe) {
             Row(
-                modifier          = Modifier.fillMaxWidth().padding(start = 46.dp),
-                verticalAlignment = Alignment.Bottom,
+                modifier              = Modifier.fillMaxWidth().padding(start = 46.dp),
+                verticalAlignment     = Alignment.Bottom,
                 horizontalArrangement = Arrangement.End,
             ) {
                 if (isFailed) {
@@ -1085,20 +1100,39 @@ fun TextMessageBubble(
                     style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
                     modifier = Modifier.padding(end = 4.dp),
                 )
-                Box(
-                    modifier = Modifier
-                        .widthIn(max = 260.dp)
-                        .offset(x = shakeOffset.value.dp)
-                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
-                        .background(if (isHighlighted) BubbleBlue.copy(alpha = 0.7f) else BubbleBlue)
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                        .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
-                ) {
-                    Column {
-                        if (message.isStatusReply && message.statusPreview.isNotEmpty()) {
-                            StatusReplyQuote(preview = message.statusPreview, isMe = true)
-                            Spacer(Modifier.height(6.dp))
+                if (message.isStatusReply && message.statusPreview.isNotEmpty()) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        StatusReplyCard(
+                            preview    = message.statusPreview,
+                            name       = statusAuthorName,
+                            profileUrl = statusAuthorProfileUrl,
+                            modifier   = Modifier.widthIn(max = 260.dp),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .widthIn(max = 260.dp)
+                                .offset(y = (-10).dp)
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                                .background(if (isHighlighted) BubbleBlue.copy(alpha = 0.7f) else BubbleBlue)
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                                .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
+                        ) {
+                            Text(
+                                text  = displayText,
+                                style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary, lineHeight = 22.sp),
+                            )
                         }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .widthIn(max = 260.dp)
+                            .offset(x = shakeOffset.value.dp)
+                            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                            .background(if (isHighlighted) BubbleBlue.copy(alpha = 0.7f) else BubbleBlue)
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
+                    ) {
                         Text(
                             text  = displayText,
                             style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary, lineHeight = 22.sp),
@@ -1125,20 +1159,39 @@ fun TextMessageBubble(
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
                     Row(verticalAlignment = Alignment.Bottom) {
-                        Box(
-                            modifier = Modifier
-                                .widthIn(max = 210.dp)
-                                .offset(x = shakeOffset.value.dp)
-                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
-                                .background(if (isHighlighted) BubbleWhite.copy(alpha = 0.7f) else BubbleWhite)
-                                .padding(horizontal = 14.dp, vertical = 10.dp)
-                                .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
-                        ) {
-                            Column {
-                                if (message.isStatusReply && message.statusPreview.isNotEmpty()) {
-                                    StatusReplyQuote(preview = message.statusPreview, isMe = false)
-                                    Spacer(Modifier.height(6.dp))
+                        if (message.isStatusReply && message.statusPreview.isNotEmpty()) {
+                            Column(horizontalAlignment = Alignment.Start) {
+                                StatusReplyCard(
+                                    preview    = message.statusPreview,
+                                    name       = statusAuthorName,
+                                    profileUrl = statusAuthorProfileUrl,
+                                    modifier   = Modifier.widthIn(max = 210.dp),
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .widthIn(max = 210.dp)
+                                        .offset(y = (-10).dp)
+                                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                                        .background(if (isHighlighted) BubbleWhite.copy(alpha = 0.7f) else BubbleWhite)
+                                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                                        .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
+                                ) {
+                                    Text(
+                                        text  = displayText,
+                                        style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary, lineHeight = 22.sp),
+                                    )
                                 }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .widthIn(max = 210.dp)
+                                    .offset(x = shakeOffset.value.dp)
+                                    .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
+                                    .background(if (isHighlighted) BubbleWhite.copy(alpha = 0.7f) else BubbleWhite)
+                                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                                    .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
+                            ) {
                                 Text(
                                     text  = displayText,
                                     style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextPrimary, lineHeight = 22.sp),
@@ -1188,38 +1241,66 @@ fun TextMessageBubble(
     }
 }
 
-// 번역 아이콘 버튼
+// StatusReplyCard — 상태메시지 답장 인용 카드 (말풍선 위에 표시, 겹침 디자인)
 @Composable
-private fun StatusReplyQuote(preview: String, isMe: Boolean) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (isMe) Color.White.copy(alpha = 0.25f) else Color(0xFFE8E8E8))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+private fun StatusReplyCard(
+    preview    : String,
+    name       : String   = "",
+    profileUrl : String?  = null,
+    modifier   : Modifier = Modifier,
+) {
+    val truncated = if (preview.length > 15) preview.take(15) + "…" else preview
+    Surface(
+        shape           = RoundedCornerShape(12.dp),
+        color           = Color.White,
+        border          = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFFDDDDDD)),
+        shadowElevation = 2.dp,
+        modifier        = modifier,
     ) {
-        Column {
-            Text(
-                "상태메시지에 답장",
-                style = TextStyle(
-                    fontSize   = 10.sp,
-                    fontFamily = PretendardFamily,
-                    fontWeight = FontWeight(500),
-                    color      = if (isMe) Color.White.copy(alpha = 0.75f) else Color(0xFF888888),
-                ),
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                preview,
-                style    = TextStyle(
-                    fontSize   = 12.sp,
-                    fontFamily = PretendardFamily,
-                    fontWeight = FontWeight(600),
-                    color      = if (isMe) Color.White else Color(0xFF444444),
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Row(
+            modifier              = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFD0D0D0)),
+            ) {
+                if (profileUrl != null) {
+                    AsyncImage(
+                        model              = profileUrl,
+                        contentDescription = name,
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                if (name.isNotEmpty()) {
+                    Text(
+                        text  = name,
+                        style = TextStyle(
+                            fontSize   = 12.sp,
+                            fontFamily = PretendardFamily,
+                            fontWeight = FontWeight(700),
+                            color      = Color(0xFF1B1B1B),
+                        ),
+                    )
+                    Spacer(Modifier.height(2.dp))
+                }
+                Text(
+                    text     = truncated,
+                    style    = TextStyle(
+                        fontSize   = 12.sp,
+                        fontFamily = PretendardFamily,
+                        color      = Color(0xFF888888),
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -1240,6 +1321,86 @@ fun TranslateIconButton(onClick: () -> Unit) {
             modifier           = Modifier.size(18.dp),
             tint               = AccentBlue,
         )
+    }
+}
+
+// ImageMessageBubble — 이미지 메시지 말풍선 (나=오른쪽, 상대=왼쪽)
+@Composable
+fun ImageMessageBubble(
+    message               : ChatMessage,
+    isMe                  : Boolean,
+    senderName            : String  = "",
+    senderProfileImageUrl : String? = null,
+    onLongPress           : () -> Unit = {},
+) {
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
+    val timeText = remember(message.timestamp) { message.timestamp.format(timeFormatter) }
+
+    Column(
+        modifier            = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 3.dp),
+        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+    ) {
+        if (isMe) {
+            Row(
+                modifier              = Modifier.fillMaxWidth().padding(start = 46.dp),
+                verticalAlignment     = Alignment.Bottom,
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Text(
+                    text     = timeText,
+                    style    = TextStyle(fontSize = 9.sp, color = TextSecondary, fontFamily = PretendardFamily),
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+                AsyncImage(
+                    model              = message.voiceUrl,
+                    contentDescription = null,
+                    contentScale       = ContentScale.Crop,
+                    modifier           = Modifier
+                        .widthIn(max = 200.dp)
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .combinedClickable(onClick = {}, onLongClick = onLongPress),
+                )
+            }
+        } else {
+            Row(
+                modifier          = Modifier.fillMaxWidth().padding(end = 38.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                SenderAvatar(
+                    profileImageUrl    = senderProfileImageUrl,
+                    contentDescription = senderName,
+                    size               = 38.dp,
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(horizontalAlignment = Alignment.Start) {
+                    Text(
+                        text     = senderName,
+                        style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
+                        modifier = Modifier.padding(bottom = 3.dp),
+                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        AsyncImage(
+                            model              = message.voiceUrl,
+                            contentDescription = null,
+                            contentScale       = ContentScale.Crop,
+                            modifier           = Modifier
+                                .widthIn(max = 200.dp)
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .combinedClickable(onClick = {}, onLongClick = onLongPress),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text  = timeText,
+                            style = TextStyle(fontSize = 9.sp, color = TextSecondary, fontFamily = PretendardFamily),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1820,6 +1981,16 @@ fun RecordingOverlay(
     onPause    : () -> Unit,
     onSend     : () -> Unit,
 ) {
+    var elapsed by remember { mutableIntStateOf(seconds) }
+    LaunchedEffect(isPaused) {
+        if (!isPaused) {
+            while (true) {
+                kotlinx.coroutines.delay(1_000L)
+                elapsed++
+            }
+        }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val rawPulseScale by infiniteTransition.animateFloat(
         initialValue   = 0.85f,
@@ -1888,7 +2059,7 @@ fun RecordingOverlay(
 
             // 타이머
             Text(
-                text  = formatTimer(seconds),
+                text  = formatTimer(elapsed),
                 style = TextStyle(
                     fontSize   = 20.sp,
                     fontFamily = PretendardFamily,

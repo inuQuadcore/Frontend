@@ -17,7 +17,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -29,6 +28,7 @@ import coil.compose.AsyncImage
 import com.everybuddy.app.R
 import com.everybuddy.app.data.dto.FriendStatusMessageDto
 import com.everybuddy.app.ui.theme.PretendardFamily
+import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
@@ -318,147 +318,158 @@ fun FriendStatusDetailPopup(
     viewModel    : StatusMessageViewModel,
     onReplySent  : (friendId: String, friendName: String) -> Unit = { _, _ -> },
 ) {
-    val state          by viewModel.state.collectAsState()
-    val focusRequester = remember { FocusRequester() }
-    val canSend        = state.replyText.isNotBlank() && !state.isSending
-    val hasText        = state.replyText.isNotBlank()
-    val preview        = if (sm.content.length > 15) sm.content.take(15) + "…" else sm.content
+    val state      by viewModel.state.collectAsState()
+    val friendId   = remember { sm.userId.toString() }
+    val friendName = remember { sm.userName }
 
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    BackHandler { viewModel.closeFriendStatus() }
+    LaunchedEffect(state.replySent) {
+        if (state.replySent) {
+            delay(1200)
+            onReplySent(friendId, friendName)
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.35f))
             .clickable { viewModel.closeFriendStatus() },
-        contentAlignment = Alignment.BottomCenter,
+        contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier        = Modifier.fillMaxWidth().clickable {},
-            shape           = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            modifier        = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .clickable {},
+            shape           = RoundedCornerShape(16.dp),
             color           = Color.White,
-            shadowElevation = 8.dp,
+            shadowElevation = 12.dp,
         ) {
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .navigationBarsPadding(),
-            ) {
-                Spacer(Modifier.height(20.dp))
-
-                Text(
-                    text  = "${sm.userName}님의 상태메시지에 답장합",
-                    style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextSec),
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                Surface(
-                    shape    = RoundedCornerShape(12.dp),
-                    color    = Color.White,
-                    border   = androidx.compose.foundation.BorderStroke(0.8.dp, C.Border),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier              = Modifier.padding(12.dp),
-                        verticalAlignment     = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFD0D0D0)),
-                        ) {
-                            AsyncImage(
-                                model              = sm.profileImageUrl,
-                                contentDescription = sm.userName,
-                                contentScale       = ContentScale.Crop,
-                                modifier           = Modifier.fillMaxSize(),
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text  = sm.userName,
-                                style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text  = preview,
-                                style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.TextSec),
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(12.dp))
-
+            Column(modifier = Modifier.padding(20.dp)) {
                 Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment      = Alignment.CenterVertically,
+                    horizontalArrangement  = Arrangement.spacedBy(12.dp),
                 ) {
                     Box(
                         modifier = Modifier
-                            .weight(1f)
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFD0D0D0)),
+                    ) {
+                        AsyncImage(
+                            model              = sm.profileImageUrl,
+                            contentDescription = sm.userName,
+                            contentScale       = ContentScale.Crop,
+                            modifier           = Modifier.fillMaxSize(),
+                        )
+                    }
+                    Text(
+                        sm.userName,
+                        style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+                    )
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                Text(
+                    text  = sm.content,
+                    style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 22.sp),
+                )
+
+                Spacer(Modifier.height(14.dp))
+
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    Text(sm.timeAgo, style = TextStyle(fontSize = 12.sp, color = C.TextSec))
+
+                    if (!state.isReplying && !state.replySent) {
+                        Button(
+                            onClick        = { viewModel.openReply() },
+                            shape          = RoundedCornerShape(20.dp),
+                            colors         = ButtonDefaults.buttonColors(containerColor = C.Accent),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
+                            Text("답장하기", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = Color.White))
+                            Spacer(Modifier.width(4.dp))
+                            Icon(painterResource(R.drawable.ic_send), "전송", Modifier.size(14.dp), tint = Color.White)
+                        }
+                    } else if (state.isReplying) {
+                        Text(
+                            "취소",
+                            style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = C.TextRed),
+                            modifier = Modifier.clickable { viewModel.cancelReply() },
+                        )
+                    }
+                }
+
+                if (state.isReplying && !state.replySent) {
+                    Spacer(Modifier.height(10.dp))
+                    val canSend = state.replyText.isNotBlank() && !state.isSending
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
                             .clip(RoundedCornerShape(24.dp))
-                            .background(if (hasText) C.Accent else Color(0xFFF2F2F2))
-                            .padding(horizontal = 16.dp, vertical = 13.dp),
+                            .background(Color(0xFFF0F0F0))
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         BasicTextField(
                             value         = state.replyText,
                             onValueChange = viewModel::updateReplyText,
-                            modifier      = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                            modifier      = Modifier.weight(1f),
                             singleLine    = true,
                             enabled       = !state.isSending,
-                            textStyle     = TextStyle(
-                                fontSize   = 14.sp,
-                                fontFamily = PretendardFamily,
-                                color      = if (hasText) Color.White else C.TextPri,
-                            ),
-                            cursorBrush   = SolidColor(if (hasText) Color.White else C.Accent),
+                            textStyle     = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri),
                             decorationBox = { inner ->
                                 if (state.replyText.isEmpty()) {
-                                    Text("메세지를 입력하세요", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextSec))
+                                    Text("답장하기", style = TextStyle(fontSize = 14.sp, color = C.TextSec))
                                 }
                                 inner()
                             },
                         )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(if (canSend) C.Accent else Color(0xFFDDDDDD))
-                            .clickable(enabled = canSend) { viewModel.sendReply() },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (state.isSending) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-                        } else {
-                            Icon(painterResource(R.drawable.ic_send), "전송", Modifier.size(18.dp), tint = Color.White)
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(if (canSend) C.Accent else Color(0xFFCCCCCC))
+                                .clickable(enabled = canSend) { viewModel.sendReply() },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (state.isSending) {
+                                CircularProgressIndicator(
+                                    modifier    = Modifier.size(16.dp),
+                                    color       = Color.White,
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Icon(painterResource(R.drawable.ic_send), "전송", Modifier.size(16.dp), tint = Color.White)
+                            }
                         }
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
-            }
-        }
-
-        AnimatedVisibility(
-            visible  = state.replySent,
-            enter    = fadeIn(animationSpec = tween(200)) + scaleIn(initialScale = 0.85f, animationSpec = tween(200)),
-            exit     = fadeOut(animationSpec = tween(300)),
-            modifier = Modifier.align(Alignment.Center).padding(bottom = 160.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFF333333))
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
-            ) {
-                Text("전송 완료!", style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color.White))
+                AnimatedVisibility(
+                    visible = state.replySent,
+                    enter   = fadeIn(animationSpec = tween(200)) + scaleIn(initialScale = 0.85f, animationSpec = tween(200)),
+                    exit    = fadeOut(animationSpec = tween(150)),
+                ) {
+                    Box(
+                        modifier         = Modifier.fillMaxWidth().padding(top = 10.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(0xFF444444))
+                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                        ) {
+                            Text("전송 완료!", style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = Color.White))
+                        }
+                    }
+                }
             }
         }
     }
