@@ -32,9 +32,8 @@ import com.everybuddy.app.ui.theme.PretendardFamily
 
 private val C = AppColors
 
-// 나이 범위 상수
-private const val AGE_MIN = 15
-private const val AGE_MAX = 60
+private const val AGE_MIN = FilterSettings.AGE_MIN
+private const val AGE_MAX = FilterSettings.AGE_MAX
 
 // 탭 카테고리
 private val tagCategories = listOf("취미/관심사", "성격/MBTI", "음식", "엔터테인먼트")

@@ -235,8 +235,8 @@ class ExploreViewModel @Inject constructor(
         val res = discoverRepository.discoverFilter(
             gender         = settings.gender.toApiCode(),
             country        = settings.country,
-            minAge         = settings.minAge.toLong(),
-            maxAge         = settings.maxAge.toLong(),
+            minAge         = settings.minAge.toLong().takeIf { !settings.isAgeFullRange },
+            maxAge         = settings.maxAge.toLong().takeIf { !settings.isAgeFullRange },
             languages      = settings.languages.ifEmpty { null },
             tags           = settings.selectedTags.map { it.tag }.ifEmpty { null },
             isOnline       = settings.isOnline.takeIf { it },
