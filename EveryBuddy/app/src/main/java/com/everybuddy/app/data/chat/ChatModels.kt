@@ -101,6 +101,7 @@ data class ChatMessage(
     val sourceText       : String          = "",                    // 음성 번역 응답의 STT 결과. 텍스트 메시지는 빈 문자열.
     val isStatusReply    : Boolean         = false,
     val statusPreview    : String          = "",
+    val localFilePath    : String?         = null,                  // 영속화된 미디어 로컬 경로. null이면 voiceUrl/fileUrl로 fallback.
 )
 
 data class ChatRoomUiState(
@@ -145,4 +146,7 @@ data class ChatRoomUiState(
     val isConversationSelectOpen  : Boolean              = false,
     val conversationSaveMessages  : List<ChatMessage>    = emptyList(),
     val conversationCaptureOption : CaptureOption        = CaptureOption.COMBINED,
+
+    // 이미지 풀스크린 뷰어 — localFilePath 또는 fileUrl. null이면 닫힘.
+    val fullscreenImage           : String?              = null,
 )

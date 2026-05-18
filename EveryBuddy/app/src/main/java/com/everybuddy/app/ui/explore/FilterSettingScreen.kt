@@ -32,12 +32,14 @@ import com.everybuddy.app.ui.theme.PretendardFamily
 
 private val C = AppColors
 
-// 나이 범위 상수
-private const val AGE_MIN = 15
-private const val AGE_MAX = 60
+private const val AGE_MIN = FilterSettings.AGE_MIN
+private const val AGE_MAX = FilterSettings.AGE_MAX
 
 // 탭 카테고리
 private val tagCategories = listOf("취미/관심사", "성격/MBTI", "음식", "엔터테인먼트")
+
+// 국적 BottomSheet 옵션 (서버 enum 코드)
+private val countryOptions = listOf("KOREA", "USA", "JAPAN", "CHINA", "FRANCE", "CZECH")
 
 @Composable
 fun FilterSettingScreen(
@@ -56,6 +58,7 @@ fun FilterSettingScreen(
     var activityFilters by remember { mutableStateOf(current.activityFilters) }
     var selectedTags    by remember { mutableStateOf(current.selectedTags) }
     var tagCategoryIdx  by remember { mutableIntStateOf(0) }
+    var countrySheetOpen by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -178,10 +181,9 @@ fun FilterSettingScreen(
 
             // ── 국적 ──────────────────────────────────────────────────────
             FilterSection(title = "국적", desc = "소통하고 싶은 친구의 국적을 선택해주세요") {
-                // TODO: 국적 선택 하위 시트 → 현재는 드롭다운 표시
                 SelectionRow(
-                    label = country ?: "모든 국적",
-                    onTap = { /* TODO: 국적 선택 BottomSheet */ },
+                    label = country?.let { "${countryFlag(it)} ${countryName(it)}" } ?: "모든 국적",
+                    onTap = { countrySheetOpen = true },
                 )
             }
 
@@ -344,6 +346,90 @@ fun FilterSettingScreen(
             }
 
             Spacer(Modifier.height(16.dp))
+        }
+    }
+
+    if (countrySheetOpen) {
+        CountryPickerSheet(
+            selected = country,
+            onSelect = { code ->
+                country = code
+                countrySheetOpen = false
+            },
+            onDismiss = { countrySheetOpen = false },
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 국적 BottomSheet
+// ─────────────────────────────────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CountryPickerSheet(
+    selected  : String?,
+    onSelect  : (String?) -> Unit,
+    onDismiss : () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = sheetState,
+        containerColor   = Color.White,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+        ) {
+            Text(
+                "국적 선택",
+                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                style    = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri),
+            )
+            HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+
+            CountryPickerRow(
+                label    = "모든 국적",
+                isSelected = selected == null,
+                onClick  = { onSelect(null) },
+            )
+            countryOptions.forEach { code ->
+                CountryPickerRow(
+                    label    = "${countryFlag(code)} ${countryName(code)}",
+                    isSelected = selected == code,
+                    onClick  = { onSelect(code) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CountryPickerRow(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            label,
+            style = TextStyle(
+                fontSize   = 15.sp,
+                fontFamily = PretendardFamily,
+                fontWeight = if (isSelected) FontWeight(700) else FontWeight(500),
+                color      = if (isSelected) C.Accent else C.TextPri,
+            ),
+        )
+        if (isSelected) {
+            Icon(
+                painter            = painterResource(R.drawable.ic_check),
+                contentDescription = "선택됨",
+                modifier           = Modifier.size(18.dp),
+                tint               = C.Accent,
+            )
         }
     }
 }

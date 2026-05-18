@@ -128,6 +128,21 @@ object NetworkModule {
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
+    // Plain OkHttpClient — JWT/Authenticator 없음.
+    // S3 presigned URL 같은 외부 스토리지 다운로드용. Authorization 헤더가 붙으면
+    // presigned 서명 검증이 깨져 403이 떨어짐.
+    @Provides
+    @Singleton
+    @Named("plain")
+    fun providePlainOkHttpClient(
+        @Named("logging") loggingInterceptor : Interceptor,
+    ): OkHttpClient = OkHttpClient.Builder()
+        .apply { if (BuildConfig.DEBUG) addInterceptor(loggingInterceptor) }
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build()
+
     @Provides
     @Singleton
     fun provideGson(): Gson = GsonBuilder()

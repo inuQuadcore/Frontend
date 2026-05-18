@@ -10,7 +10,7 @@ import androidx.room.TypeConverters
         FolderEntity::class,
         FolderRoomEntity::class,
     ],
-    version       = 4,                                   // v4: ChatMessageEntity.translatedText/sourceText 추가 (번역 영구 캐싱)
+    version       = 5,                                   // v5: ChatMessageEntity.localFilePath 추가 (미디어 영속 저장)
     exportSchema  = false,
 )
 @TypeConverters(LocalDateTimeConverter::class)

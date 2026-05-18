@@ -39,11 +39,9 @@ data class ExploreUiState(
     val cardSet            : List<DiscoverUser> = emptyList(),
     val currentCardIndex   : Int               = 0,
     val tagMatchUsers      : List<DiscoverUser> = emptyList(),
-    val tagMatchLabel      : String            = "관심사",
     val learningLangUsers  : List<DiscoverUser> = emptyList(),
     val myFirstTag         : UserTag?          = null,   // 내 첫 번째 태그 — 관심사 섹션 헤더 + /filter?tags=
-    val myPrimaryLanguage  : String?           = null,   // 내 주 언어(level=5) — 언어 섹션 헤더 + /filter?languages=
-    val nativeLangLabel    : String            = "한국어",
+    val myPrimaryLanguage  : String?           = null,   // 내 주 언어(isPrimary) — 언어 섹션 헤더 + /filter?languages=
     val isRefreshing       : Boolean           = false,
     val filterSettings     : FilterSettings    = FilterSettings(),
     val filterResults      : List<DiscoverUser> = emptyList(),
@@ -194,16 +192,56 @@ class ExploreViewModel @Inject constructor(
     }
 
     fun refresh() {
+        _uiState.update { it.copy(isRefreshing = true) }
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true) }
-            when (val res = discoverRepository.discoverRandom()) {
+            val userId = tokenManager.userId.first()
+
+            val randomDeferred = async { discoverRepository.discoverRandom() }
+            val langsDeferred  = if (userId != null) async { userRepository.getUserLanguages(userId) } else null
+            val tagsDeferred   = if (userId != null) async { userRepository.getUserTags(userId) } else null
+
+            val onlineIds = presenceRepository.onlineIds.value
+
+            when (val res = randomDeferred.await()) {
                 is ApiResult.Success -> _uiState.update { it.copy(
-                    cardSet          = res.data.users.map { it.toUi() },
+                    cardSet          = res.data.users.map { it.toUi() }.applyPresence(onlineIds),
                     currentCardIndex = 0,
                     isRefreshing     = false,
                 ) }
                 is ApiResult.Error, is ApiResult.NetworkError ->
                     _uiState.update { it.copy(isRefreshing = false) }
+            }
+
+            val userLangs = (langsDeferred?.await() as? ApiResult.Success)?.data?.languages ?: emptyList()
+            val userTags  = (tagsDeferred?.await() as? ApiResult.Success)?.data ?: emptyList()
+
+            val primaryLang = userLangs.firstOrNull { it.isPrimary }?.language
+            val firstTagDto = userTags.firstOrNull()
+            val firstTagUi  = firstTagDto?.toUi()
+
+            if (userLangs.isNotEmpty() || userTags.isNotEmpty()) {
+                ExploreDemo.myProfile = ExploreDemo.myProfile.copy(
+                    learningLanguages = userLangs.map { UserLanguage(it.language, it.level) },
+                    tags = if (userTags.isNotEmpty()) userTags.map { it.toUi() } else ExploreDemo.myProfile.tags,
+                )
+            }
+
+            _uiState.update { it.copy(myFirstTag = firstTagUi, myPrimaryLanguage = primaryLang) }
+
+            val tagDeferred = firstTagDto?.let { async { discoverRepository.discoverFilter(tags = listOf(it.tag), size = 10) } }
+            val langDeferred = primaryLang?.let { async { discoverRepository.discoverFilter(languages = listOf(it), size = 10) } }
+
+            tagDeferred?.await()?.let { res ->
+                if (res is ApiResult.Success) {
+                    val users = res.data.users.map { it.toUi() }.applyPresence(onlineIds)
+                    _uiState.update { it.copy(tagMatchUsers = users) }
+                }
+            }
+            langDeferred?.await()?.let { res ->
+                if (res is ApiResult.Success) {
+                    val users = res.data.users.map { it.toUi() }.applyPresence(onlineIds)
+                    _uiState.update { it.copy(learningLangUsers = users) }
+                }
             }
         }
     }
@@ -218,7 +256,7 @@ class ExploreViewModel @Inject constructor(
             filterResults       = emptyList(),
             filterNextCursor    = null,
             filterHasNext       = false,
-            isFilterApplied     = !settings.isEmpty(),
+            isFilterApplied     = true,
             isFilterScreenOpen  = false,
             isFilterLoading     = true,
             selectedTab         = 1,
@@ -242,8 +280,8 @@ class ExploreViewModel @Inject constructor(
         val res = discoverRepository.discoverFilter(
             gender         = settings.gender.toApiCode(),
             country        = settings.country,
-            minAge         = settings.minAge.toLong(),
-            maxAge         = settings.maxAge.toLong(),
+            minAge         = settings.minAge.toLong().takeIf { !settings.isAgeFullRange },
+            maxAge         = settings.maxAge.toLong().takeIf { !settings.isAgeFullRange },
             languages      = settings.languages.ifEmpty { null },
             tags           = settings.selectedTags.map { it.tag }.ifEmpty { null },
             isOnline       = settings.isOnline.takeIf { it },

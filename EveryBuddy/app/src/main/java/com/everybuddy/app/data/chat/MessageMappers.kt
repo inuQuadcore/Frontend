@@ -48,6 +48,7 @@ fun ChatMessageEntity.toChatMessage(): ChatMessage = ChatMessage(
     sourceText       = sourceText.orEmpty(),
     isStatusReply    = statusPreview != null,
     statusPreview    = statusPreview.orEmpty(),
+    localFilePath    = localFilePath,
 )
 
 /** messageType + mediaType 조합 → UI MessageType. 미디어 enum 확장 시 여기 업데이트. */

@@ -134,8 +134,8 @@ enum class ActivityFilter(val label: String, val desc: String) {
 
 data class FilterSettings(
     val gender         : GenderFilter        = GenderFilter.ALL,
-    val minAge         : Int                 = 15,
-    val maxAge         : Int                 = 30,
+    val minAge         : Int                 = AGE_MIN,
+    val maxAge         : Int                 = AGE_MAX,
     val country        : String?             = null,   // null = 모든 국적
     val languages      : List<String>        = emptyList(),  // 서버 코드("ENGLISH" 등), 빈 리스트 = 모든 언어
     val activityFilters: Set<ActivityFilter> = emptySet(),
@@ -143,10 +143,18 @@ data class FilterSettings(
     val isOnline       : Boolean             = false,
     val recentlyActive : Boolean             = false,
 ) {
+    // 슬라이더 풀범위면 나이 필터 미적용 — API에 null 전송
+    val isAgeFullRange: Boolean get() = minAge == AGE_MIN && maxAge == AGE_MAX
+
     fun isEmpty() = gender == GenderFilter.ALL &&
-            minAge == 15 && maxAge == 30 &&
+            isAgeFullRange &&
             country == null && languages.isEmpty() &&
             activityFilters.isEmpty() && selectedTags.isEmpty()
+
+    companion object {
+        const val AGE_MIN = 15
+        const val AGE_MAX = 60
+    }
 }
 
 data class MyProfile(

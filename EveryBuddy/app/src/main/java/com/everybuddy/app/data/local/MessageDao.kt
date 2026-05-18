@@ -69,4 +69,12 @@ interface MessageDao {
         WHERE messageId = :messageId
     """)
     suspend fun updateTranslation(messageId: Long, translatedText: String, sourceText: String?)
+
+    /** 미디어 영속화 경로 갱신. 송신 업로드 성공 또는 수신 첫 다운로드 직후 호출. */
+    @Query("UPDATE chat_messages SET localFilePath = :path WHERE messageId = :messageId")
+    suspend fun updateLocalFilePath(messageId: Long, path: String?)
+
+    /** PENDING(음수 tempId) 메시지의 messageId를 서버 PK로 교체할 때 path 캐리오버 용도 readback. */
+    @Query("SELECT localFilePath FROM chat_messages WHERE messageId = :messageId")
+    suspend fun localFilePath(messageId: Long): String?
 }
