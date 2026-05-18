@@ -1477,13 +1477,20 @@ fun VoiceMessageBubble(
                             )
                         }
                         Spacer(Modifier.width(4.dp))
-                        Text(
-                            text  = timeText,
-                            style = TextStyle(fontSize = 9.sp, color = TextSecondary),
-                        )
-                        if (!isAutoTranslate) {
-                            Spacer(Modifier.width(4.dp))
-                            TranslateIconButton(onClick = onToggleTranslation)
+                        Column(horizontalAlignment = Alignment.Start) {
+                            if (!isAutoTranslate) {
+                                Image(
+                                    painter            = painterResource(R.drawable.ic_translate),
+                                    contentDescription = "번역",
+                                    modifier           = Modifier.size(20.dp).clickable(onClick = onToggleTranslation),
+                                    colorFilter        = androidx.compose.ui.graphics.ColorFilter.tint(AccentBlue),
+                                )
+                                Spacer(Modifier.height(2.dp))
+                            }
+                            Text(
+                                text  = timeText,
+                                style = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                            )
                         }
                     }
                 }
