@@ -31,7 +31,8 @@ class NotificationViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(NotificationUiState())
     val uiState: StateFlow<NotificationUiState> = _uiState.asStateFlow()
 
-    init { loadFirst() }
+    // init에서 loadFirst()를 호출하지 않음 — ViewModel은 NavBackStackEntry scope에 살아남아
+    // 두 번째 진입엔 init이 다시 안 돌고 API 호출 0번 됨. 화면 mount 시 LaunchedEffect로 트리거.
 
     fun loadFirst() {
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }

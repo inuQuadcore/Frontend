@@ -50,6 +50,10 @@ fun NotificationScreen(
     val state by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
 
+    // 화면 mount(open)될 때마다 첫 페이지 재조회. ViewModel은 NavBackStackEntry scope에 살아남아
+    // init만으론 닫았다 다시 열 때 호출 안 됨 + 첫 호출 401 등 실패 후 복구도 불가.
+    LaunchedEffect(Unit) { viewModel.loadFirst() }
+
     // 마지막 항목 근처에 닿으면 다음 페이지 요청
     val shouldLoadMore by remember {
         derivedStateOf {

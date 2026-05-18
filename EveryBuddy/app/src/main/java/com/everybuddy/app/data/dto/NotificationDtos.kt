@@ -7,7 +7,9 @@ data class Notification(
     @SerializedName("body")           val body          : String,
     @SerializedName("fromUserId")     val fromUserId    : Long,
     @SerializedName("createdAt")      val createdAt     : String,
-    @SerializedName("isRead")         val isRead        : Boolean,
+    // 서버 Kotlin Boolean 직렬화는 `is` 접두사 제거 → "read"로 옴. isRead는 alternate로 호환.
+    @SerializedName(value = "read", alternate = ["isRead"])
+    val isRead : Boolean,
 )
 
 data class NotificationListResponse(

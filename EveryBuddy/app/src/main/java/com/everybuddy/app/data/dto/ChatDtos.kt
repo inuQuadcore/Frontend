@@ -11,7 +11,9 @@ import com.google.gson.annotations.SerializedName
 data class ChatRoom(
     @SerializedName("chatRoomId")      val chatRoomId      : Long,
     @SerializedName("roomName")        val roomName        : String,
-    @SerializedName("isGroup")         val isGroup         : Boolean,
+    // 서버는 "group"으로 직렬화 (Kotlin Boolean `is` 접두사 제거). isGroup은 alternate로 호환.
+    @SerializedName(value = "group", alternate = ["isGroup"])
+    val isGroup : Boolean,
     @SerializedName("createdAt")       val createdAt       : String,
     @SerializedName("participants")    val participants    : List<ParticipantSummary> = emptyList(),
     @SerializedName("unreadCount")     val unreadCount     : Int?    = null,

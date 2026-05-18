@@ -12,7 +12,9 @@ data class UserPublicProfileResponse(
     @SerializedName("gender")          val gender          : String  = "",
     @SerializedName("bio")             val bio             : String  = "",
     @SerializedName("consecutiveDays") val consecutiveDays : Int     = 0,
-    @SerializedName("isFriend")        val isFriend        : Boolean? = null,
+    // 서버는 "friend"로 직렬화 (Kotlin Boolean `is` 접두사 제거). isFriend는 alternate로 호환.
+    @SerializedName(value = "friend", alternate = ["isFriend"])
+    val isFriend : Boolean? = null,
 )
 
 data class UserProfileResponse(
