@@ -123,17 +123,19 @@ fun FriendListItem(
         Box(modifier = Modifier.size(64.dp)) {
             // 메인 프로필 원
             Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFD0D0D0)),
+                modifier         = Modifier.size(64.dp).clip(CircleShape).background(Color(0xFFD0D0D0)),
+                contentAlignment = Alignment.Center,
             ) {
-                AsyncImage(
-                    model              = friend.profileImageUrl,
-                    contentDescription = friend.name,
-                    contentScale       = ContentScale.Crop,
-                    modifier           = Modifier.fillMaxSize(),
-                )
+                if (!friend.profileImageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model              = friend.profileImageUrl,
+                        contentDescription = friend.name,
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Icon(painterResource(R.drawable.ic_nav_my), null, Modifier.size(36.dp), tint = Color(0xFF555555))
+                }
             }
             // 국기 이모지 뱃지 (우하단) — 국적(nationality) 기준
             Text(

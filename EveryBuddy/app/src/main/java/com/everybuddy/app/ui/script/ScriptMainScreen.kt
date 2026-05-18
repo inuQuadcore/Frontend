@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -812,17 +813,6 @@ fun ScriptFolderScreen(
         containerColor = Color.White,
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-            if (viewModel != null) {
-                Text(
-                    "폴더 수정하기",
-                    style    = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = SmAccent),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showFolderEdit = true }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                )
-                HorizontalDivider(color = SmBorder, thickness = 0.5.dp)
-            }
             if (folderItems.isEmpty()) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text("저장된 스크립트가 없습니다.", style = TextStyle(fontSize = 14.sp, color = SmTextSec))
@@ -916,7 +906,7 @@ private fun FolderEditScreen(
                             .background(Color.Black.copy(alpha = 0.45f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(painterResource(R.drawable.ic_media_camera), "커버 변경", Modifier.size(22.dp), tint = Color.White)
+                        Icon(painterResource(R.drawable.ic_pencil), "커버 변경", Modifier.size(22.dp), tint = Color.White)
                     }
                 }
                 Spacer(Modifier.height(16.dp))
@@ -975,17 +965,15 @@ private fun FolderEditScreen(
                     verticalAlignment     = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(22.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(if (isChecked) SmAccent else Color.Transparent)
-                            .border(1.5.dp, if (isChecked) SmAccent else SmBorder, RoundedCornerShape(4.dp)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (isChecked) {
-                            Icon(painterResource(R.drawable.ic_check), null, Modifier.size(13.dp), tint = Color.White)
-                        }
+                    if (isChecked) {
+                        Image(painterResource(R.drawable.ic_check), null, Modifier.size(22.dp).clip(CircleShape))
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .border(1.5.dp, SmBorder, CircleShape),
+                        )
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(

@@ -528,10 +528,7 @@ fun ChatRoomItem(
                         contentScale       = ContentScale.Crop,
                         modifier           = Modifier.fillMaxSize().clip(CircleShape),
                     )
-                    else -> Text(
-                        text  = room.name.take(1),
-                        style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color(0xFF888888)),
-                    )
+                    else -> Icon(painterResource(R.drawable.ic_nav_my), null, Modifier.size(28.dp), tint = Color(0xFF555555))
                 }
             }
         }
@@ -771,6 +768,9 @@ private fun ParticipantAvatar(
                 contentScale       = ContentScale.Crop,
                 modifier           = Modifier.fillMaxSize(),
             )
+            else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(painterResource(R.drawable.ic_nav_my), null, Modifier.fillMaxSize(0.55f), tint = Color(0xFF555555))
+            }
         }
     }
 }
