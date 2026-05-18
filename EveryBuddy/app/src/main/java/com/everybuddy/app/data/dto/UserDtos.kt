@@ -35,7 +35,9 @@ data class UpdateProfileRequest(
 
 data class UserLanguagesResponse(
     @SerializedName("languages") val languages : List<LanguageLevel>,
-    @SerializedName("isOwner")   val isOwner   : Boolean,
+    // 서버는 "owner"로 직렬화 (Kotlin Boolean `is` 접두사 제거). isOwner는 alternate로 호환.
+    @SerializedName(value = "owner", alternate = ["isOwner"])
+    val isOwner : Boolean,
 )
 
 data class UpdateLanguageLevelRequest(
