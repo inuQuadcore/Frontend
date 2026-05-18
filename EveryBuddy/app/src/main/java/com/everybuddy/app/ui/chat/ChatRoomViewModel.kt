@@ -14,6 +14,8 @@ import com.everybuddy.app.data.firebase.ViewingManager
 import com.everybuddy.app.data.local.ChatMessageEntity
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.MessageRepository
+import com.everybuddy.app.data.repository.TranslateRepository
+import com.everybuddy.app.data.repository.translateUserMessage
 import com.google.firebase.database.FirebaseDatabase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
@@ -43,6 +45,7 @@ class ChatRoomViewModel @Inject constructor(
     private val fileMessageUploader : FileMessageUploader,
     private val viewingManager      : ViewingManager,
     private val userSummaryCache    : UserSummaryCache,
+    private val translateRepository : TranslateRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatRoomUiState())
@@ -57,6 +60,10 @@ class ChatRoomViewModel @Inject constructor(
 
     /** 현재 viewing 중인 채팅방 ID. onCleared에서 leave 호출용. */
     private var viewingChatRoomId: Long? = null
+
+    /** 자동번역 watermark — 이 messageId 이상만 자동 번역 대상. 채팅방 진입 시 기존 메시지 제외 + OFF→ON 토글 시 갱신. */
+    private var autoTranslateWatermark: Long = -1
+    private var autoTranslateInitialized: Boolean = false
 
     init {
         viewModelScope.launch {
@@ -90,6 +97,45 @@ class ChatRoomViewModel @Inject constructor(
                 .map { state -> state.messages.mapNotNull { it.senderId.toLongOrNull() }.toSet() }
                 .distinctUntilChanged()
                 .collect { senderIds -> fetchMissingSummaries(senderIds) }
+        }
+        // 자동번역 ON 상태에서 새 메시지 도착 시 자동 번역 트리거 (텍스트 + 음성, 상대 메시지만)
+        viewModelScope.launch {
+            _uiState
+                .map { it.messages }
+                .distinctUntilChanged()
+                .collect { messages -> maybeAutoTranslate(messages) }
+        }
+    }
+
+    /**
+     * 자동번역 watermark 이상의 새 상대 메시지를 백그라운드로 번역.
+     * 첫 호출(채팅방 진입 시 Room 캐시 emit)에서는 watermark만 setting하고 skip — 기존 메시지는 대상 X.
+     */
+    private fun maybeAutoTranslate(messages: List<com.everybuddy.app.data.chat.ChatMessage>) {
+        if (!autoTranslateInitialized) {
+            autoTranslateWatermark = messages.mapNotNull { it.id.toLongOrNull() }.maxOrNull() ?: -1L
+            autoTranslateInitialized = true
+            return
+        }
+        val state = _uiState.value
+        if (!state.isAutoTranslate) return
+        val myUid = state.myUserId
+        messages.forEach { msg ->
+            val id = msg.id.toLongOrNull() ?: return@forEach
+            if (id <= autoTranslateWatermark) return@forEach
+            if (msg.senderId.toLongOrNull() == myUid) return@forEach
+            if (msg.translatedText.isNotEmpty()) return@forEach
+            if (msg.id in _uiState.value.translatingMessageIds) return@forEach
+            val hasContent = when (msg.type) {
+                MessageType.TEXT  -> msg.text.isNotBlank()
+                MessageType.VOICE -> msg.voiceUrl.isNotBlank()
+                else              -> false
+            }
+            if (!hasContent) return@forEach
+            translateMessage(msg.id, autoShow = false)
+        }
+        messages.mapNotNull { it.id.toLongOrNull() }.maxOrNull()?.let {
+            if (it > autoTranslateWatermark) autoTranslateWatermark = it
         }
     }
 
@@ -284,25 +330,90 @@ class ChatRoomViewModel @Inject constructor(
     fun onToggleTranslation(messageId: String) {
         val state   = _uiState.value
         val current = state.showTranslation[messageId] ?: state.isAutoTranslate
-        if (!current) {
-            val msg = state.messages.find { it.id == messageId } ?: return
-            if (msg.translatedText.isEmpty()) {
-                _uiState.update { it.copy(translatingMessageIds = it.translatingMessageIds + messageId) }
-                viewModelScope.launch {
-                    delay(1200)
-                    _uiState.update { it.copy(
-                        translatingMessageIds = it.translatingMessageIds - messageId,
-                        showTranslation       = it.showTranslation + (messageId to true),
-                    )}
+        val msg     = state.messages.find { it.id == messageId } ?: return
+
+        // 이미 번역 캐시가 있으면 토글만 (재호출 X)
+        if (msg.translatedText.isNotEmpty()) {
+            _uiState.update { s -> s.copy(showTranslation = s.showTranslation + (messageId to !current)) }
+            return
+        }
+        // 캐시 없는 상태에서 OFF → OFF 토글은 의미 없음. 표시 X.
+        if (current) return
+
+        // 캐시 없음 + ON 전환 → API 호출
+        translateMessage(messageId, autoShow = true)
+    }
+
+    /**
+     * 메시지 번역 API 호출 후 Room 캐시 저장. Room flow가 emit 갱신 → UI translatedText 채워짐.
+     * autoShow=true면 번역 완료 시 showTranslation도 true로.
+     */
+    private fun translateMessage(messageId: String, autoShow: Boolean) {
+        val msg = _uiState.value.messages.find { it.id == messageId } ?: return
+        val msgIdLong = messageId.toLongOrNull() ?: return
+        if (msg.translatedText.isNotEmpty()) return
+        if (messageId in _uiState.value.translatingMessageIds) return
+
+        _uiState.update { it.copy(translatingMessageIds = it.translatingMessageIds + messageId) }
+        viewModelScope.launch {
+            val result: ApiResult<Pair<String, String?>> = when (msg.type) {
+                MessageType.TEXT -> {
+                    val text = msg.text.ifBlank { return@launch finishTranslating(messageId) }
+                    when (val r = translateRepository.translateText(text)) {
+                        is ApiResult.Success      -> ApiResult.Success(r.data.translatedText to null)
+                        is ApiResult.Error        -> r
+                        is ApiResult.NetworkError -> r
+                    }
                 }
-                return
+                MessageType.VOICE -> {
+                    val url = msg.voiceUrl.ifBlank { return@launch finishTranslating(messageId) }
+                    when (val r = translateRepository.translateSpeechFromUrl(url)) {
+                        is ApiResult.Success      -> ApiResult.Success(r.data.translatedText to r.data.sourceText)
+                        is ApiResult.Error        -> r
+                        is ApiResult.NetworkError -> r
+                    }
+                }
+                else -> return@launch finishTranslating(messageId)
+            }
+            when (result) {
+                is ApiResult.Success -> {
+                    val (translated, source) = result.data
+                    messageDao.updateTranslation(msgIdLong, translated, source)
+                    _uiState.update {
+                        it.copy(
+                            translatingMessageIds = it.translatingMessageIds - messageId,
+                            showTranslation = if (autoShow) it.showTranslation + (messageId to true) else it.showTranslation,
+                        )
+                    }
+                }
+                is ApiResult.Error, is ApiResult.NetworkError -> {
+                    _uiState.update {
+                        it.copy(
+                            translatingMessageIds = it.translatingMessageIds - messageId,
+                            translationError      = result.translateUserMessage(),
+                        )
+                    }
+                }
             }
         }
-        _uiState.update { s -> s.copy(showTranslation = s.showTranslation + (messageId to !current)) }
+    }
+
+    private fun finishTranslating(messageId: String) {
+        _uiState.update { it.copy(translatingMessageIds = it.translatingMessageIds - messageId) }
+    }
+
+    fun consumeTranslationError() {
+        _uiState.update { it.copy(translationError = null) }
     }
 
     fun onToggleAutoTranslate() {
-        _uiState.update { it.copy(isAutoTranslate = !it.isAutoTranslate) }
+        val turningOn = !_uiState.value.isAutoTranslate
+        if (turningOn) {
+            // OFF→ON 토글 시 watermark를 현재 최신 messageId로 갱신 — 기존 메시지는 자동 번역 대상 X
+            autoTranslateWatermark = _uiState.value.messages.mapNotNull { it.id.toLongOrNull() }.maxOrNull()
+                ?: autoTranslateWatermark
+        }
+        _uiState.update { it.copy(isAutoTranslate = turningOn) }
     }
 
     fun onToggleMediaPanel() {

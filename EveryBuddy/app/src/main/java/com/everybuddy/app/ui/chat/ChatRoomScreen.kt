@@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -95,6 +96,14 @@ fun ChatRoomScreen(
 ) {
     LaunchedEffect(roomId) { viewModel.loadRoom(roomId, roomName, isGroup) }
     val state by viewModel.uiState.collectAsState()
+
+    val context = LocalContext.current
+    LaunchedEffect(state.translationError) {
+        state.translationError?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.consumeTranslationError()
+        }
+    }
 
     val micPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -1392,12 +1401,14 @@ private fun VoiceBubbleContent(
             )
         }
 
-        if (message.text.isNotEmpty()) {
+        // STT: 번역 응답의 sourceText 우선 (백엔드는 음성 본문 텍스트를 별도로 안 보냄)
+        val sttText = message.sourceText.ifEmpty { message.text }
+        if (sttText.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
             HorizontalDivider(color = if (isMe) Color.White.copy(0.3f) else DividerGray, thickness = 0.5.dp)
             Spacer(Modifier.height(6.dp))
             Text(
-                text  = message.text,
+                text  = sttText,
                 style = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = textColor, lineHeight = 19.sp),
             )
         }

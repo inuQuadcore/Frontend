@@ -41,11 +41,13 @@ fun ChatMessageEntity.toChatMessage(): ChatMessage = ChatMessage(
     voiceUrl  = fileUrl.orEmpty(),
     // 음성 길이: 백엔드 응답에 duration 없음. 재생 시점에 ExoPlayer가 메타 추출.
     voiceDurationSec = 0,
-    timestamp     = sendAt,
-    editedAt      = editedAt,
-    status        = status,
-    isStatusReply = statusPreview != null,
-    statusPreview = statusPreview.orEmpty(),
+    timestamp        = sendAt,
+    editedAt         = editedAt,
+    status           = status,
+    translatedText   = translatedText.orEmpty(),
+    sourceText       = sourceText.orEmpty(),
+    isStatusReply    = statusPreview != null,
+    statusPreview    = statusPreview.orEmpty(),
 )
 
 /** messageType + mediaType 조합 → UI MessageType. 미디어 enum 확장 시 여기 업데이트. */

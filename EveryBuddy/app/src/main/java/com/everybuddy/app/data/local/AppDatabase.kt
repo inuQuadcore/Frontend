@@ -10,7 +10,7 @@ import androidx.room.TypeConverters
         FolderEntity::class,
         FolderRoomEntity::class,
     ],
-    version       = 3,                                   // v3: ChatMessageEntity.senderName 제거 (stale 방지, senderId로 cache lookup)
+    version       = 4,                                   // v4: ChatMessageEntity.translatedText/sourceText 추가 (번역 영구 캐싱)
     exportSchema  = false,
 )
 @TypeConverters(LocalDateTimeConverter::class)

@@ -99,6 +99,7 @@ data class ChatMessage(
     val status           : String          = "SENT",                // "SENT" | "PENDING" | "FAILED" — 송신 인디케이터
     val isTranslated     : Boolean         = false,
     val translatedText   : String          = "",
+    val sourceText       : String          = "",                    // 음성 번역 응답의 STT 결과. 텍스트 메시지는 빈 문자열.
     val isStatusReply    : Boolean         = false,
     val statusPreview    : String          = "",
 )
@@ -114,6 +115,7 @@ data class ChatRoomUiState(
     val isAutoTranslate           : Boolean              = false,
     val showTranslation           : Map<String, Boolean> = emptyMap(),
     val translatingMessageIds     : Set<String>          = emptySet(),
+    val translationError          : String?              = null,           // 토스트 1회 노출 후 consume
 
     // 음성 녹음
     val isRecording               : Boolean              = false,
