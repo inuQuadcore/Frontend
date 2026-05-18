@@ -20,13 +20,15 @@ class ChatRoomPreferences @Inject constructor(
     private val prefs: SharedPreferences =
         context.getSharedPreferences("chat_room_flags", Context.MODE_PRIVATE)
 
-    fun isMuted(roomId: String): Boolean   = prefs.getBoolean(key("mute", roomId), false)
-    fun isPinned(roomId: String): Boolean  = prefs.getBoolean(key("pin",  roomId), false)
-    fun isStarred(roomId: String): Boolean = prefs.getBoolean(key("star", roomId), false)
+    fun isMuted(roomId: String): Boolean         = prefs.getBoolean(key("mute",     roomId), false)
+    fun isPinned(roomId: String): Boolean        = prefs.getBoolean(key("pin",      roomId), false)
+    fun isStarred(roomId: String): Boolean       = prefs.getBoolean(key("star",     roomId), false)
+    fun isAutoTranslate(roomId: String): Boolean = prefs.getBoolean(key("autoTrans", roomId), false)
 
-    fun setMuted(roomId: String, value: Boolean)   = prefs.edit().putBoolean(key("mute", roomId), value).apply()
-    fun setPinned(roomId: String, value: Boolean)  = prefs.edit().putBoolean(key("pin",  roomId), value).apply()
-    fun setStarred(roomId: String, value: Boolean) = prefs.edit().putBoolean(key("star", roomId), value).apply()
+    fun setMuted(roomId: String, value: Boolean)         = prefs.edit().putBoolean(key("mute",     roomId), value).apply()
+    fun setPinned(roomId: String, value: Boolean)        = prefs.edit().putBoolean(key("pin",      roomId), value).apply()
+    fun setStarred(roomId: String, value: Boolean)       = prefs.edit().putBoolean(key("star",     roomId), value).apply()
+    fun setAutoTranslate(roomId: String, value: Boolean) = prefs.edit().putBoolean(key("autoTrans", roomId), value).apply()
 
     private fun key(flag: String, roomId: String) = "$flag:$roomId"
 }

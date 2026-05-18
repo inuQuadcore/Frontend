@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.cache.UserSummaryCache
 import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.local.ChatRoomPreferences
 import com.everybuddy.app.data.local.MessageDao
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.local.formatRestLocalDateTime
@@ -46,6 +47,7 @@ class ChatRoomViewModel @Inject constructor(
     private val viewingManager      : ViewingManager,
     private val userSummaryCache    : UserSummaryCache,
     private val translateRepository : TranslateRepository,
+    private val chatRoomPreferences : ChatRoomPreferences,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatRoomUiState())
@@ -157,7 +159,13 @@ class ChatRoomViewModel @Inject constructor(
 
         val chatRoomId = roomId.toLongOrNull() ?: return   // 잘못된 ID — 무시
 
-        _uiState.update { it.copy(room = ChatRoomUi(id = roomId, name = roomName, isGroup = isGroup)) }
+        val savedAutoTranslate = chatRoomPreferences.isAutoTranslate(roomId)
+        _uiState.update {
+            it.copy(
+                room            = ChatRoomUi(id = roomId, name = roomName, isGroup = isGroup),
+                isAutoTranslate = savedAutoTranslate,
+            )
+        }
 
         // Room flow collect → UI state.messages.
         // RTDB가 limitToLast(50)로 캐시 유입을 제한하니 채팅방당 메시지 수 적음 — 전체 load.
@@ -414,6 +422,10 @@ class ChatRoomViewModel @Inject constructor(
                 ?: autoTranslateWatermark
         }
         _uiState.update { it.copy(isAutoTranslate = turningOn) }
+        // 채팅방 단위 영속화 — 다음 진입 시 복원
+        _uiState.value.room.id.takeIf { it.isNotEmpty() }?.let { roomId ->
+            chatRoomPreferences.setAutoTranslate(roomId, turningOn)
+        }
     }
 
     fun onToggleMediaPanel() {
