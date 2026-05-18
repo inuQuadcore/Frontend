@@ -148,6 +148,7 @@ class ExploreViewModel @Inject constructor(
     }
 
     fun refresh() {
+        _uiState.update { it.copy(isRefreshing = true) }
         viewModelScope.launch {
             val userId = tokenManager.userId.first()
 
@@ -211,7 +212,7 @@ class ExploreViewModel @Inject constructor(
             filterResults       = emptyList(),
             filterNextCursor    = null,
             filterHasNext       = false,
-            isFilterApplied     = !settings.isEmpty(),
+            isFilterApplied     = true,
             isFilterScreenOpen  = false,
             isFilterLoading     = true,
             selectedTab         = 1,
