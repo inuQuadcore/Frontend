@@ -119,117 +119,130 @@ fun ExploreScreen(
                 }
             }
 
-            PullToRefreshBox(
-                isRefreshing = uiState.isRefreshing,
-                onRefresh    = { viewModel.refresh() },
-                modifier     = Modifier.fillMaxSize(),
-            ) {
-                when (uiState.selectedTab) {
-                    0 -> RecommendTab(
-                        uiState        = uiState,
-                        viewModel      = viewModel,
-                        onOpenProfile  = { viewModel.openProfile(it); onOpenProfile(it) },
-                    )
-                    1 -> FilterTab(
-                        uiState       = uiState,
-                        viewModel     = viewModel,
-                        onOpenProfile = { viewModel.openProfile(it); onOpenProfile(it) },
-                    )
-                }
+            when (uiState.selectedTab) {
+                0 -> RecommendTab(
+                    uiState        = uiState,
+                    viewModel      = viewModel,
+                    onOpenProfile  = { viewModel.openProfile(it); onOpenProfile(it) },
+                )
+                1 -> FilterTab(
+                    uiState       = uiState,
+                    viewModel     = viewModel,
+                    onOpenProfile = { viewModel.openProfile(it); onOpenProfile(it) },
+                )
             }
         }
     }
 }
 
+// 더보기 화면 섹션 구분 — 어느 추천 섹션의 전체 list인지.
+private enum class ExploreMoreSection { TAG_MATCH, LEARNING_LANG }
+
 // 추천친구 탭
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RecommendTab(
     uiState       : ExploreUiState,
     viewModel     : ExploreViewModel,
     onOpenProfile : (DiscoverUser) -> Unit,
 ) {
-    var moreListTitle by remember { mutableStateOf("") }
-    var moreListUsers by remember { mutableStateOf<List<DiscoverUser>?>(null) }
+    var moreSection by remember { mutableStateOf<ExploreMoreSection?>(null) }
 
-    if (moreListUsers != null) {
-        BackHandler { moreListUsers = null }
+    if (moreSection != null) {
+        BackHandler { moreSection = null }
         UserMoreListScreen(
-            title   = moreListTitle,
-            users   = moreListUsers!!,
-            onBack  = { moreListUsers = null },
-            onClick = onOpenProfile,
+            section       = moreSection!!,
+            uiState       = uiState,
+            viewModel     = viewModel,
+            onBack        = { moreSection = null },
+            onClick       = onOpenProfile,
         )
         return
     }
 
-    LazyColumn(
-        modifier       = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp),
+    PullToRefreshBox(
+        isRefreshing = uiState.isRefreshing,
+        onRefresh    = { viewModel.refresh() },
+        modifier     = Modifier.fillMaxSize(),
     ) {
+        LazyColumn(
+            modifier       = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
 
-        item {
-            Spacer(Modifier.height(16.dp))
-            RandomCardSection(
-                cardSet      = uiState.cardSet,
-                currentIndex = uiState.currentCardIndex,
-                onNext       = viewModel::nextCard,
-                onPrev       = viewModel::prevCard,
-                onCardClick  = onOpenProfile,
-            )
-            Spacer(Modifier.height(24.dp))
-        }
+            item {
+                Spacer(Modifier.height(16.dp))
+                RandomCardSection(
+                    cardSet      = uiState.cardSet,
+                    currentIndex = uiState.currentCardIndex,
+                    onNext       = viewModel::nextCard,
+                    onPrev       = viewModel::prevCard,
+                    onCardClick  = onOpenProfile,
+                )
+                Spacer(Modifier.height(24.dp))
+            }
 
-        item {
-            val topTag = uiState.myFirstTag?.displayName ?: "관심사"
-            SectionHeader(
-                title    = "나와 같은 '$topTag' 관심사를 가진 추천 친구",
-                subtitle = "관심사가 같으면 대화도 쉬워져요",
-                onMore   = {
-                    moreListTitle = "나와 같은 '$topTag' 관심사 친구"
-                    moreListUsers = uiState.tagMatchUsers
-                },
-            )
-        }
-        items(uiState.tagMatchUsers.take(3)) { user ->
-            UserListItem(
-                user    = user,
-                onClick = { onOpenProfile(user) },
-            )
-        }
+            item {
+                val topTag = uiState.myFirstTag?.displayName ?: "관심사"
+                SectionHeader(
+                    title    = "나와 같은 '$topTag' 관심사를 가진 추천 친구",
+                    subtitle = "관심사가 같으면 대화도 쉬워져요",
+                    onMore   = { moreSection = ExploreMoreSection.TAG_MATCH },
+                )
+            }
+            items(uiState.tagMatchUsers.take(3)) { user ->
+                UserListItem(
+                    user    = user,
+                    onClick = { onOpenProfile(user) },
+                )
+            }
 
-        item {
-            Spacer(Modifier.height(16.dp))
-            FilterBanner(onClick = { viewModel.openFilterScreen() })
-            Spacer(Modifier.height(16.dp))
-        }
+            item {
+                Spacer(Modifier.height(16.dp))
+                FilterBanner(onClick = { viewModel.openFilterScreen() })
+                Spacer(Modifier.height(16.dp))
+            }
 
-        item {
-            val lang = uiState.myPrimaryLanguage?.let { languageKoLabel(it) } ?: "내 언어"
-            SectionHeader(
-                title    = "${lang}를 배우고 싶어해요",
-                subtitle = "편하게 대화 나눠주실래요?",
-                onMore   = {
-                    moreListTitle = "${lang}를 배우고 싶어하는 친구"
-                    moreListUsers = uiState.learningLangUsers
-                },
-            )
-        }
-        items(uiState.learningLangUsers.take(3)) { user ->
-            UserListItem(
-                user    = user,
-                onClick = { onOpenProfile(user) },
-            )
+            item {
+                val lang = uiState.myPrimaryLanguage?.let { languageKoLabel(it) } ?: "내 언어"
+                SectionHeader(
+                    title    = "${lang}를 배우고 싶어해요",
+                    subtitle = "편하게 대화 나눠주실래요?",
+                    onMore   = { moreSection = ExploreMoreSection.LEARNING_LANG },
+                )
+            }
+            items(uiState.learningLangUsers.take(3)) { user ->
+                UserListItem(
+                    user    = user,
+                    onClick = { onOpenProfile(user) },
+                )
+            }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun UserMoreListScreen(
-    title   : String,
-    users   : List<DiscoverUser>,
-    onBack  : () -> Unit,
-    onClick : (DiscoverUser) -> Unit,
+    section   : ExploreMoreSection,
+    uiState   : ExploreUiState,
+    viewModel : ExploreViewModel,
+    onBack    : () -> Unit,
+    onClick   : (DiscoverUser) -> Unit,
 ) {
+    val title = when (section) {
+        ExploreMoreSection.TAG_MATCH     ->
+            "나와 같은 '${uiState.myFirstTag?.displayName ?: "관심사"}' 관심사 친구"
+        ExploreMoreSection.LEARNING_LANG ->
+            "${uiState.myPrimaryLanguage?.let { languageKoLabel(it) } ?: "내 언어"}를 배우고 싶어하는 친구"
+    }
+    val users        = if (section == ExploreMoreSection.TAG_MATCH) uiState.tagMatchUsers else uiState.learningLangUsers
+    val isRefreshing = if (section == ExploreMoreSection.TAG_MATCH) uiState.isTagMatchRefreshing else uiState.isLearningLangRefreshing
+    val hasNext      = if (section == ExploreMoreSection.TAG_MATCH) uiState.tagMatchHasNext else uiState.learningLangHasNext
+    val nextCursor   = if (section == ExploreMoreSection.TAG_MATCH) uiState.tagMatchNextCursor else uiState.learningLangNextCursor
+    val onRefresh: () -> Unit = if (section == ExploreMoreSection.TAG_MATCH) viewModel::refreshTagMatch else viewModel::refreshLearningLang
+    val onLoadMore: () -> Unit = if (section == ExploreMoreSection.TAG_MATCH) viewModel::loadMoreTagMatch else viewModel::loadMoreLearningLang
+
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Box(
             modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
@@ -246,12 +259,26 @@ private fun UserMoreListScreen(
             )
         }
         HorizontalDivider(color = C.Border, thickness = 0.5.dp)
-        LazyColumn(
-            modifier       = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 24.dp),
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh    = onRefresh,
+            modifier     = Modifier.fillMaxSize(),
         ) {
-            items(users) { user ->
-                UserListItem(user = user, onClick = { onClick(user) })
+            LazyColumn(
+                modifier       = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 24.dp),
+            ) {
+                items(users) { user ->
+                    UserListItem(user = user, onClick = { onClick(user) })
+                }
+                if (hasNext) {
+                    item {
+                        LaunchedEffect(nextCursor) { onLoadMore() }
+                        Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                            LoadingIndicator(modifier = Modifier.size(24.dp))
+                        }
+                    }
+                }
             }
         }
     }

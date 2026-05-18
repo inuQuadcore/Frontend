@@ -39,7 +39,15 @@ data class ExploreUiState(
     val cardSet            : List<DiscoverUser> = emptyList(),
     val currentCardIndex   : Int               = 0,
     val tagMatchUsers      : List<DiscoverUser> = emptyList(),
-    val learningLangUsers  : List<DiscoverUser> = emptyList(),
+    val tagMatchHasNext    : Boolean            = false,
+    val tagMatchNextCursor : Long?              = null,
+    val isTagMatchRefreshing  : Boolean         = false,
+    val isTagMatchLoadingMore : Boolean         = false,
+    val learningLangUsers     : List<DiscoverUser> = emptyList(),
+    val learningLangHasNext   : Boolean         = false,
+    val learningLangNextCursor: Long?           = null,
+    val isLearningLangRefreshing  : Boolean     = false,
+    val isLearningLangLoadingMore : Boolean     = false,
     val myFirstTag         : UserTag?          = null,   // 내 첫 번째 태그 — 관심사 섹션 헤더 + /filter?tags=
     val myPrimaryLanguage  : String?           = null,   // 내 주 언어(isPrimary) — 언어 섹션 헤더 + /filter?languages=
     val isRefreshing       : Boolean           = false,
@@ -111,9 +119,10 @@ class ExploreViewModel @Inject constructor(
     }
 
     /**
-     * 내 전체 태그 + 주 언어(isPrimary) 로딩 후 두 추천 섹션 채움.
-     * - tagMatchUsers: /filter?tags=<내 전체 태그> — 하나라도 겹치면 노출
+     * 내 첫 번째 태그 + 주 언어(isPrimary) 로딩 후 두 추천 섹션 첫 페이지 받음.
+     * - tagMatchUsers: /filter?tags=<내 첫 태그>
      * - learningLangUsers: /filter?languages=<내 주 언어>
+     * 더보기 화면 진입 후 스크롤 끝 도달 시 loadMoreTagMatch/LearningLang으로 다음 페이지.
      */
     private fun loadMyContext() {
         viewModelScope.launch {
@@ -122,34 +131,87 @@ class ExploreViewModel @Inject constructor(
             val langsDeferred = async { userRepository.getUserLanguages(userId) }
 
             val allTagDtos  = (tagsDeferred.await() as? ApiResult.Success)?.data ?: emptyList()
-            val firstTagUi  = allTagDtos.firstOrNull()?.toUi()
+            val firstTagDto = allTagDtos.firstOrNull()
+            val firstTagUi  = firstTagDto?.toUi()
             val primaryLang = (langsDeferred.await() as? ApiResult.Success)?.data?.languages
                 ?.firstOrNull { it.isPrimary }?.language
 
             _uiState.update { it.copy(myFirstTag = firstTagUi, myPrimaryLanguage = primaryLang) }
 
-            if (allTagDtos.isNotEmpty()) {
-                loadTagMatchUsers(allTagDtos.map { it.tag })
+            firstTagDto?.let  { fetchTagMatchPage(it.tag, lastUserId = null, isFirstPage = true) }
+            primaryLang?.let  { fetchLearningLangPage(it,  lastUserId = null, isFirstPage = true) }
+        }
+    }
+
+    /** 관심사 추천 섹션 새로고침 — 더보기 화면 PullToRefresh. 첫 페이지부터 다시. */
+    fun refreshTagMatch() {
+        val tag = _uiState.value.myFirstTag?.tag ?: return
+        _uiState.update { it.copy(isTagMatchRefreshing = true) }
+        viewModelScope.launch { fetchTagMatchPage(tag, lastUserId = null, isFirstPage = true) }
+    }
+
+    /** 더보기 화면 스크롤 끝 도달 시 다음 페이지. */
+    fun loadMoreTagMatch() {
+        val state = _uiState.value
+        if (state.isTagMatchLoadingMore || !state.tagMatchHasNext) return
+        val cursor = state.tagMatchNextCursor ?: return
+        val tag    = state.myFirstTag?.tag ?: return
+        _uiState.update { it.copy(isTagMatchLoadingMore = true) }
+        viewModelScope.launch { fetchTagMatchPage(tag, lastUserId = cursor, isFirstPage = false) }
+    }
+
+    private suspend fun fetchTagMatchPage(tag: String, lastUserId: Long?, isFirstPage: Boolean) {
+        val res = discoverRepository.discoverFilter(tags = listOf(tag), lastUserId = lastUserId)
+        when (res) {
+            is ApiResult.Success -> {
+                val newUsers = res.data.users.map { it.toUi() }.applyPresence(presenceRepository.onlineIds.value)
+                _uiState.update { s ->
+                    s.copy(
+                        tagMatchUsers         = if (isFirstPage) newUsers else s.tagMatchUsers + newUsers,
+                        tagMatchHasNext       = res.data.hasNext,
+                        tagMatchNextCursor    = res.data.nextCursor,
+                        isTagMatchRefreshing  = false,
+                        isTagMatchLoadingMore = false,
+                    )
+                }
             }
-            primaryLang?.let { lang -> loadLearningLangUsers(lang) }
+            is ApiResult.Error, is ApiResult.NetworkError ->
+                _uiState.update { it.copy(isTagMatchRefreshing = false, isTagMatchLoadingMore = false) }
         }
     }
 
-    private suspend fun loadTagMatchUsers(tags: List<String>) {
-        val res = discoverRepository.discoverFilter(tags = tags)
-        if (res is ApiResult.Success) {
-            val users = res.data.users.map { it.toUi() }
-                .applyPresence(presenceRepository.onlineIds.value)
-            _uiState.update { it.copy(tagMatchUsers = users) }
-        }
+    fun refreshLearningLang() {
+        val lang = _uiState.value.myPrimaryLanguage ?: return
+        _uiState.update { it.copy(isLearningLangRefreshing = true) }
+        viewModelScope.launch { fetchLearningLangPage(lang, lastUserId = null, isFirstPage = true) }
     }
 
-    private suspend fun loadLearningLangUsers(language: String) {
-        val res = discoverRepository.discoverFilter(languages = listOf(language))
-        if (res is ApiResult.Success) {
-            val users = res.data.users.map { it.toUi() }
-                .applyPresence(presenceRepository.onlineIds.value)
-            _uiState.update { it.copy(learningLangUsers = users) }
+    fun loadMoreLearningLang() {
+        val state = _uiState.value
+        if (state.isLearningLangLoadingMore || !state.learningLangHasNext) return
+        val cursor = state.learningLangNextCursor ?: return
+        val lang   = state.myPrimaryLanguage ?: return
+        _uiState.update { it.copy(isLearningLangLoadingMore = true) }
+        viewModelScope.launch { fetchLearningLangPage(lang, lastUserId = cursor, isFirstPage = false) }
+    }
+
+    private suspend fun fetchLearningLangPage(lang: String, lastUserId: Long?, isFirstPage: Boolean) {
+        val res = discoverRepository.discoverFilter(languages = listOf(lang), lastUserId = lastUserId)
+        when (res) {
+            is ApiResult.Success -> {
+                val newUsers = res.data.users.map { it.toUi() }.applyPresence(presenceRepository.onlineIds.value)
+                _uiState.update { s ->
+                    s.copy(
+                        learningLangUsers         = if (isFirstPage) newUsers else s.learningLangUsers + newUsers,
+                        learningLangHasNext       = res.data.hasNext,
+                        learningLangNextCursor    = res.data.nextCursor,
+                        isLearningLangRefreshing  = false,
+                        isLearningLangLoadingMore = false,
+                    )
+                }
+            }
+            is ApiResult.Error, is ApiResult.NetworkError ->
+                _uiState.update { it.copy(isLearningLangRefreshing = false, isLearningLangLoadingMore = false) }
         }
     }
 
