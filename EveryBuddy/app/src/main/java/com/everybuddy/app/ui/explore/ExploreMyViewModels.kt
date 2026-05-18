@@ -39,11 +39,9 @@ data class ExploreUiState(
     val cardSet            : List<DiscoverUser> = emptyList(),
     val currentCardIndex   : Int               = 0,
     val tagMatchUsers      : List<DiscoverUser> = emptyList(),
-    val tagMatchLabel      : String            = "관심사",
     val learningLangUsers  : List<DiscoverUser> = emptyList(),
     val myFirstTag         : UserTag?          = null,   // 내 첫 번째 태그 — 관심사 섹션 헤더 + /filter?tags=
-    val myPrimaryLanguage  : String?           = null,   // 내 주 언어(level=5) — 언어 섹션 헤더 + /filter?languages=
-    val nativeLangLabel    : String            = "한국어",
+    val myPrimaryLanguage  : String?           = null,   // 내 주 언어(isPrimary) — 언어 섹션 헤더 + /filter?languages=
     val isRefreshing       : Boolean           = false,
     val filterSettings     : FilterSettings    = FilterSettings(),
     val filterResults      : List<DiscoverUser> = emptyList(),
@@ -107,48 +105,6 @@ class ExploreViewModel @Inject constructor(
     init {
         refresh()
         observePresence()
-        loadMyContext()
-    }
-
-    /**
-     * 내 첫 번째 태그 + 주 언어(isPrimary) 로딩 후 두 추천 섹션 채움.
-     * - tagMatchUsers: /filter?tags=<내 첫 태그>
-     * - learningLangUsers: /filter?languages=<내 주 언어>
-     */
-    private fun loadMyContext() {
-        viewModelScope.launch {
-            val userId = tokenManager.userId.first() ?: return@launch
-            val tagsRes  = userRepository.getUserTags(userId)
-            val langsRes = userRepository.getUserLanguages(userId)
-
-            val firstTagDto = (tagsRes as? ApiResult.Success)?.data?.firstOrNull()
-            val firstTagUi  = firstTagDto?.toUi()
-            val primaryLang = (langsRes as? ApiResult.Success)?.data?.languages
-                ?.firstOrNull { it.isPrimary }?.language
-
-            _uiState.update { it.copy(myFirstTag = firstTagUi, myPrimaryLanguage = primaryLang) }
-
-            firstTagUi?.let { tag -> loadTagMatchUsers(tag.tag) }
-            primaryLang?.let { lang -> loadLearningLangUsers(lang) }
-        }
-    }
-
-    private suspend fun loadTagMatchUsers(tag: String) {
-        val res = discoverRepository.discoverFilter(tags = listOf(tag))
-        if (res is ApiResult.Success) {
-            val users = res.data.users.map { it.toUi() }
-                .applyPresence(presenceRepository.onlineIds.value)
-            _uiState.update { it.copy(tagMatchUsers = users) }
-        }
-    }
-
-    private suspend fun loadLearningLangUsers(language: String) {
-        val res = discoverRepository.discoverFilter(languages = listOf(language))
-        if (res is ApiResult.Success) {
-            val users = res.data.users.map { it.toUi() }
-                .applyPresence(presenceRepository.onlineIds.value)
-            _uiState.update { it.copy(learningLangUsers = users) }
-        }
     }
 
     /** RTDB presence/ 변경 시 모든 user list의 isOnline 일괄 갱신. */
@@ -199,9 +155,11 @@ class ExploreViewModel @Inject constructor(
             val langsDeferred  = if (userId != null) async { userRepository.getUserLanguages(userId) } else null
             val tagsDeferred   = if (userId != null) async { userRepository.getUserTags(userId) } else null
 
+            val onlineIds = presenceRepository.onlineIds.value
+
             when (val res = randomDeferred.await()) {
                 is ApiResult.Success -> _uiState.update { it.copy(
-                    cardSet          = res.data.users.map { it.toUi() },
+                    cardSet          = res.data.users.map { it.toUi() }.applyPresence(onlineIds),
                     currentCardIndex = 0,
                     isRefreshing     = false,
                 ) }
@@ -212,48 +170,35 @@ class ExploreViewModel @Inject constructor(
             val userLangs = (langsDeferred?.await() as? ApiResult.Success)?.data?.languages ?: emptyList()
             val userTags  = (tagsDeferred?.await() as? ApiResult.Success)?.data ?: emptyList()
 
-            val nativeLang = userLangs.find { it.level == 5 }?.language
-            val firstTag   = userTags.firstOrNull()?.tag
+            val primaryLang = userLangs.firstOrNull { it.isPrimary }?.language
+            val firstTagDto = userTags.firstOrNull()
+            val firstTagUi  = firstTagDto?.toUi()
 
             if (userLangs.isNotEmpty() || userTags.isNotEmpty()) {
                 ExploreDemo.myProfile = ExploreDemo.myProfile.copy(
                     learningLanguages = userLangs.map { UserLanguage(it.language, it.level) },
-                    tags = if (userTags.isNotEmpty()) userTags.map { dto ->
-                        val sample = sampleTags.firstOrNull { s -> s.apiValue == dto.tag }
-                        UserTag(tag = dto.tag, category = dto.category, emoji = sample?.emoji ?: "", displayName = sample?.label ?: dto.tag)
-                    } else ExploreDemo.myProfile.tags,
+                    tags = if (userTags.isNotEmpty()) userTags.map { it.toUi() } else ExploreDemo.myProfile.tags,
                 )
             }
 
-            val tagLabel  = ExploreDemo.myProfile.tags.firstOrNull()?.displayName ?: "관심사"
-            val langLabel = nativeLang?.let { langDisplayName(it) } ?: "한국어"
-            _uiState.update { it.copy(tagMatchLabel = tagLabel, nativeLangLabel = langLabel) }
+            _uiState.update { it.copy(myFirstTag = firstTagUi, myPrimaryLanguage = primaryLang) }
 
-            if (firstTag != null) {
-                when (val res = discoverRepository.discoverFilter(tags = listOf(firstTag), size = 10)) {
-                    is ApiResult.Success -> _uiState.update { it.copy(tagMatchUsers = res.data.users.map { it.toUi() }) }
-                    else -> {}
+            val tagDeferred = firstTagDto?.let { async { discoverRepository.discoverFilter(tags = listOf(it.tag), size = 10) } }
+            val langDeferred = primaryLang?.let { async { discoverRepository.discoverFilter(languages = listOf(it), size = 10) } }
+
+            tagDeferred?.await()?.let { res ->
+                if (res is ApiResult.Success) {
+                    val users = res.data.users.map { it.toUi() }.applyPresence(onlineIds)
+                    _uiState.update { it.copy(tagMatchUsers = users) }
                 }
             }
-
-            if (nativeLang != null) {
-                when (val res = discoverRepository.discoverFilter(languages = listOf(nativeLang), size = 10)) {
-                    is ApiResult.Success -> _uiState.update { it.copy(learningLangUsers = res.data.users.map { it.toUi() }) }
-                    else -> {}
+            langDeferred?.await()?.let { res ->
+                if (res is ApiResult.Success) {
+                    val users = res.data.users.map { it.toUi() }.applyPresence(onlineIds)
+                    _uiState.update { it.copy(learningLangUsers = users) }
                 }
             }
         }
-    }
-
-    private fun langDisplayName(code: String): String = when (code.uppercase()) {
-        "ENGLISH"  -> "영어"
-        "JAPANESE" -> "일본어"
-        "KOREAN"   -> "한국어"
-        "CHINESE"  -> "중국어"
-        "FRENCH"   -> "프랑스어"
-        "CZECH"    -> "체코어"
-        "SPANISH"  -> "스페인어"
-        else       -> code
     }
 
     // 필터 화면 열기/닫기
