@@ -107,6 +107,50 @@ class ExploreViewModel @Inject constructor(
         restoreFilter()
         refresh()
         observePresence()
+        loadMyContext()
+    }
+
+    /**
+     * 내 전체 태그 + 주 언어(isPrimary) 로딩 후 두 추천 섹션 채움.
+     * - tagMatchUsers: /filter?tags=<내 전체 태그> — 하나라도 겹치면 노출
+     * - learningLangUsers: /filter?languages=<내 주 언어>
+     */
+    private fun loadMyContext() {
+        viewModelScope.launch {
+            val userId = tokenManager.userId.first() ?: return@launch
+            val tagsDeferred = async { userRepository.getUserTags(userId) }
+            val langsDeferred = async { userRepository.getUserLanguages(userId) }
+
+            val allTagDtos  = (tagsDeferred.await() as? ApiResult.Success)?.data ?: emptyList()
+            val firstTagUi  = allTagDtos.firstOrNull()?.toUi()
+            val primaryLang = (langsDeferred.await() as? ApiResult.Success)?.data?.languages
+                ?.firstOrNull { it.isPrimary }?.language
+
+            _uiState.update { it.copy(myFirstTag = firstTagUi, myPrimaryLanguage = primaryLang) }
+
+            if (allTagDtos.isNotEmpty()) {
+                loadTagMatchUsers(allTagDtos.map { it.tag })
+            }
+            primaryLang?.let { lang -> loadLearningLangUsers(lang) }
+        }
+    }
+
+    private suspend fun loadTagMatchUsers(tags: List<String>) {
+        val res = discoverRepository.discoverFilter(tags = tags)
+        if (res is ApiResult.Success) {
+            val users = res.data.users.map { it.toUi() }
+                .applyPresence(presenceRepository.onlineIds.value)
+            _uiState.update { it.copy(tagMatchUsers = users) }
+        }
+    }
+
+    private suspend fun loadLearningLangUsers(language: String) {
+        val res = discoverRepository.discoverFilter(languages = listOf(language))
+        if (res is ApiResult.Success) {
+            val users = res.data.users.map { it.toUi() }
+                .applyPresence(presenceRepository.onlineIds.value)
+            _uiState.update { it.copy(learningLangUsers = users) }
+        }
     }
 
     /** 영속 저장된 필터 복원. isApplied=true면 결과 list까지 자동 재조회. */
