@@ -380,6 +380,6 @@ class ChatViewModel @Inject constructor(
                 }
                 matchQuery && matchFilter
             }
-            .sortedWith(compareByDescending<ChatRoomUi> { it.isPinned })
+            .sortedWith(compareByDescending<ChatRoomUi> { it.isPinned }.thenByDescending { it.lastMessageTime })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }

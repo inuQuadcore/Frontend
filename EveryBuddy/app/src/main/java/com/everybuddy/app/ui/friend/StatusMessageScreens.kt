@@ -174,15 +174,20 @@ fun MyStatusCard(viewModel: StatusMessageViewModel) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.Top,
             ) {
-                if (myProfile != null) {
-                    AsyncImage(
-                        model              = myProfile,
-                        contentDescription = "내 프로필",
-                        contentScale       = ContentScale.Crop,
-                        modifier           = Modifier.size(44.dp).clip(CircleShape).background(Color(0xFFD0D0D0)),
-                    )
-                } else {
-                    Box(modifier = Modifier.size(44.dp).clip(CircleShape).background(Color(0xFFD0D0D0)))
+                Box(
+                    modifier         = Modifier.size(44.dp).clip(CircleShape).background(Color(0xFFD0D0D0)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (!myProfile.isNullOrBlank()) {
+                        AsyncImage(
+                            model              = myProfile,
+                            contentDescription = "내 프로필",
+                            contentScale       = ContentScale.Crop,
+                            modifier           = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        Icon(painterResource(R.drawable.ic_nav_my), null, Modifier.size(24.dp), tint = Color(0xFF555555))
+                    }
                 }
                 if (myStatus != null) {
                     Icon(
@@ -351,17 +356,19 @@ fun FriendStatusDetailPopup(
                     horizontalArrangement  = Arrangement.spacedBy(12.dp),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFD0D0D0)),
+                        modifier         = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFD0D0D0)),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        AsyncImage(
-                            model              = sm.profileImageUrl,
-                            contentDescription = sm.userName,
-                            contentScale       = ContentScale.Crop,
-                            modifier           = Modifier.fillMaxSize(),
-                        )
+                        if (!sm.profileImageUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model              = sm.profileImageUrl,
+                                contentDescription = sm.userName,
+                                contentScale       = ContentScale.Crop,
+                                modifier           = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Icon(painterResource(R.drawable.ic_nav_my), null, Modifier.size(26.dp), tint = Color(0xFF555555))
+                        }
                     }
                     Text(
                         sm.userName,
@@ -371,12 +378,27 @@ fun FriendStatusDetailPopup(
 
                 Spacer(Modifier.height(14.dp))
 
+                val translatedContent = state.translatedStatuses[sm.statusMessageId]
+                val isTranslating     = sm.statusMessageId in state.translatingStatusIds
                 Text(
-                    text  = sm.content,
+                    text  = translatedContent ?: sm.content,
                     style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 22.sp),
                 )
+                Spacer(Modifier.height(6.dp))
+                if (isTranslating) {
+                    Text("번역 중...", style = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = C.TextSec))
+                } else {
+                    Text(
+                        text     = if (translatedContent != null) "원문보기" else "번역하기",
+                        style    = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = C.Accent),
+                        modifier = Modifier.clickable {
+                            if (translatedContent != null) viewModel.clearStatusTranslation(sm.statusMessageId)
+                            else viewModel.translateStatus(sm.statusMessageId, sm.content)
+                        },
+                    )
+                }
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(10.dp))
 
                 Row(
                     modifier              = Modifier.fillMaxWidth(),

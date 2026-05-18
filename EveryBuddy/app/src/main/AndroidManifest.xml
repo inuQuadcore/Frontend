@@ -26,7 +26,8 @@
             android:name="com.everybuddy.app.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.EveryBuddy">
+            android:theme="@style/Theme.EveryBuddy"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

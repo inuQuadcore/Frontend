@@ -56,13 +56,17 @@ fun ExploreScreen(
     // 프로필 화면 분기
     if (uiState.isProfileOpen && uiState.selectedUser != null) {
         UserProfileScreen(
-            user           = uiState.selectedUser!!,
-            detail         = uiState.selectedUserDetail,
-            isFriend       = uiState.selectedUserDetail?.isFriend ?: false,
-            onBack         = viewModel::closeProfile,
-            onChat         = { onStartChat(it) },
-            onAddFriend    = { viewModel.addFriend(it.userId) },
-            onRemoveFriend = { viewModel.removeFriend(it.userId) },
+            user                 = uiState.selectedUser!!,
+            detail               = uiState.selectedUserDetail,
+            isFriend             = uiState.selectedUserDetail?.isFriend ?: false,
+            translatedBio        = uiState.translatedBio,
+            isBioTranslating     = uiState.isBioTranslating,
+            onTranslateBio       = { viewModel.translateBio(uiState.selectedUser!!.bio) },
+            onClearBioTranslation= viewModel::clearBioTranslation,
+            onBack               = viewModel::closeProfile,
+            onChat               = { onStartChat(it) },
+            onAddFriend          = { viewModel.addFriend(it.userId) },
+            onRemoveFriend       = { viewModel.removeFriend(it.userId) },
         )
         return
     }

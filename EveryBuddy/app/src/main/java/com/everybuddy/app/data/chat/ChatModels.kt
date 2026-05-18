@@ -149,4 +149,7 @@ data class ChatRoomUiState(
 
     // 이미지 풀스크린 뷰어 — localFilePath 또는 fileUrl. null이면 닫힘.
     val fullscreenImage           : String?              = null,
+
+    // 채팅 내 메시지 답장 — 롱프레스 "답장하기" 선택 시 설정. null이면 답장 모드 아님.
+    val replyToMessage            : ChatMessage?         = null,
 )

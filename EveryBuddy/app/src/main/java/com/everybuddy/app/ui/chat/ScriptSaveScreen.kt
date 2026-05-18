@@ -141,7 +141,7 @@ fun ScriptSaveSheet(
     totalCount               : Int = 0,
     isLastStep               : Boolean = true,
 ) {
-    var editedText     by remember(message.id) { mutableStateOf(message.text) }
+    var editedText     by remember(message.id) { mutableStateOf(if (message.type == MessageType.VOICE) message.sourceText else message.text) }
     var memo1          by remember(message.id) { mutableStateOf(message.translatedText) }
     var memo           by remember(message.id) { mutableStateOf("") }
     var selectedFolder by remember(message.id) { mutableStateOf<String?>(null) }
@@ -351,7 +351,7 @@ fun ScriptFolderThumbnail(folder: ScriptFolder, isSelected: Boolean, onClick: ()
                 modifier         = Modifier.align(Alignment.TopEnd).padding(4.dp).size(20.dp).clip(CircleShape).background(SsAccent),
                 contentAlignment = Alignment.Center,
             ) {
-                Image(painterResource(R.drawable.ic_check), null, Modifier.size(12.dp))
+                Icon(painterResource(R.drawable.ic_check), null, Modifier.size(12.dp), tint = Color.White)
             }
         }
     }
