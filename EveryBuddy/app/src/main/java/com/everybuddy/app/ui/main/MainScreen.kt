@@ -320,6 +320,7 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                             ScriptFolderScreen(
                                 folder      = selectedScriptFolder!!,
                                 allItems    = scriptUiState.items,
+                                viewModel   = scriptViewModel,
                                 onBack      = { selectedScriptFolder = null },
                                 onItemClick = { item -> selectedScriptItem = item },
                             )

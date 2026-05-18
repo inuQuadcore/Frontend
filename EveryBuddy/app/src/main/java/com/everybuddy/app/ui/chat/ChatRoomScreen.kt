@@ -43,6 +43,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -200,6 +202,8 @@ fun ChatRoomScreen(
         onEditMessage            = viewModel::onEditMessage,
         onInviteMembers          = viewModel::inviteMembers,
         onRetryMessage           = viewModel::retryMessage,
+        onStartReply             = viewModel::startReply,
+        onCancelReply            = viewModel::cancelReply,
         isStarred                = isStarred,
         onToggleStar             = onToggleStar,
     )
@@ -244,6 +248,8 @@ fun ChatRoomContent(
     onEditMessage             : (String, String) -> Unit = { _, _ -> },
     onInviteMembers           : (List<Long>) -> Unit   = {},
     onRetryMessage            : (String) -> Unit       = {},
+    onStartReply              : (ChatMessage) -> Unit  = {},
+    onCancelReply             : () -> Unit             = {},
     isStarred                 : Boolean                = false,
     onToggleStar              : () -> Unit             = {},
 ) {
@@ -255,6 +261,7 @@ fun ChatRoomContent(
     var editingMessageId      by remember { mutableStateOf<String?>(null) }
     var editingText           by remember { mutableStateOf("") }
     var isMenuOpen            by remember { mutableStateOf(false) }
+    val inputFocusRequester   = remember { FocusRequester() }
     var isSearchMode          by remember { mutableStateOf(false) }
     var searchQuery           by remember { mutableStateOf("") }
     var currentMatchIdx       by remember { mutableIntStateOf(0) }
@@ -313,6 +320,12 @@ fun ChatRoomContent(
             scope.launch {
                 listState.animateScrollToItem(state.messages.size - 1)
             }
+        }
+    }
+
+    LaunchedEffect(state.replyToMessage) {
+        if (state.replyToMessage != null) {
+            try { inputFocusRequester.requestFocus() } catch (_: Exception) {}
         }
     }
 
@@ -419,14 +432,22 @@ fun ChatRoomContent(
                 )
             }
 
+            state.replyToMessage?.let { reply ->
+                ReplyPreviewBar(
+                    previewText = reply.text.ifBlank { "[음성 메시지]" },
+                    onCancel    = onCancelReply,
+                )
+            }
+
             if (!state.isRecording) {
                 InputBar(
-                    text             = state.inputText,
-                    onTextChange     = onInputChange,
-                    onSend           = onSendText,
-                    onMicClick       = onStartRecording,
-                    onPlusClick      = onToggleMediaPanel,
-                    isMediaPanelOpen = state.isMediaPanelOpen,
+                    text              = state.inputText,
+                    onTextChange      = onInputChange,
+                    onSend            = onSendText,
+                    onMicClick        = onStartRecording,
+                    onPlusClick       = onToggleMediaPanel,
+                    isMediaPanelOpen  = state.isMediaPanelOpen,
+                    focusRequester    = inputFocusRequester,
                 )
             }
         }
@@ -471,7 +492,7 @@ fun ChatRoomContent(
                 onDismiss    = onDismissContextMenu,
                 onCopy       = { /* TODO: 클립보드 복사 */ },
                 onSelectCopy = { /* TODO: 텍스트 선택 복사 UI */ },
-                onReply      = { /* TODO: 답장 기능 */ },
+                onReply      = { onStartReply(msg); onDismissContextMenu() },
                 onSaveScript = {
                     onDismissContextMenu()
                     onStartScriptSave(msg.id)
@@ -987,22 +1008,27 @@ fun MessageList(
     }
 }
 
-/** 메시지 옆 송신자 아바타. profileImageUrl 있으면 Coil로 로드, 없으면 회색 placeholder. */
+/** 메시지 옆 송신자 아바타. profileImageUrl 있으면 Coil로 로드, 없으면 ic_nav_my 기본 아바타. */
 @Composable
 private fun SenderAvatar(
     profileImageUrl    : String?,
     contentDescription : String,
     size               : Dp,
 ) {
-    if (profileImageUrl != null) {
-        AsyncImage(
-            model              = profileImageUrl,
-            contentDescription = contentDescription,
-            contentScale       = ContentScale.Crop,
-            modifier           = Modifier.size(size).clip(CircleShape),
-        )
-    } else {
-        Box(modifier = Modifier.size(size).clip(CircleShape).background(Color(0xFFCCCCCC)))
+    Box(
+        modifier         = Modifier.size(size).clip(CircleShape).background(Color(0xFFD0D0D0)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!profileImageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model              = profileImageUrl,
+                contentDescription = contentDescription,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
+            )
+        } else {
+            Icon(painterResource(R.drawable.ic_nav_my), null, Modifier.size(size * 0.55f), tint = Color(0xFF555555))
+        }
     }
 }
 
@@ -1275,37 +1301,10 @@ private fun StatusReplyCard(
     ) {
         Row(
             modifier              = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment     = Alignment.CenterVertically,
+            verticalAlignment     = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFD0D0D0)),
-            ) {
-                if (profileUrl != null) {
-                    AsyncImage(
-                        model              = profileUrl,
-                        contentDescription = name,
-                        contentScale       = ContentScale.Crop,
-                        modifier           = Modifier.fillMaxSize(),
-                    )
-                }
-            }
             Column(modifier = Modifier.weight(1f)) {
-                if (name.isNotEmpty()) {
-                    Text(
-                        text  = name,
-                        style = TextStyle(
-                            fontSize   = 12.sp,
-                            fontFamily = PretendardFamily,
-                            fontWeight = FontWeight(700),
-                            color      = Color(0xFF1B1B1B),
-                        ),
-                    )
-                    Spacer(Modifier.height(2.dp))
-                }
                 Text(
                     text     = truncated,
                     style    = TextStyle(
@@ -1337,86 +1336,6 @@ fun TranslateIconButton(onClick: () -> Unit) {
             modifier           = Modifier.size(18.dp),
             tint               = AccentBlue,
         )
-    }
-}
-
-// ImageMessageBubble — 이미지 메시지 말풍선 (나=오른쪽, 상대=왼쪽)
-@Composable
-fun ImageMessageBubble(
-    message               : ChatMessage,
-    isMe                  : Boolean,
-    senderName            : String  = "",
-    senderProfileImageUrl : String? = null,
-    onLongPress           : () -> Unit = {},
-) {
-    val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
-    val timeText = remember(message.timestamp) { message.timestamp.format(timeFormatter) }
-
-    Column(
-        modifier            = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp),
-        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
-    ) {
-        if (isMe) {
-            Row(
-                modifier              = Modifier.fillMaxWidth().padding(start = 46.dp),
-                verticalAlignment     = Alignment.Bottom,
-                horizontalArrangement = Arrangement.End,
-            ) {
-                Text(
-                    text     = timeText,
-                    style    = TextStyle(fontSize = 9.sp, color = TextSecondary, fontFamily = PretendardFamily),
-                    modifier = Modifier.padding(end = 4.dp),
-                )
-                AsyncImage(
-                    model              = message.voiceUrl,
-                    contentDescription = null,
-                    contentScale       = ContentScale.Crop,
-                    modifier           = Modifier
-                        .widthIn(max = 200.dp)
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .combinedClickable(onClick = {}, onLongClick = onLongPress),
-                )
-            }
-        } else {
-            Row(
-                modifier          = Modifier.fillMaxWidth().padding(end = 38.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                SenderAvatar(
-                    profileImageUrl    = senderProfileImageUrl,
-                    contentDescription = senderName,
-                    size               = 38.dp,
-                )
-                Spacer(Modifier.width(8.dp))
-                Column(horizontalAlignment = Alignment.Start) {
-                    Text(
-                        text     = senderName,
-                        style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
-                        modifier = Modifier.padding(bottom = 3.dp),
-                    )
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        AsyncImage(
-                            model              = message.voiceUrl,
-                            contentDescription = null,
-                            contentScale       = ContentScale.Crop,
-                            modifier           = Modifier
-                                .widthIn(max = 200.dp)
-                                .aspectRatio(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .combinedClickable(onClick = {}, onLongClick = onLongPress),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text  = timeText,
-                            style = TextStyle(fontSize = 9.sp, color = TextSecondary, fontFamily = PretendardFamily),
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -1491,7 +1410,7 @@ fun VoiceMessageBubble(
                 )
                 Spacer(Modifier.width(8.dp))
 
-                Column(horizontalAlignment = Alignment.Start) {
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                     Text(
                         text     = senderName,
                         style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
@@ -1500,7 +1419,7 @@ fun VoiceMessageBubble(
                     Row(verticalAlignment = Alignment.Bottom) {
                         Box(
                             modifier = Modifier
-                                .widthIn(min = 180.dp, max = 210.dp)
+                                .widthIn(min = 160.dp, max = 200.dp)
                                 .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
                                 .background(bubbleBg)
                                 .padding(horizontal = 12.dp, vertical = 10.dp)
@@ -1790,6 +1709,7 @@ fun InputBar(
     onMicClick       : () -> Unit,
     onPlusClick      : () -> Unit,
     isMediaPanelOpen : Boolean,
+    focusRequester   : FocusRequester? = null,
 ) {
     Row(
         modifier          = Modifier
@@ -1818,14 +1738,16 @@ fun InputBar(
         }
 
         // 텍스트 필드
+        val fieldModifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color(0xFFF2F2F7))
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
         BasicTextField(
             value         = text,
             onValueChange = onTextChange,
-            modifier      = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(22.dp))
-                .background(Color(0xFFF2F2F7))
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier      = fieldModifier,
             textStyle     = TextStyle(
                 fontSize   = 15.sp,
                 fontFamily = PretendardFamily,
@@ -2122,6 +2044,35 @@ fun ConversationSaveSheet(
             }
 
             Spacer(Modifier.height(4.dp))
+        }
+    }
+}
+
+@Composable
+private fun ReplyPreviewBar(previewText: String, onCancel: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF0F4FF))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(28.dp)
+                .background(AccentBlue),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text     = previewText,
+            style    = TextStyle(fontSize = 13.sp, fontFamily = PretendardFamily, color = TextPrimary),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onCancel, modifier = Modifier.size(24.dp)) {
+            Icon(painterResource(R.drawable.ic_cancel), "취소", Modifier.size(16.dp), tint = TextSecondary)
         }
     }
 }

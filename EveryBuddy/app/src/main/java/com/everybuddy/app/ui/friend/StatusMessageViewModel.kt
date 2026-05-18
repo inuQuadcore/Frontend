@@ -12,6 +12,7 @@ import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.MessageRepository
 import com.everybuddy.app.data.repository.StatusMessageRepository
+import com.everybuddy.app.data.repository.TranslateRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,16 +21,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 import javax.inject.Inject
 
 data class StatusUiState(
     val myStatus            : MyStatusMessageResponse?     = null,
-    val myProfileImageUrl   : String?                      = null,  // 본인 프로필 — UserSummaryCache lookup 결과
+    val myProfileImageUrl   : String?                      = null,
     val friendStatuses      : List<FriendStatusMessageDto>  = emptyList(),
     val isWriteScreenOpen   : Boolean                      = false,
     val isEditMode          : Boolean                      = false,
     val draftText           : String                       = "",
-    val expandedStatus      : FriendStatusMessageDto?    = null,
+    val expandedStatus      : FriendStatusMessageDto?      = null,
     val isMyStatusMenuOpen  : Boolean                      = false,
     val isDeleteConfirmOpen : Boolean                      = false,
     val isReplying          : Boolean                      = false,
@@ -40,6 +45,8 @@ data class StatusUiState(
     val toastMessage        : String?                      = null,
     val nextCursor          : Long?                        = null,
     val hasNext             : Boolean                      = false,
+    val translatedStatuses  : Map<Long, String>            = emptyMap(),
+    val translatingStatusIds: Set<Long>                    = emptySet(),
 )
 
 @HiltViewModel
@@ -49,6 +56,7 @@ class StatusMessageViewModel @Inject constructor(
     private val messageRepository  : MessageRepository,
     private val tokenManager       : TokenManager,
     private val userSummaryCache   : UserSummaryCache,
+    private val translateRepository: TranslateRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(StatusUiState())
@@ -89,7 +97,7 @@ class StatusMessageViewModel @Inject constructor(
             when (val r = statusRepo.getFriendStatusMessages(cursor)) {
                 is ApiResult.Success -> {
                     val data   = r.data
-                    val dtos   = data.statusMessages.map { it.toDto() }
+                    val dtos   = data.statusMessages.map { it.toDto().copy(timeAgo = it.updatedAt.toRelativeTime()) }
                     val merged = if (reset) dtos else _state.value.friendStatuses + dtos
                     _state.update { it.copy(friendStatuses = merged, nextCursor = data.nextCursor, hasNext = data.hasNext, isLoading = false) }
                 }
@@ -187,4 +195,39 @@ class StatusMessageViewModel @Inject constructor(
 
     fun consumeReplySent() { _state.update { it.copy(replySent = false) } }
     fun consumeToast()     { _state.update { it.copy(toastMessage = null) } }
+
+    fun translateStatus(statusMessageId: Long, content: String) {
+        if (statusMessageId in _state.value.translatingStatusIds) return
+        _state.update { it.copy(translatingStatusIds = it.translatingStatusIds + statusMessageId) }
+        viewModelScope.launch {
+            when (val r = translateRepository.translateText(content)) {
+                is ApiResult.Success ->
+                    _state.update { it.copy(
+                        translatedStatuses   = it.translatedStatuses + (statusMessageId to r.data.translatedText),
+                        translatingStatusIds = it.translatingStatusIds - statusMessageId,
+                    )}
+                else ->
+                    _state.update { it.copy(translatingStatusIds = it.translatingStatusIds - statusMessageId) }
+            }
+        }
+    }
+
+    fun clearStatusTranslation(statusMessageId: Long) {
+        _state.update { it.copy(translatedStatuses = it.translatedStatuses - statusMessageId) }
+    }
+}
+
+private fun String.toRelativeTime(): String {
+    val past = try {
+        LocalDateTime.parse(this).atZone(ZoneId.systemDefault()).toInstant()
+    } catch (_: Exception) { return this }
+    val diff    = Duration.between(past, Instant.now())
+    val minutes = diff.toMinutes()
+    val hours   = diff.toHours()
+    return when {
+        minutes < 1 -> "방금"
+        hours < 1   -> "${minutes}분 전"
+        hours < 24  -> "${hours}시간 전"
+        else        -> "${diff.toDays()}일 전"
+    }
 }

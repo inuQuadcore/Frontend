@@ -572,7 +572,7 @@ fun StepBasicInfo(
 
         Spacer(Modifier.weight(1f))
         OnboardingNextButton(enabled = canProceed, onClick = onNext)
-        Spacer(Modifier.height(45.dp))
+        Spacer(Modifier.navigationBarsPadding())
     }
 }
 
@@ -759,7 +759,7 @@ fun StepCountry(
             enabled = uiState.selectedCountry != null,
             onClick = onNext,
         )
-        Spacer(Modifier.height(45.dp))
+        Spacer(Modifier.navigationBarsPadding())
     }
 }
 
@@ -814,7 +814,7 @@ fun StepMyLanguage(
             enabled = uiState.selectedMyLang != null,
             onClick = onNext,
         )
-        Spacer(Modifier.height(45.dp))
+        Spacer(Modifier.navigationBarsPadding())
     }
 }
 
@@ -890,7 +890,7 @@ fun StepLearnLanguage(
             enabled = uiState.selectedLearnLangs.isNotEmpty(),
             onClick = { onStateChange(uiState.copy(showLevelSheet = true)) },
         )
-        Spacer(Modifier.height(45.dp))
+        Spacer(Modifier.navigationBarsPadding())
     }
 }
 
@@ -1306,7 +1306,7 @@ fun StepPermissions(onNext: () -> Unit) {
 
         Spacer(Modifier.weight(1f))
         OnboardingNextButton(text = "확인", onClick = onNext)
-        Spacer(Modifier.height(45.dp))
+        Spacer(Modifier.navigationBarsPadding())
     }
 }
 
@@ -1444,7 +1444,7 @@ fun StepIntro(
                 )
             }
         }
-        Spacer(Modifier.height(45.dp))
+        Spacer(Modifier.navigationBarsPadding())
     }
 }
 

@@ -136,6 +136,24 @@ class ScriptViewModel @Inject constructor() : ViewModel() {
         }
     }
 
+    fun updateFolder(folder: ScriptFolder) {
+        _uiState.update { state ->
+            state.copy(folders = state.folders.map { if (it.id == folder.id) folder else it })
+        }
+    }
+
+    fun deleteItems(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        _uiState.update { state ->
+            val removed = state.items.filter { it.id in ids }
+            val updatedFolders = state.folders.map { f ->
+                val removedCount = removed.count { it.folderId == f.id }
+                if (removedCount > 0) f.copy(count = (f.count - removedCount).coerceAtLeast(0)) else f
+            }
+            state.copy(items = state.items.filter { it.id !in ids }, folders = updatedFolders)
+        }
+    }
+
     fun consumeToast() {
         _uiState.update { it.copy(toastMessage = null) }
     }

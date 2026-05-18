@@ -214,6 +214,7 @@ private fun MyPageContent(
                 val menuItems = listOf(
                     "에브리버디 가이드" to "guide",
                     "공지사항"        to "notice",
+                    "차단한 친구"     to "blocked",
                     "설정"            to "settings",
                     "버전정보"        to "version",
                 )
@@ -891,6 +892,23 @@ private fun SubMenuScreen(key: String, viewModel: MyViewModel, onBack: () -> Uni
         "version"  -> VersionScreen(onBack = onBack)
         "guide"    -> GuideScreen(onBack = onBack)
         "notice"   -> NoticeScreen(onBack = onBack)
+        "blocked"  -> {
+            val uiState by viewModel.uiState.collectAsState()
+            LaunchedEffect(Unit) { viewModel.loadBlockedUsers() }
+            FriendManageScreen(
+                title        = "차단한 친구",
+                actionLabel  = "차단 해제",
+                dialogText   = "차단을 해제하시겠습니까?",
+                friends      = uiState.blockedFriends.map {
+                    FriendListItem(it.userId, it.name, it.nationality, it.languages)
+                },
+                isLoading    = uiState.isLoadingBlocked,
+                errorMessage = uiState.blockedError,
+                onRetry      = { viewModel.loadBlockedUsers() },
+                onAction     = { userId -> viewModel.unblockFriend(userId) },
+                onBack       = onBack,
+            )
+        }
         else       -> EmptySubScreen(title = key, onBack = onBack)
     }
 }

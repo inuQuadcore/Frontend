@@ -17,6 +17,7 @@ import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.MessageRepository
 import com.everybuddy.app.data.repository.TranslateRepository
 import com.everybuddy.app.data.repository.translateUserMessage
+import android.media.MediaMetadataRetriever
 import com.google.firebase.database.FirebaseDatabase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
@@ -68,6 +69,9 @@ class ChatRoomViewModel @Inject constructor(
     private var autoTranslateWatermark: Long = -1
     private var autoTranslateInitialized: Boolean = false
 
+    /** 방금 녹음 완료한 음성의 길이(초). 해당 메시지가 RTDB에서 도착하면 적용 후 0으로 리셋. */
+    private var pendingVoiceDurationSec: Int = 0
+
     init {
         viewModelScope.launch {
             tokenManager.userId.firstOrNull()?.let { uid ->
@@ -94,12 +98,16 @@ class ChatRoomViewModel @Inject constructor(
                 }
             }
         }
-        // 메시지에 등장하는 senderId 집합 변화 감지 → 누락된 UserSummary 병렬 fetch.
+        // 메시지 senderId + 참여자 ID 합집합 변화 감지 → 누락된 UserSummary 병렬 fetch.
         viewModelScope.launch {
             _uiState
-                .map { state -> state.messages.mapNotNull { it.senderId.toLongOrNull() }.toSet() }
+                .map { state ->
+                    val senderIds      = state.messages.mapNotNull { it.senderId.toLongOrNull() }.toSet()
+                    val participantIds = state.room.participants.map { it.id }.toSet()
+                    senderIds + participantIds
+                }
                 .distinctUntilChanged()
-                .collect { senderIds -> fetchMissingSummaries(senderIds) }
+                .collect { ids -> fetchMissingSummaries(ids) }
         }
         // 자동번역 ON 상태에서 새 메시지 도착 시 자동 번역 트리거 (텍스트 + 음성, 상대 메시지만)
         viewModelScope.launch {
@@ -172,7 +180,15 @@ class ChatRoomViewModel @Inject constructor(
         // RTDB가 limitToLast(50)로 캐시 유입을 제한하니 채팅방당 메시지 수 적음 — 전체 load.
         viewModelScope.launch {
             messageDao.observeRoomAll(chatRoomId).collect { entities ->
-                val messages = entities.map { it.toChatMessage() }
+                var messages = entities.map { it.toChatMessage() }
+                val myId = _uiState.value.myUserId
+                if (pendingVoiceDurationSec > 0 && myId != null) {
+                    val idx = messages.indexOfLast { it.type == MessageType.VOICE && it.senderId.toLongOrNull() == myId && it.voiceDurationSec == 0 }
+                    if (idx >= 0) {
+                        messages = messages.toMutableList().also { it[idx] = it[idx].copy(voiceDurationSec = pendingVoiceDurationSec) }
+                        pendingVoiceDurationSec = 0
+                    }
+                }
                 _uiState.update { it.copy(messages = messages) }
             }
         }
@@ -186,6 +202,29 @@ class ChatRoomViewModel @Inject constructor(
             viewingManager.enter(myUserId, chatRoomId)
             viewingChatRoomId = chatRoomId
             markChatRoomAsRead(chatRoomId)
+        }
+
+        loadParticipants(chatRoomId)
+    }
+
+    private fun loadParticipants(chatRoomId: Long) {
+        viewModelScope.launch {
+            val myUserId = tokenManager.userId.firstOrNull() ?: return@launch
+            when (val result = chatRoomRepository.getChatRooms()) {
+                is ApiResult.Success -> {
+                    val room = result.data.firstOrNull { it.chatRoomId == chatRoomId } ?: return@launch
+                    val participantUis = room.participants.map { p ->
+                        com.everybuddy.app.data.chat.ChatParticipantUi(
+                            id              = p.userId,
+                            profileImageUrl = p.profileImageUrl,
+                        )
+                    }
+                    _uiState.update { state ->
+                        state.copy(room = state.room.copy(participants = participantUis))
+                    }
+                }
+                else -> { /* silent fail */ }
+            }
         }
     }
 
@@ -251,18 +290,28 @@ class ChatRoomViewModel @Inject constructor(
         val text = _uiState.value.inputText.trim()
         if (text.isEmpty()) return
 
-        val chatRoomId = _uiState.value.room.id.toLongOrNull() ?: return
-        val myUserId   = _uiState.value.myUserId
+        val chatRoomId  = _uiState.value.room.id.toLongOrNull() ?: return
+        val myUserId    = _uiState.value.myUserId
+        val replyMsg    = _uiState.value.replyToMessage
+        val replyPreview = replyMsg?.text?.let { if (it.length > 50) it.take(50) + "…" else it }
 
-        _uiState.update { it.copy(inputText = "") }
+        _uiState.update { it.copy(inputText = "", replyToMessage = null) }
         viewModelScope.launch {
-            when (val result = messageRepository.sendTextMessage(chatRoomId, text)) {
+            when (val result = messageRepository.sendTextMessage(chatRoomId, text, statusPreview = replyPreview)) {
                 is ApiResult.Success -> { /* RTDB push로 본인 메시지 도착 */ }
                 is ApiResult.Error, is ApiResult.NetworkError -> {
                     insertFailedTextMessage(chatRoomId, myUserId, text)
                 }
             }
         }
+    }
+
+    fun startReply(msg: ChatMessage) {
+        _uiState.update { it.copy(replyToMessage = msg, contextMenuMessage = null) }
+    }
+
+    fun cancelReply() {
+        _uiState.update { it.copy(replyToMessage = null) }
     }
 
     /** 송신 실패 메시지를 Room에 FAILED status로 저장. 음수 tempId로 PK 충돌 회피. */
@@ -317,6 +366,14 @@ class ChatRoomViewModel @Inject constructor(
         _uiState.update { it.copy(isRecording = false, isRecordingPaused = false) }
 
         val chatRoomId = _uiState.value.room.id.toLongOrNull() ?: return
+
+        pendingVoiceDurationSec = try {
+            MediaMetadataRetriever().use { r ->
+                r.setDataSource(filePath)
+                val ms = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                (ms / 1000).toInt()
+            }
+        } catch (_: Exception) { 0 }
 
         viewModelScope.launch {
             // VoiceRecorder는 MPEG_4 컨테이너 + AAC 인코딩 (.m4a)

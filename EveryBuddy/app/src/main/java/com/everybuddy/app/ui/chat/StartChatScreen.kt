@@ -306,10 +306,19 @@ private fun FriendSelectRow(
             modifier         = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFDDDDDD)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text  = friend.name.take(1),
-                style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color(0xFF888888)),
-            )
+            if (friend.profileImageUrl != null) {
+                coil.compose.AsyncImage(
+                    model              = friend.profileImageUrl,
+                    contentDescription = friend.name,
+                    contentScale       = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier           = Modifier.fillMaxSize(),
+                )
+            } else {
+                Text(
+                    text  = friend.name.take(1),
+                    style = TextStyle(fontSize = 18.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = Color(0xFF888888)),
+                )
+            }
         }
         Text(
             text     = friend.name,

@@ -13,6 +13,7 @@ import com.everybuddy.app.data.repository.AuthRepository
 import com.everybuddy.app.data.repository.BlockRepository
 import com.everybuddy.app.data.repository.DiscoverRepository
 import com.everybuddy.app.data.repository.FriendRepository
+import com.everybuddy.app.data.repository.TranslateRepository
 import com.everybuddy.app.data.repository.UserRepository
 import com.everybuddy.app.ui.onboarding.sampleTags
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -62,6 +63,8 @@ data class ExploreUiState(
     val selectedUser       : DiscoverUser?     = null,
     val selectedUserDetail : UserDetail?       = null,
     val isProfileOpen      : Boolean           = false,
+    val translatedBio      : String?           = null,
+    val isBioTranslating   : Boolean           = false,
 )
 
 // API에 없는 필드: age, consecutiveDays는 기본값. isOnline은 RTDB에서 받음.
@@ -106,6 +109,7 @@ class ExploreViewModel @Inject constructor(
     private val presenceRepository : PresenceRepository,
     private val tokenManager       : TokenManager,
     private val filterPreferences  : ExploreFilterPreferences,
+    private val translateRepository : TranslateRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExploreUiState())
@@ -368,6 +372,8 @@ class ExploreViewModel @Inject constructor(
             selectedUser       = user,
             selectedUserDetail = null,
             isProfileOpen      = true,
+            translatedBio      = null,
+            isBioTranslating   = false,
         ) }
         viewModelScope.launch {
             val res = userRepository.getUserProfile(user.userId)
@@ -377,11 +383,28 @@ class ExploreViewModel @Inject constructor(
         }
     }
 
+    fun translateBio(text: String) {
+        if (_uiState.value.isBioTranslating) return
+        _uiState.update { it.copy(isBioTranslating = true) }
+        viewModelScope.launch {
+            when (val r = translateRepository.translateText(text)) {
+                is ApiResult.Success -> _uiState.update { it.copy(translatedBio = r.data.translatedText, isBioTranslating = false) }
+                else                 -> _uiState.update { it.copy(isBioTranslating = false) }
+            }
+        }
+    }
+
+    fun clearBioTranslation() {
+        _uiState.update { it.copy(translatedBio = null) }
+    }
+
     fun closeProfile() {
         _uiState.update { it.copy(
             selectedUser       = null,
             selectedUserDetail = null,
             isProfileOpen      = false,
+            translatedBio      = null,
+            isBioTranslating   = false,
         ) }
     }
 

@@ -30,15 +30,19 @@ private val C = AppColors
 
 @Composable
 fun UserProfileScreen(
-    user            : DiscoverUser,
-    detail          : UserDetail? = null,
-    isFriend        : Boolean = false,
-    myTags          : List<UserTag> = ExploreDemo.myProfile.tags,
-    onBack          : () -> Unit,
-    onChat          : (DiscoverUser) -> Unit = {},
-    onAddFriend     : (DiscoverUser) -> Unit = {},
-    onRemoveFriend  : (DiscoverUser) -> Unit = {},
-    onBlock         : (DiscoverUser) -> Unit = {},
+    user                 : DiscoverUser,
+    detail               : UserDetail? = null,
+    isFriend             : Boolean = false,
+    myTags               : List<UserTag> = ExploreDemo.myProfile.tags,
+    translatedBio        : String? = null,
+    isBioTranslating     : Boolean = false,
+    onTranslateBio       : () -> Unit = {},
+    onClearBioTranslation: () -> Unit = {},
+    onBack               : () -> Unit,
+    onChat               : (DiscoverUser) -> Unit = {},
+    onAddFriend          : (DiscoverUser) -> Unit = {},
+    onRemoveFriend       : (DiscoverUser) -> Unit = {},
+    onBlock              : (DiscoverUser) -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
 
@@ -97,13 +101,20 @@ fun UserProfileScreen(
             ) {
                 // 프로필 이미지 + 국기 뱃지
                 Box(modifier = Modifier.size(72.dp)) {
-                    Box(Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFD0D0D0))) {
-                        AsyncImage(
-                            model              = user.profileImageUrl,
-                            contentDescription = user.name,
-                            contentScale       = ContentScale.Crop,
-                            modifier           = Modifier.fillMaxSize(),
-                        )
+                    Box(
+                        modifier         = Modifier.size(72.dp).clip(CircleShape).background(Color(0xFFD0D0D0)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (!user.profileImageUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model              = user.profileImageUrl,
+                                contentDescription = user.name,
+                                contentScale       = ContentScale.Crop,
+                                modifier           = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Icon(painterResource(R.drawable.ic_nav_my), null, Modifier.size(40.dp), tint = Color(0xFF555555))
+                        }
                     }
                     Text(
                         user.countryFlag(), fontSize = 18.sp,
@@ -137,14 +148,14 @@ fun UserProfileScreen(
 
             // 자기소개
             Text(
-                user.bio,
+                translatedBio ?: user.bio,
                 style    = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = C.TextPri, lineHeight = 22.sp),
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
 
             Spacer(Modifier.height(10.dp))
 
-            // 국적 / 연속출석 / 원문보기 정보 행
+            // 국적 / 연속출석 / 번역버튼 정보 행
             Row(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -156,20 +167,24 @@ fun UserProfileScreen(
                 }
                 if (detail != null && detail.consecutiveDays > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        // ic_calendar.xml
                         Icon(painterResource(R.drawable.ic_calendar), "출석", Modifier.size(14.dp), tint = C.TextSec)
                         Text("연속 ${detail.consecutiveDays}일 출석", style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
                     }
                 }
-                // 원문보기
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.clickable { /* TODO: 원문 보기 */ },
-                ) {
-                    // ic_translate.xml
-                    Icon(painterResource(R.drawable.ic_translate), "원문보기", Modifier.size(14.dp), tint = C.TextSec)
-                    Text("원문보기", style = TextStyle(fontSize = 12.sp, color = C.TextSec, fontFamily = PretendardFamily))
+                if (user.bio.isNotBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.clickable(enabled = !isBioTranslating) {
+                            if (translatedBio != null) onClearBioTranslation() else onTranslateBio()
+                        },
+                    ) {
+                        Icon(painterResource(R.drawable.ic_translate), "번역", Modifier.size(14.dp), tint = C.Accent)
+                        Text(
+                            text  = if (isBioTranslating) "번역 중..." else if (translatedBio != null) "원문보기" else "번역하기",
+                            style = TextStyle(fontSize = 12.sp, color = C.Accent, fontFamily = PretendardFamily),
+                        )
+                    }
                 }
             }
 
