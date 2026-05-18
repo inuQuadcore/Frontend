@@ -95,11 +95,12 @@ private fun UserPublicProfileResponse.toUserDetail(): UserDetail = UserDetail(
 
 @HiltViewModel
 class ExploreViewModel @Inject constructor(
-    private val discoverRepository  : DiscoverRepository,
-    private val userRepository      : UserRepository,
-    private val friendRepository    : FriendRepository,
-    private val presenceRepository  : PresenceRepository,
-    private val tokenManager        : TokenManager,
+    private val discoverRepository : DiscoverRepository,
+    private val userRepository     : UserRepository,
+    private val friendRepository   : FriendRepository,
+    private val presenceRepository : PresenceRepository,
+    private val tokenManager       : TokenManager,
+    private val filterPreferences  : ExploreFilterPreferences,
     private val translateRepository : TranslateRepository,
 ) : ViewModel() {
 
@@ -107,6 +108,7 @@ class ExploreViewModel @Inject constructor(
     val uiState: StateFlow<ExploreUiState> = _uiState.asStateFlow()
 
     init {
+        restoreFilter()
         refresh()
         observePresence()
         loadMyContext()
@@ -152,6 +154,21 @@ class ExploreViewModel @Inject constructor(
             val users = res.data.users.map { it.toUi() }
                 .applyPresence(presenceRepository.onlineIds.value)
             _uiState.update { it.copy(learningLangUsers = users) }
+        }
+    }
+
+    /** 영속 저장된 필터 복원. isApplied=true면 결과 list까지 자동 재조회. */
+    private fun restoreFilter() {
+        val saved = filterPreferences.load() ?: return
+        val applied = filterPreferences.isApplied()
+        _uiState.update { it.copy(
+            filterSettings  = saved,
+            isFilterApplied = applied,
+            selectedTab     = if (applied) 1 else it.selectedTab,
+            isFilterLoading = applied,
+        ) }
+        if (applied) {
+            viewModelScope.launch { fetchFilterPage(saved, lastUserId = null, isFirstPage = true) }
         }
     }
 
@@ -265,6 +282,7 @@ class ExploreViewModel @Inject constructor(
             isFilterLoading     = true,
             selectedTab         = 1,
         ) }
+        filterPreferences.save(settings, isApplied = true)
         viewModelScope.launch {
             fetchFilterPage(settings, lastUserId = null, isFirstPage = true)
         }
@@ -322,6 +340,7 @@ class ExploreViewModel @Inject constructor(
             filterHasNext    = false,
             isFilterApplied  = false,
         ) }
+        filterPreferences.clear()
     }
 
     fun openProfile(user: DiscoverUser) {
