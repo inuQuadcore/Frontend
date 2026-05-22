@@ -1,16 +1,22 @@
 package com.everybuddy.app.ui.script
 
+import android.content.Context
+import android.media.MediaPlayer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.repository.TranslateRepository
 import com.everybuddy.app.ui.chat.ScriptFolder
 import com.everybuddy.app.ui.chat.ScriptItem
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 
@@ -22,6 +28,7 @@ data class ScriptUiState(
     val searchQuery   : String             = "",
     val isRefreshing  : Boolean            = false,
     val toastMessage  : String?            = null,
+    val isTtsLoading  : Boolean            = false,
 )
 
 enum class ScriptSortOption(val label: String) {
@@ -31,10 +38,15 @@ enum class ScriptSortOption(val label: String) {
 }
 
 @HiltViewModel
-class ScriptViewModel @Inject constructor() : ViewModel() {
+class ScriptViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val translateRepository: TranslateRepository,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ScriptUiState())
     val uiState: StateFlow<ScriptUiState> = _uiState.asStateFlow()
+
+    private var mediaPlayer: MediaPlayer? = null
 
     /** 현재 선택된 폴더 기준으로 필터링된 아이템 목록 */
     val filteredItems: List<ScriptItem>
@@ -156,5 +168,36 @@ class ScriptViewModel @Inject constructor() : ViewModel() {
 
     fun consumeToast() {
         _uiState.update { it.copy(toastMessage = null) }
+    }
+
+    fun playAudio(item: ScriptItem) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isTtsLoading = true) }
+            val result = translateRepository.tts(item.originalText)
+            _uiState.update { it.copy(isTtsLoading = false) }
+            if (result is ApiResult.Success) {
+                val bytes = result.data ?: return@launch
+                try {
+                    val tempFile = File.createTempFile("tts_", ".wav", context.cacheDir)
+                    tempFile.writeBytes(bytes)
+                    mediaPlayer?.release()
+                    mediaPlayer = MediaPlayer().apply {
+                        setDataSource(tempFile.absolutePath)
+                        prepare()
+                        start()
+                    }
+                } catch (e: Exception) {
+                    _uiState.update { it.copy(toastMessage = "재생 실패: ${e.message}") }
+                }
+            } else {
+                _uiState.update { it.copy(toastMessage = "TTS 변환에 실패했습니다.") }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        mediaPlayer?.release()
+        mediaPlayer = null
     }
 }

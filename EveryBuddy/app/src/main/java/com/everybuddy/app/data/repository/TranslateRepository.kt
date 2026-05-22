@@ -21,6 +21,19 @@ class TranslateRepository @Inject constructor(
     suspend fun translateText(text: String): ApiResult<TextTranslateResponse> =
         safeApiCall(gson, { api.translateText(TextTranslateRequest(text)) })
 
+    suspend fun tts(text: String): ApiResult<ByteArray> = try {
+        val response = api.tts(TextTranslateRequest(text))
+        if (response.isSuccessful) {
+            val bytes = response.body()?.bytes()
+            if (bytes != null) ApiResult.Success(bytes)
+            else ApiResult.Error(200, "EMPTY_RESPONSE", "빈 응답")
+        } else {
+            ApiResult.Error(response.code(), "TTS_ERROR", "TTS 변환 실패")
+        }
+    } catch (e: Exception) {
+        ApiResult.NetworkError(e)
+    }
+
     /**
      * 음성 번역 — 로컬 File을 multipart로 업로드.
      * 호출자가 파일 준비 책임 (MediaFileStore로 영속/다운로드 캐시).

@@ -71,7 +71,6 @@ class ChatRoomViewModel @Inject constructor(
 
     /** 방금 녹음 완료한 음성의 길이(초). 해당 메시지가 RTDB에서 도착하면 적용 후 0으로 리셋. */
     private var pendingVoiceDurationSec: Int = 0
-    private var pendingReplyPreview: String? = null
 
     /** ExoPlayer STATE_READY 시 추출한 재생 길이 캐시 (messageId → sec). 세션 단위 인메모리. */
     private val voiceDurationCache = mutableMapOf<String, Int>()
@@ -215,14 +214,6 @@ class ChatRoomViewModel @Inject constructor(
                         pendingVoiceDurationSec = 0
                     }
                 }
-                val preview = pendingReplyPreview
-                if (preview != null && myId != null) {
-                    val idx = messages.indexOfLast { it.type == MessageType.TEXT && it.senderId.toLongOrNull() == myId && it.statusPreview.isEmpty() }
-                    if (idx >= 0) {
-                        messages = messages.toMutableList().also { it[idx] = it[idx].copy(statusPreview = preview, isStatusReply = false) }
-                        pendingReplyPreview = null
-                    }
-                }
                 // 인메모리 캐시에서 음성 길이 패치
                 if (voiceDurationCache.isNotEmpty()) {
                     messages = messages.map { msg ->
@@ -334,17 +325,16 @@ class ChatRoomViewModel @Inject constructor(
         val chatRoomId  = _uiState.value.room.id.toLongOrNull() ?: return
         val myUserId    = _uiState.value.myUserId
         val replyMsg = _uiState.value.replyToMessage
-        if (replyMsg != null) {
-            val raw = replyMsg.text.ifBlank { "[음성 메시지]" }
-            pendingReplyPreview = if (raw.length > 20) raw.take(20) + "…" else raw
+        val statusPreview = replyMsg?.let { msg ->
+            val raw = msg.text.ifBlank { "[음성 메시지]" }
+            if (raw.length > 20) raw.take(20) + "…" else raw
         }
         chatRoomPreferences.clearReply(_uiState.value.room.id)
         _uiState.update { it.copy(inputText = "", replyToMessage = null) }
         viewModelScope.launch {
-            when (val result = messageRepository.sendTextMessage(chatRoomId, text)) {
+            when (val result = messageRepository.sendTextMessage(chatRoomId, text, statusPreview)) {
                 is ApiResult.Success -> { /* RTDB push로 본인 메시지 도착 */ }
                 is ApiResult.Error, is ApiResult.NetworkError -> {
-                    pendingReplyPreview = null
                     insertFailedTextMessage(chatRoomId, myUserId, text)
                 }
             }

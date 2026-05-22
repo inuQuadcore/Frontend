@@ -334,6 +334,7 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                                 onFolderClick = { folder -> selectedScriptFolder = folder },
                                 onItemClick   = { item -> selectedScriptItem = item },
                                 onAddFolder   = { showNewFolderInScript = true },
+                                onItemAudio   = scriptViewModel::playAudio,
                             )
                             if (showNewFolderInScript) {
                                 Dialog(
