@@ -305,6 +305,7 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                                 item     = selectedScriptItem!!,
                                 folders  = scriptUiStateDetail.folders,
                                 onBack   = { selectedScriptItem = null },
+                                onAudio  = scriptViewModel::playAudio,
                                 onSave   = { updatedItem ->
                                     scriptViewModel.updateItem(updatedItem)
                                     selectedScriptItem = updatedItem
@@ -323,6 +324,7 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                                 viewModel   = scriptViewModel,
                                 onBack      = { selectedScriptFolder = null },
                                 onItemClick = { item -> selectedScriptItem = item },
+                                onItemAudio = scriptViewModel::playAudio,
                             )
                         }
                         else -> {

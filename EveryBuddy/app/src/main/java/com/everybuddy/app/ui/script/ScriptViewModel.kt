@@ -133,12 +133,8 @@ class ScriptViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
             delay(300)
-            // TODO: real API call
-            _uiState.update { it.copy(
-                isRefreshing = false,
-                folders      = emptyList(),
-                items        = emptyList(),
-            ) }
+            // TODO: real API call — 현재는 서버 미연동이므로 기존 데이터 유지
+            _uiState.update { it.copy(isRefreshing = false) }
         }
     }
 
