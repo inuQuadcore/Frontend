@@ -30,6 +30,22 @@ class ChatRoomPreferences @Inject constructor(
     fun setStarred(roomId: String, value: Boolean)       = prefs.edit().putBoolean(key("star",     roomId), value).apply()
     fun setAutoTranslate(roomId: String, value: Boolean) = prefs.edit().putBoolean(key("autoTrans", roomId), value).apply()
 
+    fun getShowTranslation(roomId: String): Map<String, Boolean> {
+        val onSet  = prefs.getStringSet(key("showTr_on",  roomId), emptySet())?.toSet() ?: emptySet()
+        val offSet = prefs.getStringSet(key("showTr_off", roomId), emptySet())?.toSet() ?: emptySet()
+        return onSet.associate { it to true } + offSet.associate { it to false }
+    }
+
+    fun setShowTranslation(roomId: String, messageId: String, show: Boolean) {
+        val onKey  = key("showTr_on",  roomId)
+        val offKey = key("showTr_off", roomId)
+        val onSet  = prefs.getStringSet(onKey,  emptySet())?.toMutableSet() ?: mutableSetOf()
+        val offSet = prefs.getStringSet(offKey, emptySet())?.toMutableSet() ?: mutableSetOf()
+        if (show) { onSet += messageId; offSet -= messageId }
+        else      { offSet += messageId; onSet -= messageId }
+        prefs.edit().putStringSet(onKey, onSet).putStringSet(offKey, offSet).apply()
+    }
+
     fun saveReply(roomId: String, msgId: String, text: String) {
         prefs.edit()
             .putString(key("replyId",   roomId), msgId)

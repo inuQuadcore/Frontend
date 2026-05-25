@@ -5,11 +5,13 @@ import android.media.MediaPlayer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.everybuddy.app.data.dto.ApiResult
+import com.everybuddy.app.data.local.ScriptStore
 import com.everybuddy.app.data.repository.TranslateRepository
 import com.everybuddy.app.ui.chat.ScriptFolder
 import com.everybuddy.app.ui.chat.ScriptItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,8 +29,9 @@ data class ScriptUiState(
     val sortOption    : ScriptSortOption   = ScriptSortOption.SAVED_AT_DESC,
     val searchQuery   : String             = "",
     val isRefreshing  : Boolean            = false,
-    val toastMessage  : String?            = null,
-    val isTtsLoading  : Boolean            = false,
+    val toastMessage     : String?  = null,
+    val ttsLoadingItemId : String?  = null,
+    val ttsPlayingItemId : String?  = null,
 )
 
 enum class ScriptSortOption(val label: String) {
@@ -41,12 +44,29 @@ enum class ScriptSortOption(val label: String) {
 class ScriptViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val translateRepository: TranslateRepository,
+    private val scriptStore: ScriptStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ScriptUiState())
     val uiState: StateFlow<ScriptUiState> = _uiState.asStateFlow()
 
     private var mediaPlayer: MediaPlayer? = null
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val items   = scriptStore.loadItems()
+            val folders = scriptStore.loadFolders()
+            _uiState.update { it.copy(items = items, folders = folders) }
+        }
+    }
+
+    private fun persistItems(items: List<ScriptItem>) {
+        viewModelScope.launch(Dispatchers.IO) { scriptStore.saveItems(items) }
+    }
+
+    private fun persistFolders(folders: List<ScriptFolder>) {
+        viewModelScope.launch(Dispatchers.IO) { scriptStore.saveFolders(folders) }
+    }
 
     /** 현재 선택된 폴더 기준으로 필터링된 아이템 목록 */
     val filteredItems: List<ScriptItem>
@@ -89,12 +109,13 @@ class ScriptViewModel @Inject constructor(
         )
         _uiState.update { state ->
             val updatedItems   = listOf(newItem) + state.items
-            // 폴더 아이템 카운트 갱신
             val updatedFolders = state.folders.map { f ->
                 if (f.id == folderId) f.copy(count = f.count + 1) else f
             }
             state.copy(items = updatedItems, folders = updatedFolders, toastMessage = "저장되었습니다.")
         }
+        persistItems(_uiState.value.items)
+        persistFolders(_uiState.value.folders)
     }
 
     fun addFolder(name: String, coverImageUri: String?, id: String = UUID.randomUUID().toString()) {
@@ -105,6 +126,7 @@ class ScriptViewModel @Inject constructor(
             coverImage = coverImageUri ?: "",
         )
         _uiState.update { it.copy(folders = it.folders + newFolder) }
+        persistFolders(_uiState.value.folders)
     }
 
     fun deleteItem(id: String) {
@@ -115,6 +137,8 @@ class ScriptViewModel @Inject constructor(
             } else state.folders
             state.copy(items = state.items.filter { it.id != id }, folders = updatedFolders)
         }
+        persistItems(_uiState.value.items)
+        persistFolders(_uiState.value.folders)
     }
 
     fun selectFolder(index: Int) {
@@ -142,12 +166,14 @@ class ScriptViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(items = state.items.map { if (it.id == updatedItem.id) updatedItem else it })
         }
+        persistItems(_uiState.value.items)
     }
 
     fun updateFolder(folder: ScriptFolder) {
         _uiState.update { state ->
             state.copy(folders = state.folders.map { if (it.id == folder.id) folder else it })
         }
+        persistFolders(_uiState.value.folders)
     }
 
     fun deleteItems(ids: Set<String>) {
@@ -160,19 +186,34 @@ class ScriptViewModel @Inject constructor(
             }
             state.copy(items = state.items.filter { it.id !in ids }, folders = updatedFolders)
         }
+        persistItems(_uiState.value.items)
+        persistFolders(_uiState.value.folders)
     }
 
     fun consumeToast() {
         _uiState.update { it.copy(toastMessage = null) }
     }
 
+    fun stopAudio() {
+        mediaPlayer?.stop()
+        mediaPlayer?.release()
+        mediaPlayer = null
+        _uiState.update { it.copy(ttsLoadingItemId = null, ttsPlayingItemId = null) }
+    }
+
     fun playAudio(item: ScriptItem) {
+        if (_uiState.value.ttsPlayingItemId == item.id) {
+            stopAudio()
+            return
+        }
         viewModelScope.launch {
-            _uiState.update { it.copy(isTtsLoading = true) }
+            _uiState.update { it.copy(ttsLoadingItemId = item.id, ttsPlayingItemId = null) }
             val result = translateRepository.tts(item.originalText)
-            _uiState.update { it.copy(isTtsLoading = false) }
             if (result is ApiResult.Success) {
-                val bytes = result.data ?: return@launch
+                val bytes = result.data ?: run {
+                    _uiState.update { it.copy(ttsLoadingItemId = null) }
+                    return@launch
+                }
                 try {
                     val tempFile = File.createTempFile("tts_", ".wav", context.cacheDir)
                     tempFile.writeBytes(bytes)
@@ -181,12 +222,16 @@ class ScriptViewModel @Inject constructor(
                         setDataSource(tempFile.absolutePath)
                         prepare()
                         start()
+                        setOnCompletionListener {
+                            _uiState.update { it.copy(ttsPlayingItemId = null) }
+                        }
                     }
+                    _uiState.update { it.copy(ttsLoadingItemId = null, ttsPlayingItemId = item.id) }
                 } catch (e: Exception) {
-                    _uiState.update { it.copy(toastMessage = "재생 실패: ${e.message}") }
+                    _uiState.update { it.copy(ttsLoadingItemId = null, toastMessage = "재생 실패: ${e.message}") }
                 }
             } else {
-                _uiState.update { it.copy(toastMessage = "TTS 변환에 실패했습니다.") }
+                _uiState.update { it.copy(ttsLoadingItemId = null, toastMessage = "TTS 변환에 실패했습니다.") }
             }
         }
     }

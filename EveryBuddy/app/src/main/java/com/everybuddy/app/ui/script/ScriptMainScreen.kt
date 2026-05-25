@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,6 +28,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -177,9 +179,11 @@ fun ScriptMainScreen(
 
             items(items) { item ->
                 ScriptItemCard(
-                    item      = item,
-                    onClick   = { onItemClick(item) },
-                    onAudio   = { onItemAudio(item) },
+                    item           = item,
+                    onClick        = { onItemClick(item) },
+                    onAudio        = { onItemAudio(item) },
+                    isAudioLoading = uiState.ttsLoadingItemId == item.id,
+                    isAudioPlaying = uiState.ttsPlayingItemId == item.id,
                 )
             }
         }
@@ -341,10 +345,65 @@ private fun AddFolderButton(onClick: () -> Unit) {
 }
 
 @Composable
+private fun TtsLoadingDots(dotSize: Dp) {
+    val transition = rememberInfiniteTransition(label = "ttsload")
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(dotSize * 0.5f),
+        verticalAlignment     = Alignment.CenterVertically,
+    ) {
+        repeat(3) { i ->
+            val alpha by transition.animateFloat(
+                initialValue  = 0.25f,
+                targetValue   = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation          = tween(500),
+                    repeatMode         = RepeatMode.Reverse,
+                    initialStartOffset = StartOffset(i * 166),
+                ),
+                label = "ttsdot_$i",
+            )
+            Box(
+                Modifier
+                    .size(dotSize)
+                    .clip(CircleShape)
+                    .background(SmAccent.copy(alpha = alpha)),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TtsSpeakerButton(
+    isLoading  : Boolean,
+    isPlaying  : Boolean,
+    buttonSize : Dp,
+    iconSize   : Dp,
+    dotSize    : Dp,
+    onClick    : () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(buttonSize)
+            .clip(CircleShape)
+            .background(if (isPlaying) SmAccent else Color.Transparent)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        when {
+            isLoading -> TtsLoadingDots(dotSize = dotSize)
+            isPlaying -> Icon(painterResource(R.drawable.ic_speaker), "재생 중", Modifier.size(iconSize), tint = Color.White)
+            else      -> Icon(painterResource(R.drawable.ic_speaker), "발음 듣기", Modifier.size(iconSize), tint = SmTextPri)
+        }
+    }
+}
+
+@Composable
 fun ScriptItemCard(
-    item    : ScriptItem,
-    onClick : () -> Unit,
-    onAudio : () -> Unit,
+    item           : ScriptItem,
+    onClick        : () -> Unit,
+    onAudio        : () -> Unit,
+    isAudioLoading : Boolean = false,
+    isAudioPlaying : Boolean = false,
 ) {
     Surface(
         modifier = Modifier
@@ -363,21 +422,14 @@ fun ScriptItemCard(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            // ic_speaker.xml — 클릭 시 TTS 재생
-            IconButton(
-                onClick  = onAudio,
-                modifier = Modifier
-                    .size(26.dp)
-                    // TODO padding: 스피커 아이콘 우측 4dp
-                    .padding(end = 0.dp),
-            ) {
-                Icon(
-                    painter            = painterResource(R.drawable.ic_speaker),
-                    contentDescription = "발음 듣기",
-                    modifier           = Modifier.size(18.dp),
-                    tint               = SmTextPri,
-                )
-            }
+            TtsSpeakerButton(
+                isLoading  = isAudioLoading,
+                isPlaying  = isAudioPlaying,
+                buttonSize = 26.dp,
+                iconSize   = 18.dp,
+                dotSize    = 4.dp,
+                onClick    = onAudio,
+            )
             // TODO padding: 스피커-텍스트 간격 4dp
             Spacer(Modifier.width(4.dp))
 
@@ -436,12 +488,14 @@ private fun BorderStroke(width: androidx.compose.ui.unit.Dp, color: Color) =
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScriptDetailScreen(
-    item     : ScriptItem,
-    folders  : List<ScriptFolder> = emptyList(),
-    onBack   : () -> Unit,
-    onAudio  : (ScriptItem) -> Unit = {},
-    onSave   : (ScriptItem) -> Unit = {},
-    onDelete : (ScriptItem) -> Unit = {},
+    item         : ScriptItem,
+    folders      : List<ScriptFolder> = emptyList(),
+    onBack       : () -> Unit,
+    onAudio      : (ScriptItem) -> Unit = {},
+    isTtsLoading : Boolean             = false,
+    isTtsPlaying : Boolean             = false,
+    onSave       : (ScriptItem) -> Unit = {},
+    onDelete     : (ScriptItem) -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
 
@@ -497,9 +551,14 @@ fun ScriptDetailScreen(
                         style    = TextStyle(fontSize = 22.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = SmTextPri, lineHeight = 32.sp),
                     )
                 }
-                IconButton(onClick = { onAudio(item) }, modifier = Modifier.size(36.dp)) {
-                    Icon(painterResource(R.drawable.ic_speaker), "발음 듣기", Modifier.size(22.dp), tint = SmAccent)
-                }
+                TtsSpeakerButton(
+                    isLoading  = isTtsLoading,
+                    isPlaying  = isTtsPlaying,
+                    buttonSize = 36.dp,
+                    iconSize   = 22.dp,
+                    dotSize    = 6.dp,
+                    onClick    = { onAudio(item) },
+                )
             }
             Spacer(Modifier.height(4.dp))
             if (editingOriginal) {
@@ -826,7 +885,13 @@ fun ScriptFolderScreen(
                     contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
                 ) {
                     items(folderItems) { item ->
-                        ScriptItemCard(item = item, onClick = { onItemClick(item) }, onAudio = { onItemAudio(item) })
+                        ScriptItemCard(
+                            item           = item,
+                            onClick        = { onItemClick(item) },
+                            onAudio        = { onItemAudio(item) },
+                            isAudioLoading = uiState?.value?.ttsLoadingItemId == item.id,
+                            isAudioPlaying = uiState?.value?.ttsPlayingItemId == item.id,
+                        )
                     }
                 }
             }

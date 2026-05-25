@@ -300,17 +300,22 @@ fun MainScreen(onLogout: () -> Unit = {}) {
                     isChatRoomOpen = false
                     when {
                         selectedScriptItem != null -> {
+                            DisposableEffect(Unit) {
+                                onDispose { scriptViewModel.stopAudio() }
+                            }
                             val scriptUiStateDetail by scriptViewModel.uiState.collectAsState()
                             ScriptDetailScreen(
-                                item     = selectedScriptItem!!,
-                                folders  = scriptUiStateDetail.folders,
-                                onBack   = { selectedScriptItem = null },
-                                onAudio  = scriptViewModel::playAudio,
-                                onSave   = { updatedItem ->
+                                item         = selectedScriptItem!!,
+                                folders      = scriptUiStateDetail.folders,
+                                onBack       = { selectedScriptItem = null },
+                                onAudio      = scriptViewModel::playAudio,
+                                isTtsLoading = scriptUiStateDetail.ttsLoadingItemId == selectedScriptItem!!.id,
+                                isTtsPlaying = scriptUiStateDetail.ttsPlayingItemId == selectedScriptItem!!.id,
+                                onSave       = { updatedItem ->
                                     scriptViewModel.updateItem(updatedItem)
                                     selectedScriptItem = updatedItem
                                 },
-                                onDelete = { item ->
+                                onDelete     = { item ->
                                     scriptViewModel.deleteItem(item.id)
                                     selectedScriptItem = null
                                 },

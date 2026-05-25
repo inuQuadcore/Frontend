@@ -4,9 +4,6 @@
 //           현재는 stop()만 있음 — play() 호출 시 처음부터 재생됨
 //           PlayerState.Paused 활용하여 일시정지 후 재개 지원
 //
-// TODO 진행률: 현재 재생 위치(ms)를 StateFlow<Long>으로 노출
-//             Player.Listener.onPositionDiscontinuity / 주기적 poll(Handler)로 업데이트
-//             ChatRoomScreen의 음성 메시지 진행 바(Slider) 연동
 //
 // TODO 에러: Player.Listener.onPlayerError() 구현
 //           네트워크 오류 시 PlayerState.Error 추가 및 UI에 재시도 버튼 표시
@@ -20,6 +17,12 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,11 +40,17 @@ sealed class PlayerState {
 class VoicePlayer @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    private var player           : ExoPlayer? = null
-    private var currentMessageId : String?    = null
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var positionJob      : Job?        = null
+    private var player           : ExoPlayer?  = null
+    private var currentMessageId : String?     = null
 
     private val _state = MutableStateFlow<PlayerState>(PlayerState.Idle)
     val state: StateFlow<PlayerState> = _state.asStateFlow()
+
+    /** 현재 재생 위치(ms). 재생 중 100ms마다 갱신, 정지 시 0으로 초기화. */
+    private val _positionMs = MutableStateFlow(0L)
+    val positionMs: StateFlow<Long> = _positionMs.asStateFlow()
 
     /** (messageId → durationSec) — STATE_READY 시 1회 emit 후 null로 초기화 */
     private val _durationReady = MutableStateFlow<Pair<String, Int>?>(null)
@@ -75,12 +84,23 @@ class VoicePlayer @Inject constructor(
         player           = p
         currentMessageId = messageId
         _state.value     = PlayerState.Playing(messageId)
+        positionJob = scope.launch {
+            while (true) {
+                delay(100)
+                val cur = player ?: break
+                _positionMs.value = cur.currentPosition.coerceAtLeast(0)
+                if (!cur.isPlaying) break
+            }
+        }
     }
 
     fun stop() {
+        positionJob?.cancel()
+        positionJob      = null
         player?.release()
         player           = null
         currentMessageId = null
+        _positionMs.value = 0L
         _state.value     = PlayerState.Idle
     }
 

@@ -97,8 +97,13 @@ class ChatRoomViewModel @Inject constructor(
                     is PlayerState.Playing  -> _uiState.update { it.copy(playingMessageId = playerState.messageId) }
                     is PlayerState.Finished,
                     is PlayerState.Idle,
-                    is PlayerState.Paused   -> _uiState.update { it.copy(playingMessageId = null) }
+                    is PlayerState.Paused   -> _uiState.update { it.copy(playingMessageId = null, playPositionMs = 0L) }
                 }
+            }
+        }
+        viewModelScope.launch {
+            voicePlayer.positionMs.collect { ms ->
+                _uiState.update { it.copy(playPositionMs = ms) }
             }
         }
         viewModelScope.launch {
@@ -114,6 +119,7 @@ class ChatRoomViewModel @Inject constructor(
                             }
                         )
                     }
+                    msgId.toLongOrNull()?.let { id -> messageDao.updateVoiceDuration(id, sec) }
                 }
             }
         }
@@ -148,22 +154,24 @@ class ChatRoomViewModel @Inject constructor(
             return
         }
         val state = _uiState.value
-        if (!state.isAutoTranslate) return
         val myUid = state.myUserId
-        messages.forEach { msg ->
-            val id = msg.id.toLongOrNull() ?: return@forEach
-            if (id <= autoTranslateWatermark) return@forEach
-            if (msg.senderId.toLongOrNull() == myUid) return@forEach
-            if (msg.translatedText.isNotEmpty()) return@forEach
-            if (msg.id in _uiState.value.translatingMessageIds) return@forEach
-            val hasContent = when (msg.type) {
-                MessageType.TEXT  -> msg.text.isNotBlank()
-                MessageType.VOICE -> msg.voiceUrl.isNotBlank()
-                else              -> false
+        if (state.isAutoTranslate) {
+            messages.forEach { msg ->
+                val id = msg.id.toLongOrNull() ?: return@forEach
+                if (id <= autoTranslateWatermark) return@forEach
+                if (msg.senderId.toLongOrNull() == myUid) return@forEach
+                if (msg.translatedText.isNotEmpty()) return@forEach
+                if (msg.id in _uiState.value.translatingMessageIds) return@forEach
+                val hasContent = when (msg.type) {
+                    MessageType.TEXT  -> msg.text.isNotBlank()
+                    MessageType.VOICE -> msg.voiceUrl.isNotBlank()
+                    else              -> false
+                }
+                if (!hasContent) return@forEach
+                translateMessage(msg.id, autoShow = false)
             }
-            if (!hasContent) return@forEach
-            translateMessage(msg.id, autoShow = false)
         }
+        // isAutoTranslate와 무관하게 watermark는 항상 갱신 — OFF 중 도착한 메시지도 추적해야 ON 전환 후 watermark가 정확함
         messages.mapNotNull { it.id.toLongOrNull() }.maxOrNull()?.let {
             if (it > autoTranslateWatermark) autoTranslateWatermark = it
         }
@@ -184,10 +192,13 @@ class ChatRoomViewModel @Inject constructor(
         // 채팅방 이동/재진입 시 이전 listener 정리
         messageListener?.detach()
         messageListener = null
+        autoTranslateWatermark = -1
+        autoTranslateInitialized = false
 
         val chatRoomId = roomId.toLongOrNull() ?: return   // 잘못된 ID — 무시
 
-        val savedAutoTranslate = chatRoomPreferences.isAutoTranslate(roomId)
+        val savedAutoTranslate  = chatRoomPreferences.isAutoTranslate(roomId)
+        val savedShowTranslation = chatRoomPreferences.getShowTranslation(roomId)
         val savedReplyText = chatRoomPreferences.getSavedReplyText(roomId)
         val savedReplyId   = chatRoomPreferences.getSavedReplyId(roomId)
         val savedReply = if (savedReplyText != null && savedReplyId != null) {
@@ -197,6 +208,7 @@ class ChatRoomViewModel @Inject constructor(
             it.copy(
                 room            = ChatRoomUi(id = roomId, name = roomName, isGroup = isGroup),
                 isAutoTranslate = savedAutoTranslate,
+                showTranslation = savedShowTranslation,
                 replyToMessage  = savedReply,
             )
         }
@@ -488,15 +500,14 @@ class ChatRoomViewModel @Inject constructor(
         val current = state.showTranslation[messageId] ?: state.isAutoTranslate
         val msg     = state.messages.find { it.id == messageId } ?: return
 
-        // 이미 번역 캐시가 있으면 토글만 (재호출 X)
         if (msg.translatedText.isNotEmpty()) {
-            _uiState.update { s -> s.copy(showTranslation = s.showTranslation + (messageId to !current)) }
+            val newShow = !current
+            _uiState.update { s -> s.copy(showTranslation = s.showTranslation + (messageId to newShow)) }
+            chatRoomPreferences.setShowTranslation(state.room.id, messageId, newShow)
             return
         }
-        // 캐시 없는 상태에서 OFF → OFF 토글은 의미 없음. 표시 X.
         if (current) return
 
-        // 캐시 없음 + ON 전환 → API 호출
         translateMessage(messageId, autoShow = true)
     }
 
@@ -548,6 +559,7 @@ class ChatRoomViewModel @Inject constructor(
                 is ApiResult.Success -> {
                     val (translated, source) = result.data
                     messageDao.updateTranslation(msgIdLong, translated, source)
+                    if (autoShow) chatRoomPreferences.setShowTranslation(_uiState.value.room.id, messageId, true)
                     _uiState.update {
                         it.copy(
                             translatingMessageIds = it.translatingMessageIds - messageId,
@@ -577,15 +589,25 @@ class ChatRoomViewModel @Inject constructor(
 
     fun onToggleAutoTranslate() {
         val turningOn = !_uiState.value.isAutoTranslate
-        if (turningOn) {
-            // OFF→ON 토글 시 watermark를 현재 최신 messageId로 갱신 — 기존 메시지는 자동 번역 대상 X
-            autoTranslateWatermark = _uiState.value.messages.mapNotNull { it.id.toLongOrNull() }.maxOrNull()
-                ?: autoTranslateWatermark
-        }
         _uiState.update { it.copy(isAutoTranslate = turningOn) }
-        // 채팅방 단위 영속화 — 다음 진입 시 복원
         _uiState.value.room.id.takeIf { it.isNotEmpty() }?.let { roomId ->
             chatRoomPreferences.setAutoTranslate(roomId, turningOn)
+        }
+        if (!turningOn) return
+        // ON 전환 시 — 현재 화면에 보이는 미번역 상대 메시지를 watermark 무관하게 즉시 번역 요청
+        val state = _uiState.value
+        val myUid = state.myUserId
+        state.messages.forEach { msg ->
+            if (msg.senderId.toLongOrNull() == myUid) return@forEach
+            if (msg.translatedText.isNotEmpty()) return@forEach
+            if (msg.id in state.translatingMessageIds) return@forEach
+            val hasContent = when (msg.type) {
+                MessageType.TEXT  -> msg.text.isNotBlank()
+                MessageType.VOICE -> msg.voiceUrl.isNotBlank()
+                else              -> false
+            }
+            if (!hasContent) return@forEach
+            translateMessage(msg.id, autoShow = false)
         }
     }
 

@@ -406,6 +406,7 @@ fun ChatRoomContent(
                 showTranslation       = state.showTranslation,
                 translatingMessageIds = state.translatingMessageIds,
                 playingMessageId      = state.playingMessageId,
+                playPositionMs        = state.playPositionMs,
                 modifier              = Modifier.weight(1f),
                 listState             = listState,
                 onPlayVoice           = onPlayVoice,
@@ -874,14 +875,13 @@ fun ChatSideMenu(
     }
 }
 
-// TranslationLoadingDots — 번역 로딩 애니메이션 (ic_transload × 3)
+// TranslationLoadingDots — 번역 로딩 애니메이션 (원형 점 × 3)
 @Composable
 fun TranslationLoadingDots(modifier: Modifier = Modifier) {
     val infiniteTransition = rememberInfiniteTransition(label = "transload")
-
     Row(
         modifier              = modifier,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment     = Alignment.CenterVertically,
     ) {
         repeat(3) { index ->
@@ -889,17 +889,17 @@ fun TranslationLoadingDots(modifier: Modifier = Modifier) {
                 initialValue  = 0.25f,
                 targetValue   = 1f,
                 animationSpec = infiniteRepeatable(
-                    animation          = tween(500),
+                    animation          = tween(480),
                     repeatMode         = RepeatMode.Reverse,
-                    initialStartOffset = StartOffset(index * 166),
+                    initialStartOffset = StartOffset(index * 160),
                 ),
                 label = "dot_$index",
             )
-            Icon(
-                painter            = painterResource(R.drawable.ic_transload),
-                contentDescription = null,
-                modifier           = Modifier.size(8.dp),
-                tint               = AccentBlue.copy(alpha = alpha),
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(AccentBlue.copy(alpha = alpha)),
             )
         }
     }
@@ -916,6 +916,7 @@ fun MessageList(
     showTranslation       : Map<String, Boolean>,
     translatingMessageIds : Set<String>,
     playingMessageId      : String?,
+    playPositionMs        : Long     = 0L,
     modifier              : Modifier = Modifier,
     listState             : androidx.compose.foundation.lazy.LazyListState,
     onPlayVoice           : (String) -> Unit,
@@ -980,17 +981,18 @@ fun MessageList(
 
                     MessageType.VOICE ->
                         VoiceMessageBubble(
-                            message             = msg,
-                            isMe                = isMe,
+                            message               = msg,
+                            isMe                  = isMe,
                             senderName            = senderName,
                             senderProfileImageUrl = senderProfileImageUrl,
-                            isAutoTranslate     = isAutoTranslate,
-                            isPlaying           = playing,
-                            showTranslation     = showTr,
-                            isTranslating       = msg.id in translatingMessageIds,
-                            onPlay              = { onPlayVoice(msg.id) },
-                            onToggleTranslation = { onToggleTranslation(msg.id) },
-                            onLongPress         = { onLongPressMessage(msg) },
+                            isAutoTranslate       = isAutoTranslate,
+                            isPlaying             = playing,
+                            playPositionMs        = if (playing) playPositionMs else 0L,
+                            showTranslation       = showTr,
+                            isTranslating         = msg.id in translatingMessageIds,
+                            onPlay                = { onPlayVoice(msg.id) },
+                            onToggleTranslation   = { onToggleTranslation(msg.id) },
+                            onLongPress           = { onLongPressMessage(msg) },
                         )
 
                     MessageType.IMAGE ->
@@ -1383,17 +1385,18 @@ fun TranslateIconButton(onClick: () -> Unit) {
 // VoiceMessageBubble — 재생버튼(파란원) + 파형(Canvas) + 타이머 / STT 텍스트 하단
 @Composable
 fun VoiceMessageBubble(
-    message             : ChatMessage,
-    isMe                : Boolean,
+    message               : ChatMessage,
+    isMe                  : Boolean,
     senderName            : String  = "",
     senderProfileImageUrl : String? = null,
-    isAutoTranslate     : Boolean,
-    isPlaying           : Boolean,
-    showTranslation     : Boolean,
-    isTranslating       : Boolean,
-    onPlay              : () -> Unit,
-    onToggleTranslation : () -> Unit,
-    onLongPress         : () -> Unit = {},
+    isAutoTranslate       : Boolean,
+    isPlaying             : Boolean,
+    playPositionMs        : Long    = 0L,
+    showTranslation       : Boolean,
+    isTranslating         : Boolean,
+    onPlay                : () -> Unit,
+    onToggleTranslation   : () -> Unit,
+    onLongPress           : () -> Unit = {},
 ) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
     val timeText = remember(message.timestamp, message.editedAt) {
@@ -1429,13 +1432,14 @@ fun VoiceMessageBubble(
                         .combinedClickable(onClick = {}, onLongClick = { onLongPress() }),
                 ) {
                     VoiceBubbleContent(
-                        message      = message,
-                        isMe         = true,
-                        isPlaying    = isPlaying,
-                        isTranslating = isTranslating,
+                        message         = message,
+                        isMe            = true,
+                        isPlaying       = isPlaying,
+                        playPositionMs  = playPositionMs,
+                        isTranslating   = isTranslating,
                         showTranslation = showTranslation,
-                        textColor    = textColor,
-                        onPlay       = onPlay,
+                        textColor       = textColor,
+                        onPlay          = onPlay,
                     )
                 }
             }
@@ -1470,6 +1474,7 @@ fun VoiceMessageBubble(
                                 message         = message,
                                 isMe            = false,
                                 isPlaying       = isPlaying,
+                                playPositionMs  = playPositionMs,
                                 isTranslating   = isTranslating,
                                 showTranslation = showTranslation,
                                 textColor       = textColor,
@@ -1479,12 +1484,21 @@ fun VoiceMessageBubble(
                         Spacer(Modifier.width(4.dp))
                         Column(horizontalAlignment = Alignment.Start) {
                             if (!isAutoTranslate) {
-                                Image(
-                                    painter            = painterResource(R.drawable.ic_translate),
-                                    contentDescription = "번역",
-                                    modifier           = Modifier.size(20.dp).clickable(onClick = onToggleTranslation),
-                                    colorFilter        = androidx.compose.ui.graphics.ColorFilter.tint(AccentBlue),
-                                )
+                                Box(
+                                    modifier         = Modifier
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFEEEEEE))
+                                        .clickable(onClick = onToggleTranslation),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Image(
+                                        painter            = painterResource(R.drawable.ic_translate),
+                                        contentDescription = "번역",
+                                        modifier           = Modifier.size(18.dp),
+                                        colorFilter        = androidx.compose.ui.graphics.ColorFilter.tint(AccentBlue),
+                                    )
+                                }
                                 Spacer(Modifier.height(2.dp))
                             }
                             Text(
@@ -1505,12 +1519,20 @@ private fun VoiceBubbleContent(
     message         : ChatMessage,
     isMe            : Boolean,
     isPlaying       : Boolean,
+    playPositionMs  : Long    = 0L,
     isTranslating   : Boolean,
     showTranslation : Boolean,
     textColor       : Color,
     onPlay          : () -> Unit,
 ) {
-    val bubbleBg  = if (isMe) BubbleMyVoice else BubbleWhite
+    val totalMs      = message.voiceDurationSec * 1000L
+    val waveProgress = if (isPlaying && totalMs > 0) (playPositionMs.toFloat() / totalMs).coerceIn(0f, 1f) else 0f
+    val displaySec   = if (isPlaying && totalMs > 0) {
+        ((totalMs - playPositionMs) / 1000L).coerceAtLeast(0L).toInt()
+    } else {
+        message.voiceDurationSec
+    }
+
     Column {
         Row(
             verticalAlignment     = Alignment.CenterVertically,
@@ -1524,19 +1546,30 @@ private fun VoiceBubbleContent(
                     .clickable(onClick = onPlay),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text  = if (isPlaying) "⏸" else "▶",
-                    style = TextStyle(fontSize = 11.sp, color = if (isMe) AccentBlue else Color.White),
-                )
+                if (isPlaying) {
+                    Image(
+                        painter            = painterResource(R.drawable.ic_stop),
+                        contentDescription = "정지",
+                        modifier           = Modifier.size(14.dp),
+                        colorFilter        = ColorFilter.tint(if (isMe) AccentBlue else Color.White),
+                    )
+                } else {
+                    Text(
+                        text  = "▶",
+                        style = TextStyle(fontSize = 11.sp, color = if (isMe) AccentBlue else Color.White),
+                    )
+                }
             }
             WaveformView(
-                modifier  = Modifier.weight(1f).height(24.dp),
-                isPlaying = isPlaying,
-                progress  = 0f,
-                barColor  = if (isMe) Color.White.copy(alpha = 0.8f) else AccentBlue,
+                modifier      = Modifier.weight(1f).height(24.dp),
+                isPlaying     = isPlaying,
+                progress      = waveProgress,
+                playedColor   = AccentBlue,
+                unplayedColor = if (isMe) Color.White.copy(alpha = 0.6f) else AccentBlue.copy(alpha = 0.3f),
+                seed          = message.id.hashCode(),
             )
             Text(
-                text  = formatDuration(message.voiceDurationSec),
+                text  = formatDuration(displaySec),
                 style = TextStyle(
                     fontSize   = 11.sp,
                     fontFamily = PretendardFamily,
@@ -1718,28 +1751,28 @@ fun FullscreenImageViewer(
 // WaveformView — 파형 Canvas 컴포저블
 @Composable
 fun WaveformView(
-    modifier  : Modifier = Modifier,
-    isPlaying : Boolean,
-    progress  : Float,           // 0f~1f
-    barColor  : Color,
-    barCount  : Int = 30,
+    modifier      : Modifier = Modifier,
+    isPlaying     : Boolean,
+    progress      : Float,           // 0f~1f
+    playedColor   : Color,
+    unplayedColor : Color,
+    barCount      : Int = 30,
+    seed          : Int = 0,
 ) {
-    // 더미 파형 (실제: VoicePlayer 진행률 StateFlow 연동 후 교체)
-    val heights = remember {
-        listOf(0.3f,0.6f,0.8f,0.5f,0.9f,0.7f,0.4f,0.85f,0.6f,0.3f,
-            0.7f,0.95f,0.5f,0.6f,0.8f,0.4f,0.7f,0.6f,0.9f,0.5f,
-            0.3f,0.75f,0.65f,0.8f,0.4f,0.55f,0.7f,0.45f,0.85f,0.6f)
+    val heights = remember(seed, barCount) {
+        val rng = java.util.Random(seed.toLong())
+        List(barCount) { 0.15f + rng.nextFloat() * 0.85f }
     }
 
     Canvas(modifier = modifier) {
         val barWidth = 2.dp.toPx()
         val gap      = (size.width - barCount * barWidth) / (barCount - 1)
         heights.take(barCount).forEachIndexed { i, h ->
-            val x       = i * (barWidth + gap)
-            val barH    = h * size.height * 0.9f
-            val played  = (i.toFloat() / barCount) <= progress
+            val x      = i * (barWidth + gap)
+            val barH   = h * size.height * 0.9f
+            val played = progress > 0f && (i.toFloat() / barCount) < progress
             drawRoundRect(
-                color        = if (played) barColor else barColor.copy(alpha = 0.3f),
+                color        = if (played) playedColor else unplayedColor,
                 topLeft      = Offset(x, (size.height - barH) / 2f),
                 size         = Size(barWidth, barH),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx()),

@@ -10,7 +10,7 @@ import androidx.room.TypeConverters
         FolderEntity::class,
         FolderRoomEntity::class,
     ],
-    version       = 5,                                   // v5: ChatMessageEntity.localFilePath 추가 (미디어 영속 저장)
+    version       = 6,                                   // v6: ChatMessageEntity.voiceDuration 추가 (음성 길이 DB 영속)
     exportSchema  = false,
 )
 @TypeConverters(LocalDateTimeConverter::class)

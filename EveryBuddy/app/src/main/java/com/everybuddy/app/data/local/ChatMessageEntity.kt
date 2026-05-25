@@ -41,4 +41,5 @@ data class ChatMessageEntity(
     // - 수신: 첫 재생/표시/번역 시 fileUrl 다운로드 후 채움.
     // null이면 아직 다운로드 안 됨 → fileUrl로 fallback.
     val localFilePath  : String?        = null,
+    val voiceDuration  : Int?           = null,
 )

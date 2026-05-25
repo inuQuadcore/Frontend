@@ -74,6 +74,10 @@ interface MessageDao {
     @Query("UPDATE chat_messages SET localFilePath = :path WHERE messageId = :messageId")
     suspend fun updateLocalFilePath(messageId: Long, path: String?)
 
+    /** 음성 메시지 재생 길이 영속화. ExoPlayer STATE_READY 시 추출 후 호출. */
+    @Query("UPDATE chat_messages SET voiceDuration = :duration WHERE messageId = :messageId")
+    suspend fun updateVoiceDuration(messageId: Long, duration: Int)
+
     /** PENDING(음수 tempId) 메시지의 messageId를 서버 PK로 교체할 때 path 캐리오버 용도 readback. */
     @Query("SELECT localFilePath FROM chat_messages WHERE messageId = :messageId")
     suspend fun localFilePath(messageId: Long): String?

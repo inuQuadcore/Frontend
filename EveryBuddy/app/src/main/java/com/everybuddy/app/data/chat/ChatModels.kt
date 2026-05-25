@@ -125,6 +125,7 @@ data class ChatRoomUiState(
 
     // 음성 재생
     val playingMessageId          : String?              = null,
+    val playPositionMs            : Long                 = 0L,
 
     // 미디어 패널
     val isMediaPanelOpen          : Boolean              = false,
