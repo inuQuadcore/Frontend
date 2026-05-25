@@ -17,9 +17,11 @@ import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.MessageRepository
 import com.everybuddy.app.data.repository.TranslateRepository
 import com.everybuddy.app.data.repository.translateUserMessage
+import com.everybuddy.app.di.ApplicationScope
 import android.media.MediaMetadataRetriever
 import com.google.firebase.database.FirebaseDatabase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -50,6 +52,7 @@ class ChatRoomViewModel @Inject constructor(
     private val translateRepository : TranslateRepository,
     private val chatRoomPreferences : ChatRoomPreferences,
     private val mediaFileStore      : MediaFileStore,
+    @ApplicationScope private val appScope: CoroutineScope,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatRoomUiState())
@@ -242,7 +245,7 @@ class ChatRoomViewModel @Inject constructor(
             val myUserId = tokenManager.userId.firstOrNull() ?: return@launch
             enterChatRoomAt = readEnterChatRoomAt(myUserId, chatRoomId)
             syncMessagesFromServer(chatRoomId)
-            attachMessageListener(chatRoomId, myUserId)
+            attachMessageListener(chatRoomId)
             viewingManager.enter(myUserId, chatRoomId)
             viewingChatRoomId = chatRoomId
             markChatRoomAsRead(chatRoomId)
@@ -272,18 +275,12 @@ class ChatRoomViewModel @Inject constructor(
         }
     }
 
-    private fun attachMessageListener(chatRoomId: Long, myUserId: Long) {
+    private fun attachMessageListener(chatRoomId: Long) {
         val listener = ChatMessageListener(
             chatRoomId      = chatRoomId,
             enterChatRoomAt = enterChatRoomAt,
             onUpsert        = { entity ->
-                viewModelScope.launch {
-                    messageDao.upsert(entity)
-                    // 본인이 viewing 중 + 타인 메시지면 즉시 read 표시 (본인 메시지는 unreadCount 영향 없음)
-                    if (viewingChatRoomId == chatRoomId && entity.senderId != myUserId) {
-                        markChatRoomAsRead(chatRoomId)
-                    }
-                }
+                viewModelScope.launch { messageDao.upsert(entity) }
             },
             onRemoved       = { messageId ->
                 viewModelScope.launch { messageDao.delete(messageId) }
@@ -782,7 +779,10 @@ class ChatRoomViewModel @Inject constructor(
         super.onCleared()
         messageListener?.detach()
         messageListener = null
-        viewingChatRoomId?.let { viewingManager.leave(it) }
+        viewingChatRoomId?.let { roomId ->
+            appScope.launch { markChatRoomAsRead(roomId) }
+            viewingManager.leave(roomId)
+        }
         viewingChatRoomId = null
         voiceRecorder.release()
         voicePlayer.release()
