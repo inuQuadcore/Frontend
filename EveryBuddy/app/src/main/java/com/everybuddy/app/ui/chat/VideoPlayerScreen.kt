@@ -1,18 +1,20 @@
 package com.everybuddy.app.ui.chat
 
 import android.app.Activity
-import android.content.pm.ActivityInfo
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -28,12 +30,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.everybuddy.app.R
@@ -50,16 +54,17 @@ private val VpScriptBg  = Color(0xFF1A1A1A)
 private val VpScriptHdr = Color(0xFF222222)
 private val VpDivider   = Color(0xFF2A2A2A)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoPlayerScreen(
     message           : ChatMessage,
     senderName        : String,
     subtitles         : List<VideoSubtitle>,
     isSubtitleLoading : Boolean,
+    subtitleProgress  : Pair<Int, Int>? = null,
     onClose           : () -> Unit,
 ) {
-    val context  = LocalContext.current
-    val activity = context as? Activity
+    val context = LocalContext.current
 
     val player = remember(message.id) {
         ExoPlayer.Builder(context).build().apply {
@@ -78,12 +83,15 @@ fun VideoPlayerScreen(
     var isDragging   by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableFloatStateOf(0f) }
     var isScriptOpen by remember { mutableStateOf(false) }
-    var isLandscape  by remember { mutableStateOf(false) }
 
     LaunchedEffect(player) {
         while (true) {
             delay(100)
-            if (!isDragging) {
+            if (player.playbackState == Player.STATE_ENDED) {
+                player.seekTo(0)
+                player.pause()
+                positionMs = 0
+            } else if (!isDragging) {
                 positionMs = player.currentPosition.coerceAtLeast(0)
                 durationMs = player.duration.coerceAtLeast(0)
             }
@@ -92,10 +100,7 @@ fun VideoPlayerScreen(
     }
 
     DisposableEffect(Unit) {
-        onDispose {
-            player.release()
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        }
+        onDispose { player.release() }
     }
 
     val activeSubtitleIdx = remember(positionMs, subtitles) {
@@ -115,26 +120,45 @@ fun VideoPlayerScreen(
 
             Column(modifier = Modifier.fillMaxSize()) {
 
-                // ① Sender name (48dp, centered)
-                Box(
-                    modifier         = Modifier.fillMaxWidth().height(48.dp).statusBarsPadding(),
-                    contentAlignment = Alignment.Center,
+                // 상단 바: 발신자 이름(중앙) + 닫기 버튼(우측)
+                Row(
+                    modifier          = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .height(52.dp)
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Spacer(Modifier.width(36.dp))
                     Text(
-                        text  = senderName,
-                        style = TextStyle(
+                        text      = senderName,
+                        modifier  = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style     = TextStyle(
                             fontSize   = 16.sp,
                             fontFamily = PretendardFamily,
                             fontWeight = FontWeight.Medium,
                             color      = Color.White,
                         ),
                     )
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x66000000))
+                            .clickable(onClick = onClose),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Image(
+                            painter            = painterResource(R.drawable.ic_cancel),
+                            contentDescription = "닫기",
+                            modifier           = Modifier.size(18.dp),
+                        )
+                    }
                 }
 
-                // ③ Video area (fills remaining space)
-                Box(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                ) {
+                // 영상 영역
+                Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                     AndroidView(
                         factory = { ctx ->
                             PlayerView(ctx).apply {
@@ -147,7 +171,7 @@ fun VideoPlayerScreen(
                     )
                 }
 
-                // ④ Subtitle text area (below video, min 72dp)
+                // 자막 텍스트 영역
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -156,126 +180,139 @@ fun VideoPlayerScreen(
                         .padding(16.dp),
                 ) {
                     if (isSubtitleLoading) {
-                        CircularProgressIndicator(
-                            modifier    = Modifier.align(Alignment.Center).size(22.dp),
-                            color       = Color.White,
-                            strokeWidth = 2.dp,
-                        )
+                        if (subtitleProgress != null) {
+                            Column(
+                                modifier            = Modifier.align(Alignment.Center),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                LinearProgressIndicator(
+                                    progress = { subtitleProgress.first.toFloat() / subtitleProgress.second.coerceAtLeast(1) },
+                                    modifier = Modifier.fillMaxWidth(0.5f),
+                                    color    = VpAccent,
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text  = "번역 중 ${subtitleProgress.first}/${subtitleProgress.second}",
+                                    style = TextStyle(fontSize = 12.sp, color = VpTextSec, fontFamily = PretendardFamily),
+                                )
+                            }
+                        } else {
+                            CircularProgressIndicator(
+                                modifier    = Modifier.align(Alignment.Center).size(22.dp),
+                                color       = Color.White,
+                                strokeWidth = 2.dp,
+                            )
+                        }
                     } else {
                         Text(
-                            text  = currentSubtitle?.translated ?: "",
-                            style = TextStyle(
+                            text      = currentSubtitle?.translated ?: "",
+                            textAlign = TextAlign.Center,
+                            style     = TextStyle(
                                 fontSize   = 15.sp,
                                 fontFamily = PretendardFamily,
                                 color      = Color.White,
                                 lineHeight  = 21.sp,
+                                textAlign  = TextAlign.Center,
                             ),
+                            modifier  = Modifier.fillMaxWidth(),
                         )
                     }
                 }
 
-                // ⑤ Controls row: [Play/Pause] [Seekbar] [Rotate] [Caption]
-                Row(
-                    modifier          = Modifier
+                // 컨트롤 영역
+                Column(
+                    modifier = Modifier
                         .fillMaxWidth()
                         .background(VpBg)
-                        .padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .padding(horizontal = 8.dp)
+                        .navigationBarsPadding()
+                        .padding(bottom = 48.dp),
                 ) {
-                    VpCtrlBtn(onClick = { if (isPlaying) player.pause() else player.play() }) {
-                        if (isPlaying) {
+                    // 스크립트 아이콘 — 시크바 오른쪽 상단 (시크바 우측 끝과 정렬)
+                    Row(
+                        modifier              = Modifier.fillMaxWidth().padding(start = 40.dp, end = 8.dp),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clickable(
+                                    indication        = null,
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    onClick           = { isScriptOpen = !isScriptOpen },
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
                             Image(
-                                painter            = painterResource(R.drawable.ic_play),
-                                contentDescription = "일시정지",
-                                modifier           = Modifier.size(24.dp),
-                                colorFilter        = ColorFilter.tint(Color.White),
+                                painter            = painterResource(R.drawable.ic_caption),
+                                contentDescription = "스크립트",
+                                modifier           = Modifier.fillMaxSize(),
+                                colorFilter        = ColorFilter.tint(if (isScriptOpen) VpAccent else Color.White),
+                                alpha              = if (isScriptOpen) 1f else 0.65f,
                             )
-                        } else {
-                            // TODO: play 아이콘 이름 확인 후 Image(painterResource(R.drawable.ic_???)) 로 교체
-                            Text("▶", style = TextStyle(fontSize = 20.sp, color = Color.White))
                         }
                     }
 
-                    Slider(
-                        value                = seekProgress,
-                        onValueChange        = { isDragging = true; dragProgress = it },
-                        onValueChangeFinished = {
-                            player.seekTo((dragProgress * durationMs).toLong())
-                            isDragging = false
-                        },
-                        colors   = SliderDefaults.colors(
-                            thumbColor         = VpAccent,
-                            activeTrackColor   = VpAccent,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.25f),
-                        ),
-                        modifier = Modifier.weight(1f),
-                    )
+                    // 재생/정지 버튼 + 시크바 — 같은 행. Spacer로 스크립트 아이콘 왼쪽 끝에 정렬
+                    Row(
+                        modifier          = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        VpCtrlBtn(onClick = { if (isPlaying) player.pause() else player.play() }) {
+                            Image(
+                                painter            = painterResource(
+                                    if (isPlaying) R.drawable.ic_stop else R.drawable.ic_play
+                                ),
+                                contentDescription = if (isPlaying) "정지" else "재생",
+                                modifier           = Modifier.size(24.dp),
+                                colorFilter        = ColorFilter.tint(Color.White),
+                            )
+                        }
 
-                    // Rotate button — TODO: ic_rotate 아이콘 추가 시 교체
-                    VpCtrlBtn(onClick = {
-                        isLandscape = !isLandscape
-                        activity?.requestedOrientation =
-                            if (isLandscape) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                            else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                    }) {
-                        Text("⟳", style = TextStyle(fontSize = 20.sp, color = Color.White))
+                        Slider(
+                            value                = seekProgress,
+                            onValueChange        = { isDragging = true; dragProgress = it },
+                            onValueChangeFinished = {
+                                player.seekTo((dragProgress * durationMs).toLong())
+                                isDragging = false
+                            },
+                            thumb  = {
+                                Image(
+                                    painter            = painterResource(R.drawable.ic_dot_filled),
+                                    contentDescription = null,
+                                    modifier           = Modifier.size(16.dp),
+                                    colorFilter        = ColorFilter.tint(VpAccent),
+                                )
+                            },
+                            track  = { sliderState ->
+                                SliderDefaults.Track(
+                                    sliderState = sliderState,
+                                    modifier    = Modifier.height(3.dp),
+                                    colors      = SliderDefaults.colors(
+                                        activeTrackColor   = VpAccent,
+                                        inactiveTrackColor = Color.White.copy(alpha = 0.25f),
+                                    ),
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+
                     }
 
-                    VpCtrlBtn(
-                        onClick    = { isScriptOpen = !isScriptOpen },
-                        isActive   = isScriptOpen,
+                    // 재생 시간 — 시크바 오른쪽 하단
+                    Row(
+                        modifier              = Modifier.fillMaxWidth().padding(end = 8.dp),
+                        horizontalArrangement = Arrangement.End,
                     ) {
-                        Image(
-                            painter            = painterResource(R.drawable.ic_caption),
-                            contentDescription = "스크립트",
-                            modifier           = Modifier.size(22.dp),
-                            colorFilter        = ColorFilter.tint(Color.White),
+                        Text(
+                            text  = "${vpFmtDuration((positionMs / 1000).toInt())}/${vpFmtDuration((durationMs / 1000).toInt())}",
+                            style = TextStyle(fontSize = 12.sp, color = VpTextSec, fontFamily = PretendardFamily),
                         )
                     }
                 }
-
-                // ⑥ Time row
-                Row(
-                    modifier              = Modifier
-                        .fillMaxWidth()
-                        .background(VpBg)
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = 8.dp)
-                        .navigationBarsPadding(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text  = vpFmtDuration((positionMs / 1000).toInt()),
-                        style = TextStyle(fontSize = 12.sp, color = VpTextSec, fontFamily = PretendardFamily),
-                    )
-                    Text(
-                        text  = vpFmtDuration((durationMs / 1000).toInt()),
-                        style = TextStyle(fontSize = 12.sp, color = VpTextSec, fontFamily = PretendardFamily),
-                    )
-                }
             }
 
-            // ② Close button — top-end overlay, circular semi-transparent bg
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(8.dp)
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x66000000))
-                    .clickable(onClick = onClose),
-                contentAlignment = Alignment.Center,
-            ) {
-                Image(
-                    painter            = painterResource(R.drawable.ic_cancel),
-                    contentDescription = "닫기",
-                    modifier           = Modifier.size(18.dp),
-                    colorFilter        = ColorFilter.tint(Color.White),
-                )
-            }
-
-            // ⑧ Script panel — slides in from right, centered vertically
+            // 스크립트 패널 — 우측에서 슬라이드 인
             Box(modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()) {
                 AnimatedVisibility(
                     visible = isScriptOpen,
@@ -283,11 +320,13 @@ fun VideoPlayerScreen(
                     exit    = slideOutHorizontally { it },
                 ) {
                     ScriptPanel(
-                        modifier  = Modifier.width(260.dp).fillMaxHeight().background(VpScriptBg),
-                        subtitles = subtitles,
-                        activeIdx = activeSubtitleIdx,
-                        isLoading = isSubtitleLoading,
-                        onSeekTo  = { ms -> player.seekTo(ms) },
+                        modifier         = Modifier.width(260.dp).fillMaxHeight().background(VpScriptBg),
+                        subtitles        = subtitles,
+                        activeIdx        = activeSubtitleIdx,
+                        isLoading        = isSubtitleLoading,
+                        subtitleProgress = subtitleProgress,
+                        onSeekTo         = { ms -> player.seekTo(ms) },
+                        onClose          = { isScriptOpen = false },
                     )
                 }
             }
@@ -297,15 +336,13 @@ fun VideoPlayerScreen(
 
 @Composable
 private fun VpCtrlBtn(
-    onClick  : () -> Unit,
-    isActive : Boolean = false,
-    content  : @Composable () -> Unit,
+    onClick : () -> Unit,
+    content : @Composable () -> Unit,
 ) {
     Box(
         modifier         = Modifier
             .size(40.dp)
             .clip(CircleShape)
-            .background(if (isActive) VpAccent else Color.Transparent)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
         content          = { content() },
@@ -314,11 +351,13 @@ private fun VpCtrlBtn(
 
 @Composable
 private fun ScriptPanel(
-    modifier  : Modifier,
-    subtitles : List<VideoSubtitle>,
-    activeIdx : Int,
-    isLoading : Boolean,
-    onSeekTo  : (Long) -> Unit,
+    modifier         : Modifier,
+    subtitles        : List<VideoSubtitle>,
+    activeIdx        : Int,
+    isLoading        : Boolean,
+    subtitleProgress : Pair<Int, Int>? = null,
+    onSeekTo         : (Long) -> Unit,
+    onClose          : () -> Unit,
 ) {
     val listState = rememberLazyListState()
 
@@ -327,23 +366,33 @@ private fun ScriptPanel(
     }
 
     Column(modifier = modifier) {
-        // Panel header
+        // 헤더: 좌측 뒤로가기 + 중앙 제목
         Box(
-            modifier         = Modifier
+            modifier = Modifier
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .height(40.dp)
-                .background(VpScriptHdr)
-                .padding(start = 16.dp),
-            contentAlignment = Alignment.CenterStart,
+                .background(VpScriptHdr),
         ) {
+            Image(
+                painter            = painterResource(R.drawable.ic_back),
+                contentDescription = "닫기",
+                modifier           = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 8.dp)
+                    .size(24.dp)
+                    .clickable(onClick = onClose),
+                colorFilter        = ColorFilter.tint(Color.White),
+            )
             Text(
-                text  = "스크립트",
-                style = TextStyle(
+                text     = "스크립트",
+                style    = TextStyle(
                     fontSize   = 14.sp,
                     fontFamily = PretendardFamily,
                     fontWeight = FontWeight.Medium,
                     color      = Color.White,
                 ),
+                modifier = Modifier.align(Alignment.Center),
             )
         }
 
@@ -353,7 +402,22 @@ private fun ScriptPanel(
                     modifier         = Modifier.height(280.dp).fillMaxWidth(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(32.dp), color = VpAccent, strokeWidth = 2.dp)
+                    if (subtitleProgress != null) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            LinearProgressIndicator(
+                                progress = { subtitleProgress.first.toFloat() / subtitleProgress.second.coerceAtLeast(1) },
+                                modifier = Modifier.fillMaxWidth(0.7f),
+                                color    = VpAccent,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text  = "번역 중 ${subtitleProgress.first}/${subtitleProgress.second}",
+                                style = TextStyle(fontSize = 13.sp, color = VpTextSec, fontFamily = PretendardFamily),
+                            )
+                        }
+                    } else {
+                        CircularProgressIndicator(modifier = Modifier.size(32.dp), color = VpAccent, strokeWidth = 2.dp)
+                    }
                 }
             }
             subtitles.isEmpty() -> {

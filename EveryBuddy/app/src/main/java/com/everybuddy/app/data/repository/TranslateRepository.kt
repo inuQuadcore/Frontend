@@ -4,19 +4,29 @@ import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.SpeechTranslateResponse
 import com.everybuddy.app.data.dto.TextTranslateRequest
 import com.everybuddy.app.data.dto.TextTranslateResponse
+import com.everybuddy.app.data.dto.VideoStreamSegment
+import com.everybuddy.app.data.dto.VideoTranslateResponse
 import com.everybuddy.app.data.network.TranslateApi
 import com.google.gson.Gson
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Singleton
 class TranslateRepository @Inject constructor(
-    private val api  : TranslateApi,
-    private val gson : Gson,
+    private val api          : TranslateApi,
+    private val gson         : Gson,
+    @Named("translate") private val okHttpClient : OkHttpClient,
+    @Named("base_url")  private val baseUrl      : String,
 ) {
     suspend fun translateText(text: String): ApiResult<TextTranslateResponse> =
         safeApiCall(gson, { api.translateText(TextTranslateRequest(text)) })
@@ -48,6 +58,77 @@ class TranslateRepository @Inject constructor(
         return safeApiCall(gson, { api.translateSpeech(part) })
     }
 
+    /**
+     * 영상 번역 — POST /api/v1/translate/video (multipart)
+     * VAD로 음성 구간 감지 → 자동 언어 감지 → 사용자 주 언어로 번역.
+     * 반환: segments 배열 (startSeconds/endSeconds/sourceText/translatedText)
+     */
+    suspend fun translateVideo(file: File): ApiResult<VideoTranslateResponse> {
+        val mimeType = when (file.extension.lowercase()) {
+            "mov" -> "video/quicktime"
+            else  -> "video/mp4"
+        }.toMediaTypeOrNull()
+        val part = MultipartBody.Part.createFormData(
+            name     = "file",
+            filename = file.name,
+            body     = file.asRequestBody(mimeType),
+        )
+        return safeApiCall(gson, { api.translateVideo(part) })
+    }
+
+    /**
+     * 영상 번역 스트리밍 — POST /api/v1/translate/video/stream (SSE)
+     * 구간별로 VideoStreamSegment를 emit. error 필드가 있거나 isFinal=true이면 스트림 종료.
+     */
+    fun translateVideoStream(file: File): Flow<VideoStreamSegment> = flow {
+        val mimeType = when (file.extension.lowercase()) {
+            "mov" -> "video/quicktime"
+            else  -> "video/mp4"
+        }
+        val requestBody = okhttp3.MultipartBody.Builder()
+            .setType(okhttp3.MultipartBody.FORM)
+            .addFormDataPart("file", file.name, file.asRequestBody(mimeType.toMediaType()))
+            .build()
+        val request = Request.Builder()
+            .url("${baseUrl}api/v1/translate/video/stream")
+            .post(requestBody)
+            .addHeader("Accept", "text/event-stream")
+            .build()
+        val call = okHttpClient.newCall(request)
+        try {
+            val response = call.execute()
+            if (!response.isSuccessful) {
+                emit(VideoStreamSegment(error = "HTTP ${response.code}", isFinal = true))
+                response.body?.close()
+                return@flow
+            }
+            val source = response.body?.source() ?: run {
+                emit(VideoStreamSegment(error = "빈 응답", isFinal = true))
+                return@flow
+            }
+            try {
+                while (!source.exhausted()) {
+                    val line = source.readUtf8Line() ?: break
+                    if (!line.startsWith("data:")) continue
+                    val json = line.removePrefix("data:").trim()
+                    if (json.isEmpty()) continue
+                    val segment = try {
+                        gson.fromJson(json, VideoStreamSegment::class.java)
+                    } catch (_: Exception) { continue }
+                    emit(segment)
+                    if (segment.isFinal) break
+                }
+            } finally {
+                response.body?.close()
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            call.cancel()
+            throw e
+        } catch (e: Exception) {
+            emit(VideoStreamSegment(error = e.message ?: "연결 오류", isFinal = true))
+        }
+    }
+
     private fun guessAudioMediaType(extension: String) =
         when (extension.lowercase()) {
             "mp3"  -> "audio/mpeg"
@@ -63,6 +144,20 @@ class TranslateRepository @Inject constructor(
  * Translate 도메인 에러 → 사용자 친화 토스트 메시지.
  * 명세 권장 메시지 반영 (502/504, UNSUPPORTED_LANGUAGE, 413 등).
  */
+fun ApiResult<*>.videoTranslateUserMessage(): String = when (this) {
+    is ApiResult.Success      -> ""
+    is ApiResult.NetworkError -> "네트워크 연결을 확인해주세요."
+    is ApiResult.Error        -> when {
+        name == "INVALID_VIDEO_FORMAT" -> "지원하지 않는 영상 형식입니다. (mp4, mov)"
+        name == "EMPTY_FILE"           -> "영상 파일이 비어 있습니다."
+        code == 403                    -> "서버에서 요청을 거부했습니다. (파일 크기 제한 초과)"
+        code == 413                    -> "영상 파일이 너무 큽니다. (최대 50MB)"
+        code == 500                    -> "영상 변환 중 오류가 발생했습니다."
+        code == 502 || code == 504     -> "번역 서버 응답이 늦어요. 잠시 후 다시 시도해주세요."
+        else                           -> message ?: "번역에 실패했습니다."
+    }
+}
+
 fun ApiResult<*>.translateUserMessage(): String? = when (this) {
     is ApiResult.Success      -> null
     is ApiResult.NetworkError -> "네트워크 연결을 확인해주세요."

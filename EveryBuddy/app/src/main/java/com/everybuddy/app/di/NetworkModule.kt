@@ -56,6 +56,9 @@ object NetworkModule {
 
     private const val BASE_URL = "https://api.everybuddy.cloud/"
 
+    @Provides @Singleton @Named("base_url")
+    fun provideBaseUrl(): String = BASE_URL
+
     @Provides
     @Singleton
     fun provideTokenDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
@@ -109,7 +112,7 @@ object NetworkModule {
         .authenticator(authenticator)        // 401 시 자동 refresh
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(3, TimeUnit.MINUTES)
         .build()
 
     // Auth 전용 OkHttpClient — JWT 인터셉터만, Authenticator 없음
@@ -139,7 +142,7 @@ object NetworkModule {
     ): OkHttpClient = OkHttpClient.Builder()
         .apply { if (BuildConfig.DEBUG) addInterceptor(loggingInterceptor) }
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.MINUTES)
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
@@ -212,7 +215,35 @@ object NetworkModule {
     fun provideNotificationApi(retrofit: Retrofit): NotificationApi =
         retrofit.create(NotificationApi::class.java)
 
+    @Provides
+    @Singleton
+    @Named("translate")
+    fun provideTranslateOkHttpClient(
+        @Named("jwt")     jwtInterceptor     : Interceptor,
+        @Named("logging") loggingInterceptor : Interceptor,
+        authenticator                        : Authenticator,
+    ): OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor(jwtInterceptor)
+        .addInterceptor(loggingInterceptor)
+        .authenticator(authenticator)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(5, TimeUnit.MINUTES)
+        .readTimeout(10, TimeUnit.MINUTES)
+        .build()
+
+    @Provides
+    @Singleton
+    @Named("translate")
+    fun provideTranslateRetrofit(
+        @Named("translate") okHttpClient : OkHttpClient,
+        gson                             : Gson,
+    ): Retrofit = Retrofit.Builder()
+        .baseUrl(BASE_URL)
+        .client(okHttpClient)
+        .addConverterFactory(GsonConverterFactory.create(gson))
+        .build()
+
     @Provides @Singleton
-    fun provideTranslateApi(retrofit: Retrofit): TranslateApi =
+    fun provideTranslateApi(@Named("translate") retrofit: Retrofit): TranslateApi =
         retrofit.create(TranslateApi::class.java)
 }

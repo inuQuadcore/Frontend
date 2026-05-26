@@ -36,7 +36,7 @@ fun ChatMessageEntity.toChatMessage(): ChatMessage = ChatMessage(
     id        = messageId.toString(),
     roomId    = chatRoomId.toString(),
     senderId  = senderId.toString(),
-    type      = resolveType(messageType, mediaType),
+    type      = resolveType(messageType, mediaType, fileName),
     text      = content.orEmpty(),
     voiceUrl  = fileUrl.orEmpty(),
     voiceDurationSec = voiceDuration ?: 0,
@@ -48,15 +48,35 @@ fun ChatMessageEntity.toChatMessage(): ChatMessage = ChatMessage(
     isStatusReply    = statusPreview != null,
     statusPreview    = statusPreview.orEmpty(),
     localFilePath    = localFilePath,
+    fileName         = fileName.orEmpty(),
+    fileSize         = fileSize ?: 0L,
 )
 
-/** messageType + mediaType 조합 → UI MessageType. 미디어 enum 확장 시 여기 업데이트. */
-private fun resolveType(messageType: String, mediaType: String?): MessageType = when {
-    messageType == "TEXT"                             -> MessageType.TEXT
-    messageType == "FILE" && mediaType == "AUDIO"     -> MessageType.VOICE
-    messageType == "FILE" && mediaType == "IMAGE"     -> MessageType.IMAGE
-    messageType == "FILE" && mediaType == "VIDEO"     -> MessageType.VIDEO
-    else                                              -> MessageType.IMAGE
+private val VIDEO_EXTS = setOf("mp4", "mov", "avi", "mkv", "webm", "3gp", "ts")
+private val AUDIO_EXTS = setOf("mp3", "aac", "wav", "m4a", "ogg", "flac", "opus")
+private val IMAGE_EXTS = setOf("jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp")
+
+private fun resolveType(messageType: String, mediaType: String?, fileName: String?): MessageType {
+    if (messageType == "TEXT") return MessageType.TEXT
+    if (messageType != "FILE") return MessageType.TEXT
+
+    val mt = mediaType?.uppercase()
+    if (mt != null) {
+        return when {
+            mt.contains("VIDEO") -> MessageType.VIDEO
+            mt.contains("AUDIO") -> MessageType.VOICE
+            mt.contains("IMAGE") -> MessageType.IMAGE
+            else                 -> MessageType.FILE
+        }
+    }
+
+    val ext = fileName?.substringAfterLast('.', "")?.lowercase()
+    return when (ext) {
+        in VIDEO_EXTS -> MessageType.VIDEO
+        in AUDIO_EXTS -> MessageType.VOICE
+        in IMAGE_EXTS -> MessageType.IMAGE
+        else          -> MessageType.FILE
+    }
 }
 
 /** RTDB messages/{chatRoomId}/{messageId} 스냅샷 → Room ChatMessageEntity. */

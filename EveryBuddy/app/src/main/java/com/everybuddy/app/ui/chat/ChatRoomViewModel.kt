@@ -17,6 +17,7 @@ import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.MessageRepository
 import com.everybuddy.app.data.repository.TranslateRepository
 import com.everybuddy.app.data.repository.translateUserMessage
+import com.everybuddy.app.data.repository.videoTranslateUserMessage
 import com.everybuddy.app.di.ApplicationScope
 import android.media.MediaMetadataRetriever
 import com.google.firebase.database.FirebaseDatabase
@@ -290,10 +291,15 @@ class ChatRoomViewModel @Inject constructor(
         messageListener = listener
     }
 
-    /** 채팅방의 마지막 SENT 메시지 ID로 POST /messages/{id}/read — RTDB unreadCount=0 reset. */
+    private var lastMarkedReadId: Long = -1L
+
     private suspend fun markChatRoomAsRead(chatRoomId: Long) {
-        val lastMessageId = messageDao.lastMessageId(chatRoomId) ?: return
-        messageRepository.readMessage(lastMessageId)
+        val last = messageDao.lastMessageWithSender(chatRoomId) ?: return
+        if (last.messageId == lastMarkedReadId) return
+        val myUserId = _uiState.value.myUserId
+        if (myUserId != 0L && last.senderId == myUserId) return
+        messageRepository.readMessage(last.messageId)
+        lastMarkedReadId = last.messageId
     }
 
     /** RTDB users/{me}/chatrooms/{roomId}/enterChatRoomAt 단건 read (epoch ms). 실패 시 0. */
@@ -477,31 +483,89 @@ class ChatRoomViewModel @Inject constructor(
 
     private fun loadVideoSubtitles(messageId: String) {
         if (_uiState.value.videoSubtitles.containsKey(messageId)) return
+        if (messageId in _uiState.value.subtitleLoadingIds) return
+        val message = _uiState.value.messages.firstOrNull { it.id == messageId } ?: return
         _uiState.update { it.copy(subtitleLoadingIds = it.subtitleLoadingIds + messageId) }
-        viewModelScope.launch {
-            // TODO: POST /api/v1/messages/{messageId}/video-subtitles
-            //       요청: videoUrl = message.voiceUrl
-            //       응답: [{ startMs: Long, endMs: Long, original: String, translated: String }]
-            // when (val result = messageRepository.getVideoSubtitles(messageId)) {
-            //     is ApiResult.Success -> {
-            //         val subtitles = result.data?.map { VideoSubtitle(it.startMs, it.endMs, it.original, it.translated) } ?: emptyList()
-            //         _uiState.update { state ->
-            //             state.copy(
-            //                 videoSubtitles     = state.videoSubtitles + (messageId to subtitles),
-            //                 subtitleLoadingIds = state.subtitleLoadingIds - messageId,
-            //             )
-            //         }
-            //     }
-            //     else -> _uiState.update { it.copy(subtitleLoadingIds = it.subtitleLoadingIds - messageId) }
-            // }
-            kotlinx.coroutines.delay(1500)
-            _uiState.update { state ->
-                state.copy(
-                    videoSubtitles     = state.videoSubtitles + (messageId to emptyList()),
-                    subtitleLoadingIds = state.subtitleLoadingIds - messageId,
-                )
+
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val file = resolveVideoFileForTranslation(message)
+            if (file == null) {
+                _uiState.update { state ->
+                    state.copy(
+                        subtitleLoadingIds = state.subtitleLoadingIds - messageId,
+                        translationError   = "영상 파일을 불러올 수 없습니다.",
+                    )
+                }
+                return@launch
+            }
+
+            try {
+                translateRepository.translateVideoStream(file).collect { segment ->
+                    if (segment.error != null) {
+                        _uiState.update { state ->
+                            state.copy(
+                                subtitleLoadingIds = state.subtitleLoadingIds - messageId,
+                                subtitleProgress   = state.subtitleProgress - messageId,
+                                translationError   = segment.error,
+                            )
+                        }
+                        return@collect
+                    }
+                    val newSub = VideoSubtitle(
+                        startMs    = (segment.startSeconds * 1000).toLong(),
+                        endMs      = (segment.endSeconds * 1000).toLong(),
+                        original   = segment.sourceText,
+                        translated = segment.translatedText,
+                    )
+                    _uiState.update { state ->
+                        state.copy(
+                            videoSubtitles     = state.videoSubtitles +
+                                (messageId to (state.videoSubtitles[messageId].orEmpty() + newSub)),
+                            subtitleProgress   = when {
+                                segment.isFinal                -> state.subtitleProgress - messageId
+                                segment.totalSegments > 0     -> state.subtitleProgress +
+                                    (messageId to (segment.index to segment.totalSegments))
+                                else                           -> state.subtitleProgress
+                            },
+                            subtitleLoadingIds = if (segment.isFinal)
+                                state.subtitleLoadingIds - messageId
+                            else
+                                state.subtitleLoadingIds,
+                        )
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _uiState.update { state ->
+                    state.copy(
+                        subtitleLoadingIds = state.subtitleLoadingIds - messageId,
+                        subtitleProgress   = state.subtitleProgress - messageId,
+                        translationError   = "번역 연결이 끊어졌습니다.",
+                    )
+                }
             }
         }
+    }
+
+    private suspend fun resolveVideoFileForTranslation(message: ChatMessage): File? {
+        // 이미 로컬에 영속된 파일이 있으면 바로 사용
+        message.localFilePath?.let { path ->
+            val f = File(path)
+            if (f.exists() && f.length() > 0) return f
+        }
+        val mid = message.id.toLongOrNull() ?: return null
+        val ext = mediaFileStore.extFromUrlOrName(
+            url      = message.voiceUrl.takeIf { it.isNotBlank() },
+            fileName = message.fileName.takeIf { it.isNotBlank() },
+            fallback = "mp4",
+        )
+        // mediaFileStore 영속 경로 확인
+        val persisted = mediaFileStore.pathFor(mid, ext)
+        if (persisted.exists() && persisted.length() > 0) return persisted
+        // S3에서 다운로드 후 영속화 (이후 재생에도 재사용)
+        val url = message.voiceUrl.ifBlank { return null }
+        return mediaFileStore.downloadAndPersist(url, mid, ext)
     }
 
     fun onPlayVoice(messageId: String) {
@@ -793,7 +857,13 @@ class ChatRoomViewModel @Inject constructor(
         if (uris.isEmpty()) return
 
         viewModelScope.launch {
-            uris.forEach { uri -> fileMessageUploader.upload(chatRoomId, uri) }
+            uris.forEach { uri ->
+                when (val result = fileMessageUploader.upload(chatRoomId, uri)) {
+                    is ApiResult.Error        -> _uiState.update { it.copy(translationError = result.message ?: "파일 전송에 실패했습니다.") }
+                    is ApiResult.NetworkError -> _uiState.update { it.copy(translationError = "네트워크 오류로 전송에 실패했습니다.") }
+                    is ApiResult.Success      -> {}
+                }
+            }
         }
     }
 

@@ -3,6 +3,7 @@ package com.everybuddy.app.data.network
 import com.everybuddy.app.data.dto.SpeechTranslateResponse
 import com.everybuddy.app.data.dto.TextTranslateRequest
 import com.everybuddy.app.data.dto.TextTranslateResponse
+import com.everybuddy.app.data.dto.VideoTranslateResponse
 import okhttp3.MultipartBody
 import okhttp3.ResponseBody
 import retrofit2.Response
@@ -44,4 +45,17 @@ interface TranslateApi {
     suspend fun translateSpeech(
         @Part file: MultipartBody.Part,
     ): Response<SpeechTranslateResponse>
+
+    /**
+     * POST /api/v1/translate/video — 영상 VAD + 번역 (multipart)
+     * 200: { translatedText, segments: [{ index, startSeconds, endSeconds, sourceText, translatedText, ... }] }
+     * 400: INVALID_VIDEO_FORMAT / EMPTY_FILE
+     * 413: VIDEO_FILE_TOO_LARGE (50MB 초과)
+     * 500: VIDEO_CONVERT_FAILED | 502: MODEL_ERROR / MODEL_UNAVAILABLE | 504: MODEL_TIMEOUT
+     */
+    @Multipart
+    @POST("api/v1/translate/video")
+    suspend fun translateVideo(
+        @Part file: MultipartBody.Part,
+    ): Response<VideoTranslateResponse>
 }

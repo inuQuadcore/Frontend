@@ -24,9 +24,11 @@ data class SyncMessagesResponse(
 )
 
 // POST /api/v1/messages (multipart JSON part)
+// 파일 메시지: content = null (file만 전송, text와 동시 전송 불가)
+// 텍스트 메시지: content = 본문
 data class SendMessageRequest(
     @SerializedName("chatRoomId")    val chatRoomId    : Long,
-    @SerializedName("content")       val content       : String,
+    @SerializedName("content")       val content       : String? = null,
     @SerializedName("statusPreview") val statusPreview : String? = null,
 )
 

@@ -29,10 +29,10 @@ class FileMessageUploader @Inject constructor(
         val file = copyToCache(uri)
             ?: return ApiResult.Error(-1, "FILE_PREPARE_FAILED", "파일을 읽을 수 없습니다.")
         return try {
-            if (file.length() > MAX_BYTES) {
-                return ApiResult.Error(-1, "FILE_TOO_LARGE", "10MB를 초과합니다.")
-            }
             val mime = resolveMime(uri, file)
+            if (file.length() > MAX_BYTES) {
+                return ApiResult.Error(-1, "FILE_TOO_LARGE", "파일이 너무 큽니다. (최대 50MB)")
+            }
             messageRepository.sendFileMessage(chatRoomId, content, file, mime)
         } finally {
             file.delete()
@@ -75,6 +75,6 @@ class FileMessageUploader @Inject constructor(
     }
 
     companion object {
-        private const val MAX_BYTES = 10L * 1024 * 1024
+        private const val MAX_BYTES = 50L * 1024 * 1024
     }
 }

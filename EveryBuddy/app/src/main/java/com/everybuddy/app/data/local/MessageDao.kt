@@ -55,6 +55,14 @@ interface MessageDao {
     """)
     suspend fun lastMessageId(chatRoomId: Long): Long?
 
+    /** 마지막 메시지의 messageId + senderId — 자기 메시지 read 스킵 판정용. */
+    @Query("""
+        SELECT messageId, senderId FROM chat_messages
+        WHERE chatRoomId = :chatRoomId AND status = 'SENT'
+        ORDER BY sendAt DESC LIMIT 1
+    """)
+    suspend fun lastMessageWithSender(chatRoomId: Long): LastMessageInfo?
+
     /** SENT 상태 메시지 개수 — 로컬 페이지네이션 hasMore 판정. */
     @Query("""
         SELECT COUNT(*) FROM chat_messages
@@ -82,3 +90,5 @@ interface MessageDao {
     @Query("SELECT localFilePath FROM chat_messages WHERE messageId = :messageId")
     suspend fun localFilePath(messageId: Long): String?
 }
+
+data class LastMessageInfo(val messageId: Long, val senderId: Long)

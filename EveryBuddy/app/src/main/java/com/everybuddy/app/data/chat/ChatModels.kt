@@ -84,7 +84,7 @@ enum class ChatFilter(val label: String) {
     FAVORITE("즐겨찾기"),
 }
 
-enum class MessageType { TEXT, VOICE, IMAGE, VIDEO }
+enum class MessageType { TEXT, VOICE, IMAGE, VIDEO, FILE }
 
 data class VideoSubtitle(
     val startMs    : Long,
@@ -109,6 +109,8 @@ data class ChatMessage(
     val isStatusReply    : Boolean         = false,
     val statusPreview    : String          = "",
     val localFilePath    : String?         = null,                  // 영속화된 미디어 로컬 경로. null이면 voiceUrl/fileUrl로 fallback.
+    val fileName         : String          = "",
+    val fileSize         : Long            = 0L,
 )
 
 data class ChatRoomUiState(
@@ -162,7 +164,8 @@ data class ChatRoomUiState(
     val replyToMessage            : ChatMessage?         = null,
 
     // 영상 재생 + 자막
-    val videoPlayerMessageId  : String?                          = null,
-    val videoSubtitles        : Map<String, List<VideoSubtitle>> = emptyMap(),
-    val subtitleLoadingIds    : Set<String>                      = emptySet(),
+    val videoPlayerMessageId  : String?                            = null,
+    val videoSubtitles        : Map<String, List<VideoSubtitle>>  = emptyMap(),
+    val subtitleLoadingIds    : Set<String>                        = emptySet(),
+    val subtitleProgress      : Map<String, Pair<Int, Int>>        = emptyMap(),  // msgId → (current, total)
 )

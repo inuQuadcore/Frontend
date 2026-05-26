@@ -46,6 +46,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -58,15 +59,20 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.media.MediaMetadataRetriever
 import coil.compose.AsyncImage
 import com.everybuddy.app.data.cache.UserSummary
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.everybuddy.app.R
 import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.ui.theme.PretendardFamily
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.format.DateTimeFormatter
 
 // 색상 상수 (디자인 이미지 기준)
@@ -501,6 +507,7 @@ fun ChatRoomContent(
                     senderName        = senderName,
                     subtitles         = state.videoSubtitles[msgId] ?: emptyList(),
                     isSubtitleLoading = msgId in state.subtitleLoadingIds,
+                    subtitleProgress  = state.subtitleProgress[msgId],
                     onClose           = onCloseVideoPlayer,
                 )
             }
@@ -1032,6 +1039,15 @@ fun MessageList(
                             senderName            = senderName,
                             senderProfileImageUrl = senderProfileImageUrl,
                             onTap                 = { onTapVideo(msg.id) },
+                            onLongPress           = { onLongPressMessage(msg) },
+                        )
+
+                    MessageType.FILE ->
+                        FileMessageBubble(
+                            message               = msg,
+                            isMe                  = isMe,
+                            senderName            = senderName,
+                            senderProfileImageUrl = senderProfileImageUrl,
                             onLongPress           = { onLongPressMessage(msg) },
                         )
                 }
@@ -1768,7 +1784,7 @@ fun VideoMessageBubble(
                     style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
                     modifier = Modifier.padding(end = 4.dp),
                 )
-                VideoThumb(onTap = onTap, onLongPress = onLongPress, durationSec = message.voiceDurationSec)
+                VideoThumb(onTap = onTap, onLongPress = onLongPress, localFilePath = message.localFilePath, voiceUrl = message.voiceUrl, durationSec = message.voiceDurationSec)
             }
         } else {
             Row(
@@ -1788,7 +1804,7 @@ fun VideoMessageBubble(
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
                     Row(verticalAlignment = Alignment.Bottom) {
-                        VideoThumb(onTap = onTap, onLongPress = onLongPress, durationSec = message.voiceDurationSec)
+                        VideoThumb(onTap = onTap, onLongPress = onLongPress, localFilePath = message.localFilePath, voiceUrl = message.voiceUrl, durationSec = message.voiceDurationSec)
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text  = timeText,
@@ -1804,10 +1820,31 @@ fun VideoMessageBubble(
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun VideoThumb(
-    onTap       : () -> Unit,
-    onLongPress : () -> Unit,
-    durationSec : Int = 0,
+    onTap         : () -> Unit,
+    onLongPress   : () -> Unit,
+    localFilePath : String?,
+    voiceUrl      : String = "",
+    durationSec   : Int = 0,
 ) {
+    val thumbnail by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, localFilePath, voiceUrl) {
+        value = withContext(Dispatchers.IO) {
+            try {
+                val retriever = MediaMetadataRetriever()
+                val localValid = !localFilePath.isNullOrBlank() && File(localFilePath).exists()
+                if (localValid) {
+                    retriever.setDataSource(localFilePath!!)
+                } else if (voiceUrl.isNotBlank()) {
+                    retriever.setDataSource(voiceUrl, emptyMap())
+                } else {
+                    return@withContext null
+                }
+                retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    ?.asImageBitmap()
+                    .also { retriever.release() }
+            } catch (_: Exception) { null }
+        }
+    }
+
     Box(
         modifier = Modifier
             .width(200.dp)
@@ -1817,6 +1854,14 @@ private fun VideoThumb(
             .combinedClickable(onClick = onTap, onLongClick = onLongPress),
         contentAlignment = Alignment.Center,
     ) {
+        if (thumbnail != null) {
+            Image(
+                bitmap             = thumbnail!!,
+                contentDescription = null,
+                modifier           = Modifier.fillMaxSize(),
+                contentScale       = androidx.compose.ui.layout.ContentScale.Crop,
+            )
+        }
         // Play button circle
         Box(
             modifier         = Modifier
@@ -1825,7 +1870,12 @@ private fun VideoThumb(
                 .background(Color.White.copy(alpha = 0.85f)),
             contentAlignment = Alignment.Center,
         ) {
-            Text("▶", style = TextStyle(fontSize = 18.sp, color = Color(0xFF1A1A1A)))
+            Image(
+                painter            = painterResource(R.drawable.ic_play),
+                contentDescription = "재생",
+                modifier           = Modifier.size(20.dp),
+                colorFilter        = ColorFilter.tint(Color(0xFF1A1A1A)),
+            )
         }
         // Duration badge
         if (durationSec > 0) {
@@ -1845,6 +1895,127 @@ private fun VideoThumb(
                 )
             }
         }
+    }
+}
+
+// FileMessageBubble — 파일(문서/압축) 메시지 말풍선
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun FileMessageBubble(
+    message               : ChatMessage,
+    isMe                  : Boolean,
+    senderName            : String  = "",
+    senderProfileImageUrl : String? = null,
+    onLongPress           : () -> Unit = {},
+) {
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
+    val timeText      = remember(message.timestamp) { message.timestamp.format(timeFormatter) }
+    val displayName   = message.fileName.ifBlank { "파일" }
+    val displaySize   = formatFileSize(message.fileSize)
+
+    Column(
+        modifier            = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 3.dp),
+        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+    ) {
+        if (isMe) {
+            Row(
+                modifier              = Modifier.fillMaxWidth().padding(start = 46.dp),
+                verticalAlignment     = Alignment.Bottom,
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Text(
+                    text     = timeText,
+                    style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+                FileChip(displayName, displaySize, isMe, onLongPress)
+            }
+        } else {
+            Row(
+                modifier          = Modifier.fillMaxWidth().padding(end = 38.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                SenderAvatar(
+                    profileImageUrl    = senderProfileImageUrl,
+                    contentDescription = senderName,
+                    size               = 38.dp,
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(horizontalAlignment = Alignment.Start) {
+                    Text(
+                        text     = senderName,
+                        style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
+                        modifier = Modifier.padding(bottom = 3.dp),
+                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        FileChip(displayName, displaySize, isMe, onLongPress)
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text  = timeText,
+                            style = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun FileChip(
+    fileName    : String,
+    fileSize    : String,
+    isMe        : Boolean,
+    onLongPress : () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .widthIn(max = 220.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (isMe) BubbleBlue else BubbleWhite)
+            .combinedClickable(onLongClick = onLongPress, onClick = {})
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Image(
+            painter            = painterResource(R.drawable.ic_option_file),
+            contentDescription = null,
+            modifier           = Modifier.size(32.dp),
+            colorFilter        = ColorFilter.tint(AccentBlue),
+        )
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(
+                text     = fileName,
+                style    = TextStyle(
+                    fontSize   = 13.sp,
+                    fontFamily = PretendardFamily,
+                    fontWeight = FontWeight(600),
+                    color      = TextPrimary,
+                ),
+                maxLines  = 2,
+                overflow  = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            if (fileSize.isNotEmpty()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text  = fileSize,
+                    style = TextStyle(fontSize = 11.sp, fontFamily = PretendardFamily, color = TextSecondary),
+                )
+            }
+        }
+    }
+}
+
+private fun formatFileSize(bytes: Long): String {
+    if (bytes <= 0) return ""
+    return when {
+        bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
+        bytes >= 1_024     -> "%.1f KB".format(bytes / 1_024.0)
+        else               -> "$bytes B"
     }
 }
 
@@ -1883,7 +2054,6 @@ fun FullscreenImageViewer(
                     painter            = painterResource(R.drawable.ic_cancel),
                     contentDescription = "닫기",
                     modifier           = Modifier.size(20.dp),
-                    colorFilter        = ColorFilter.tint(Color.White),
                 )
             }
         }

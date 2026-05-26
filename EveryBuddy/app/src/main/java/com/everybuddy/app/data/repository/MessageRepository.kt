@@ -44,11 +44,12 @@ class MessageRepository @Inject constructor(
      */
     suspend fun sendFileMessage(
         chatRoomId : Long,
-        content    : String,
+        content    : String = "",
         file       : File,
         mimeType   : String,
     ): ApiResult<Unit> {
-        val requestBody = gson.toJson(SendMessageRequest(chatRoomId, content))
+        // 파일 메시지는 content null 전송 — CANNOT_SEND_FILE_AND_TEXT_TOGETHER 방지
+        val requestBody = gson.toJson(SendMessageRequest(chatRoomId, null))
             .toRequestBody("application/json".toMediaType())
         val filePart = MultipartBody.Part.createFormData(
             name     = "file",
