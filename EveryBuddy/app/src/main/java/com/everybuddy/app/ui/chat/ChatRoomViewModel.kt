@@ -466,6 +466,44 @@ class ChatRoomViewModel @Inject constructor(
         _uiState.update { it.copy(fullscreenImage = null) }
     }
 
+    fun onOpenVideoPlayer(messageId: String) {
+        _uiState.update { it.copy(videoPlayerMessageId = messageId) }
+        loadVideoSubtitles(messageId)
+    }
+
+    fun onCloseVideoPlayer() {
+        _uiState.update { it.copy(videoPlayerMessageId = null) }
+    }
+
+    private fun loadVideoSubtitles(messageId: String) {
+        if (_uiState.value.videoSubtitles.containsKey(messageId)) return
+        _uiState.update { it.copy(subtitleLoadingIds = it.subtitleLoadingIds + messageId) }
+        viewModelScope.launch {
+            // TODO: POST /api/v1/messages/{messageId}/video-subtitles
+            //       요청: videoUrl = message.voiceUrl
+            //       응답: [{ startMs: Long, endMs: Long, original: String, translated: String }]
+            // when (val result = messageRepository.getVideoSubtitles(messageId)) {
+            //     is ApiResult.Success -> {
+            //         val subtitles = result.data?.map { VideoSubtitle(it.startMs, it.endMs, it.original, it.translated) } ?: emptyList()
+            //         _uiState.update { state ->
+            //             state.copy(
+            //                 videoSubtitles     = state.videoSubtitles + (messageId to subtitles),
+            //                 subtitleLoadingIds = state.subtitleLoadingIds - messageId,
+            //             )
+            //         }
+            //     }
+            //     else -> _uiState.update { it.copy(subtitleLoadingIds = it.subtitleLoadingIds - messageId) }
+            // }
+            kotlinx.coroutines.delay(1500)
+            _uiState.update { state ->
+                state.copy(
+                    videoSubtitles     = state.videoSubtitles + (messageId to emptyList()),
+                    subtitleLoadingIds = state.subtitleLoadingIds - messageId,
+                )
+            }
+        }
+    }
+
     fun onPlayVoice(messageId: String) {
         if (_uiState.value.playingMessageId == messageId) { voicePlayer.stop(); return }
         val msg = _uiState.value.messages.find { it.id == messageId } ?: return

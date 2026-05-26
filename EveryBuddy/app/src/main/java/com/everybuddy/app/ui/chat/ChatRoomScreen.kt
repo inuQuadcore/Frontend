@@ -161,6 +161,8 @@ fun ChatRoomScreen(
         onPlayVoice              = viewModel::onPlayVoice,
         onToggleTranslation      = viewModel::onToggleTranslation,
         onTapImage               = viewModel::onTapImage,
+        onTapVideo             = viewModel::onOpenVideoPlayer,
+        onCloseVideoPlayer     = viewModel::onCloseVideoPlayer,
         onImageAppeared          = viewModel::onImageAppeared,
         onCloseFullscreenImage   = viewModel::onCloseFullscreenImage,
         onToggleAutoTranslate    = viewModel::onToggleAutoTranslate,
@@ -223,6 +225,8 @@ fun ChatRoomContent(
     onPlayVoice               : (String) -> Unit,
     onToggleTranslation       : (String) -> Unit,
     onTapImage                : (String) -> Unit           = {},
+    onTapVideo               : (String) -> Unit           = {},
+    onCloseVideoPlayer       : () -> Unit                 = {},
     onImageAppeared           : (String) -> Unit           = {},
     onCloseFullscreenImage    : () -> Unit                 = {},
     onToggleAutoTranslate     : () -> Unit,
@@ -412,6 +416,7 @@ fun ChatRoomContent(
                 onPlayVoice           = onPlayVoice,
                 onToggleTranslation   = onToggleTranslation,
                 onTapImage            = onTapImage,
+                onTapVideo            = onTapVideo,
                 onImageAppeared       = onImageAppeared,
                 onLongPressMessage    = onLongPressMessage,
                 onSaveScript          = { msg -> onStartScriptSave(msg.id) },
@@ -486,6 +491,17 @@ fun ChatRoomContent(
 
         state.fullscreenImage?.let { img ->
             FullscreenImageViewer(image = img, onClose = onCloseFullscreenImage)
+        }
+        state.videoPlayerMessageId?.let { msgId ->
+            val videoMsg = state.messages.find { it.id == msgId }
+            if (videoMsg != null) {
+                VideoPlayerScreen(
+                    message           = videoMsg,
+                    subtitles         = state.videoSubtitles[msgId] ?: emptyList(),
+                    isSubtitleLoading = msgId in state.subtitleLoadingIds,
+                    onClose           = onCloseVideoPlayer,
+                )
+            }
         }
 
         state.contextMenuMessage?.let { msg ->
@@ -922,6 +938,7 @@ fun MessageList(
     onPlayVoice           : (String) -> Unit,
     onToggleTranslation   : (String) -> Unit,
     onTapImage            : (String) -> Unit       = {},
+    onTapVideo            : (String) -> Unit       = {},
     onImageAppeared       : (String) -> Unit       = {},
     onLongPressMessage    : (ChatMessage) -> Unit = {},
     onSaveScript          : (ChatMessage) -> Unit,
@@ -1003,6 +1020,16 @@ fun MessageList(
                             senderProfileImageUrl = senderProfileImageUrl,
                             onTap                 = { onTapImage(msg.id) },
                             onAppeared            = { onImageAppeared(msg.id) },
+                            onLongPress           = { onLongPressMessage(msg) },
+                        )
+
+                    MessageType.VIDEO ->
+                        VideoMessageBubble(
+                            message               = msg,
+                            isMe                  = isMe,
+                            senderName            = senderName,
+                            senderProfileImageUrl = senderProfileImageUrl,
+                            onTap                 = { onTapVideo(msg.id) },
                             onLongPress           = { onLongPressMessage(msg) },
                         )
                 }
@@ -1708,6 +1735,117 @@ private fun ImageThumb(
     }
 }
 
+// VideoMessageBubble — 영상 메시지 말풍선 (썸네일 플레이스홀더 + 재생 버튼)
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun VideoMessageBubble(
+    message               : ChatMessage,
+    isMe                  : Boolean,
+    senderName            : String  = "",
+    senderProfileImageUrl : String? = null,
+    onTap                 : () -> Unit = {},
+    onLongPress           : () -> Unit = {},
+) {
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
+    val timeText = remember(message.timestamp) { message.timestamp.format(timeFormatter) }
+
+    Column(
+        modifier            = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 3.dp),
+        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+    ) {
+        if (isMe) {
+            Row(
+                modifier              = Modifier.fillMaxWidth().padding(start = 46.dp),
+                verticalAlignment     = Alignment.Bottom,
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Text(
+                    text     = timeText,
+                    style    = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+                VideoThumb(onTap = onTap, onLongPress = onLongPress, durationSec = message.voiceDurationSec)
+            }
+        } else {
+            Row(
+                modifier          = Modifier.fillMaxWidth().padding(end = 38.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                SenderAvatar(
+                    profileImageUrl    = senderProfileImageUrl,
+                    contentDescription = senderName,
+                    size               = 38.dp,
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                    Text(
+                        text     = senderName,
+                        style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(500), color = TextSecondary),
+                        modifier = Modifier.padding(bottom = 3.dp),
+                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        VideoThumb(onTap = onTap, onLongPress = onLongPress, durationSec = message.voiceDurationSec)
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text  = timeText,
+                            style = TextStyle(fontSize = 9.sp, color = TextSecondary),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun VideoThumb(
+    onTap       : () -> Unit,
+    onLongPress : () -> Unit,
+    durationSec : Int = 0,
+) {
+    Box(
+        modifier = Modifier
+            .width(200.dp)
+            .height(130.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF1A1A1A))
+            .combinedClickable(onClick = onTap, onLongClick = onLongPress),
+        contentAlignment = Alignment.Center,
+    ) {
+        // Play button circle
+        Box(
+            modifier         = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.85f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("▶", style = TextStyle(fontSize = 18.sp, color = Color(0xFF1A1A1A)))
+        }
+        // Duration badge
+        if (durationSec > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            ) {
+                val m = durationSec / 60
+                val s = durationSec % 60
+                Text(
+                    text  = "%02d:%02d".format(m, s),
+                    style = TextStyle(fontSize = 11.sp, color = Color.White, fontFamily = PretendardFamily),
+                )
+            }
+        }
+    }
+}
+
 // FullscreenImageViewer — 이미지 메시지 탭 시 풀스크린 뷰어 (X 버튼으로 닫기)
 @Composable
 fun FullscreenImageViewer(
@@ -1729,19 +1867,21 @@ fun FullscreenImageViewer(
                 contentScale       = ContentScale.Fit,
                 modifier           = Modifier.fillMaxSize(),
             )
-            IconButton(
-                onClick  = onClose,
+            Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(12.dp)
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.5f)),
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable(onClick = onClose),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(
+                Image(
                     painter            = painterResource(R.drawable.ic_cancel),
                     contentDescription = "닫기",
-                    tint               = Color.White,
+                    modifier           = Modifier.size(20.dp),
+                    colorFilter        = ColorFilter.tint(Color.White),
                 )
             }
         }

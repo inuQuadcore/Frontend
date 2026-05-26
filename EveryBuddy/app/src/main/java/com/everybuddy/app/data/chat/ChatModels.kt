@@ -84,7 +84,14 @@ enum class ChatFilter(val label: String) {
     FAVORITE("즐겨찾기"),
 }
 
-enum class MessageType { TEXT, VOICE, IMAGE }
+enum class MessageType { TEXT, VOICE, IMAGE, VIDEO }
+
+data class VideoSubtitle(
+    val startMs    : Long,
+    val endMs      : Long,
+    val original   : String,
+    val translated : String,
+)
 
 data class ChatMessage(
     val id               : String          = "",
@@ -153,4 +160,9 @@ data class ChatRoomUiState(
 
     // 채팅 내 메시지 답장 — 롱프레스 "답장하기" 선택 시 설정. null이면 답장 모드 아님.
     val replyToMessage            : ChatMessage?         = null,
+
+    // 영상 재생 + 자막
+    val videoPlayerMessageId  : String?                          = null,
+    val videoSubtitles        : Map<String, List<VideoSubtitle>> = emptyMap(),
+    val subtitleLoadingIds    : Set<String>                      = emptySet(),
 )

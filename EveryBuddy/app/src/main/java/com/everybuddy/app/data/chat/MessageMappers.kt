@@ -55,7 +55,7 @@ private fun resolveType(messageType: String, mediaType: String?): MessageType = 
     messageType == "TEXT"                             -> MessageType.TEXT
     messageType == "FILE" && mediaType == "AUDIO"     -> MessageType.VOICE
     messageType == "FILE" && mediaType == "IMAGE"     -> MessageType.IMAGE
-    // TODO: VIDEO/DOCUMENT용 enum 추가 시 분기. 현재는 IMAGE로 통합 표시.
+    messageType == "FILE" && mediaType == "VIDEO"     -> MessageType.VIDEO
     else                                              -> MessageType.IMAGE
 }
 
