@@ -495,8 +495,10 @@ fun ChatRoomContent(
         state.videoPlayerMessageId?.let { msgId ->
             val videoMsg = state.messages.find { it.id == msgId }
             if (videoMsg != null) {
+                val senderName = state.userSummaries[videoMsg.senderId.toLongOrNull()]?.name ?: ""
                 VideoPlayerScreen(
                     message           = videoMsg,
+                    senderName        = senderName,
                     subtitles         = state.videoSubtitles[msgId] ?: emptyList(),
                     isSubtitleLoading = msgId in state.subtitleLoadingIds,
                     onClose           = onCloseVideoPlayer,

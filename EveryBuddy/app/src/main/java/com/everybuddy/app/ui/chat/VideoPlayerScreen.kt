@@ -4,16 +4,14 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Slider
@@ -22,10 +20,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -45,17 +43,17 @@ import com.everybuddy.app.ui.theme.PretendardFamily
 import kotlinx.coroutines.delay
 import java.io.File
 
-private val VpBg           = Color(0xFF000000)
-private val VpSubtitleBg   = Color(0xCC000000)
-private val VpControlBg    = Color(0xB3000000)
-private val VpAccent       = Color(0xFF0167FF)
-private val VpTextSec      = Color(0xFFAAAAAA)
-private val VpScriptBg     = Color(0xFF111111)
-private val VpDivider      = Color(0xFF2A2A2A)
+private val VpBg        = Color(0xFF000000)
+private val VpAccent    = Color(0xFF2979FF)
+private val VpTextSec   = Color(0xFFAAAAAA)
+private val VpScriptBg  = Color(0xFF1A1A1A)
+private val VpScriptHdr = Color(0xFF222222)
+private val VpDivider   = Color(0xFF2A2A2A)
 
 @Composable
 fun VideoPlayerScreen(
     message           : ChatMessage,
+    senderName        : String,
     subtitles         : List<VideoSubtitle>,
     isSubtitleLoading : Boolean,
     onClose           : () -> Unit,
@@ -79,11 +77,9 @@ fun VideoPlayerScreen(
     var isPlaying    by remember { mutableStateOf(false) }
     var isDragging   by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableFloatStateOf(0f) }
-    var showControls by remember { mutableStateOf(true) }
     var isScriptOpen by remember { mutableStateOf(false) }
     var isLandscape  by remember { mutableStateOf(false) }
 
-    // Position polling
     LaunchedEffect(player) {
         while (true) {
             delay(100)
@@ -95,24 +91,6 @@ fun VideoPlayerScreen(
         }
     }
 
-    // Auto-hide controls after 3s while playing
-    LaunchedEffect(showControls, isPlaying) {
-        if (showControls && isPlaying) {
-            delay(3000)
-            showControls = false
-        }
-    }
-
-    // Scroll script panel to active subtitle
-    val activeSubtitleIdx = remember(positionMs, subtitles) {
-        subtitles.indexOfFirst { it.startMs <= positionMs && positionMs < it.endMs }
-    }
-    val currentSubtitle = subtitles.getOrNull(activeSubtitleIdx)
-
-    val seekProgress = if (isDragging) dragProgress
-                       else if (durationMs > 0) positionMs.toFloat() / durationMs
-                       else 0f
-
     DisposableEffect(Unit) {
         onDispose {
             player.release()
@@ -120,23 +98,43 @@ fun VideoPlayerScreen(
         }
     }
 
+    val activeSubtitleIdx = remember(positionMs, subtitles) {
+        subtitles.indexOfLast { it.startMs <= positionMs }
+    }
+    val currentSubtitle = subtitles.getOrNull(activeSubtitleIdx)
+
+    val seekProgress = if (isDragging) dragProgress
+                       else if (durationMs > 0) positionMs.toFloat() / durationMs
+                       else 0f
+
     Dialog(
         onDismissRequest = onClose,
         properties       = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         Box(modifier = Modifier.fillMaxSize().background(VpBg)) {
-            Row(modifier = Modifier.fillMaxSize()) {
 
-                // ── Video Section ──────────────────────────────────────────
+            Column(modifier = Modifier.fillMaxSize()) {
+
+                // ① Sender name (48dp, centered)
                 Box(
-                    modifier = Modifier
-                        .weight(if (isScriptOpen) 0.6f else 1f)
-                        .fillMaxHeight()
-                        .pointerInput(Unit) {
-                            detectTapGestures { showControls = !showControls }
-                        },
+                    modifier         = Modifier.fillMaxWidth().height(48.dp).statusBarsPadding(),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    // ExoPlayer surface
+                    Text(
+                        text  = senderName,
+                        style = TextStyle(
+                            fontSize   = 16.sp,
+                            fontFamily = PretendardFamily,
+                            fontWeight = FontWeight.Medium,
+                            color      = Color.White,
+                        ),
+                    )
+                }
+
+                // ③ Video area (fills remaining space)
+                Box(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                ) {
                     AndroidView(
                         factory = { ctx ->
                             PlayerView(ctx).apply {
@@ -147,164 +145,149 @@ fun VideoPlayerScreen(
                         },
                         modifier = Modifier.fillMaxSize(),
                     )
+                }
 
-                    // Movie-style subtitle overlay
-                    val bottomPad = if (showControls) 88.dp else 20.dp
-                    currentSubtitle?.let { sub ->
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = bottomPad, start = 16.dp, end = 16.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(VpSubtitleBg)
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                        ) {
-                            Text(
-                                text  = sub.translated,
-                                style = TextStyle(
-                                    fontSize   = 17.sp,
-                                    fontFamily = PretendardFamily,
-                                    fontWeight = FontWeight(600),
-                                    color      = Color.White,
-                                ),
-                            )
-                        }
-                    }
-
-                    // Subtitle loading spinner
+                // ④ Subtitle text area (below video, min 72dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 72.dp)
+                        .background(VpBg)
+                        .padding(16.dp),
+                ) {
                     if (isSubtitleLoading) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = bottomPad),
-                        ) {
-                            CircularProgressIndicator(
-                                modifier    = Modifier.size(22.dp),
-                                color       = Color.White,
-                                strokeWidth = 2.dp,
-                            )
-                        }
-                    }
-
-                    // Controls overlay
-                    AnimatedVisibility(
-                        visible  = showControls,
-                        enter    = fadeIn(),
-                        exit     = fadeOut(),
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-
-                            // ── Top bar ─────────────────────────────────
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(VpControlBg)
-                                    .statusBarsPadding()
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    .align(Alignment.TopStart),
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment     = Alignment.CenterVertically,
-                            ) {
-                                // Script toggle
-                                VpIconButton(
-                                    onClick    = { isScriptOpen = !isScriptOpen },
-                                    isActive   = isScriptOpen,
-                                ) {
-                                    Text("📄", fontSize = 16.sp) // TODO: ic_script 교체
-                                }
-                                Spacer(Modifier.width(4.dp))
-                                // Rotate
-                                VpIconButton(onClick = {
-                                    isLandscape = !isLandscape
-                                    activity?.requestedOrientation =
-                                        if (isLandscape) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                                        else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                }) {
-                                    Text("⟳", fontSize = 20.sp, color = Color.White) // TODO: ic_rotate 교체
-                                }
-                                Spacer(Modifier.width(4.dp))
-                                // Close
-                                VpIconButton(onClick = onClose) {
-                                    Image(
-                                        painter            = painterResource(R.drawable.ic_cancel),
-                                        contentDescription = "닫기",
-                                        modifier           = Modifier.size(18.dp),
-                                        colorFilter        = ColorFilter.tint(Color.White),
-                                    )
-                                }
-                            }
-
-                            // ── Center play/pause ────────────────────────
-                            Box(
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.18f))
-                                    .clickable {
-                                        if (isPlaying) player.pause() else player.play()
-                                        showControls = true
-                                    }
-                                    .align(Alignment.Center),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text  = if (isPlaying) "⏸" else "▶", // TODO: ic_pause / ic_play 교체
-                                    style = TextStyle(fontSize = 26.sp, color = Color.White),
-                                )
-                            }
-
-                            // ── Bottom seek bar + time ───────────────────
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(VpControlBg)
-                                    .navigationBarsPadding()
-                                    .padding(horizontal = 12.dp)
-                                    .align(Alignment.BottomStart),
-                            ) {
-                                Slider(
-                                    value    = seekProgress,
-                                    onValueChange = { isDragging = true; dragProgress = it },
-                                    onValueChangeFinished = {
-                                        player.seekTo((dragProgress * durationMs).toLong())
-                                        isDragging = false
-                                    },
-                                    colors   = SliderDefaults.colors(
-                                        thumbColor         = Color.White,
-                                        activeTrackColor   = VpAccent,
-                                        inactiveTrackColor = Color.White.copy(alpha = 0.25f),
-                                    ),
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                Row(
-                                    modifier              = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Text(
-                                        text  = vpFmtDuration((positionMs / 1000).toInt()),
-                                        style = TextStyle(fontSize = 12.sp, color = VpTextSec, fontFamily = PretendardFamily),
-                                    )
-                                    Text(
-                                        text  = vpFmtDuration((durationMs / 1000).toInt()),
-                                        style = TextStyle(fontSize = 12.sp, color = VpTextSec, fontFamily = PretendardFamily),
-                                    )
-                                }
-                            }
-                        }
+                        CircularProgressIndicator(
+                            modifier    = Modifier.align(Alignment.Center).size(22.dp),
+                            color       = Color.White,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text(
+                            text  = currentSubtitle?.translated ?: "",
+                            style = TextStyle(
+                                fontSize   = 15.sp,
+                                fontFamily = PretendardFamily,
+                                color      = Color.White,
+                                lineHeight  = 21.sp,
+                            ),
+                        )
                     }
                 }
 
-                // ── Script Panel ───────────────────────────────────────────
-                if (isScriptOpen) {
+                // ⑤ Controls row: [Play/Pause] [Seekbar] [Rotate] [Caption]
+                Row(
+                    modifier          = Modifier
+                        .fillMaxWidth()
+                        .background(VpBg)
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    VpCtrlBtn(onClick = { if (isPlaying) player.pause() else player.play() }) {
+                        if (isPlaying) {
+                            Image(
+                                painter            = painterResource(R.drawable.ic_play),
+                                contentDescription = "일시정지",
+                                modifier           = Modifier.size(24.dp),
+                                colorFilter        = ColorFilter.tint(Color.White),
+                            )
+                        } else {
+                            // TODO: play 아이콘 이름 확인 후 Image(painterResource(R.drawable.ic_???)) 로 교체
+                            Text("▶", style = TextStyle(fontSize = 20.sp, color = Color.White))
+                        }
+                    }
+
+                    Slider(
+                        value                = seekProgress,
+                        onValueChange        = { isDragging = true; dragProgress = it },
+                        onValueChangeFinished = {
+                            player.seekTo((dragProgress * durationMs).toLong())
+                            isDragging = false
+                        },
+                        colors   = SliderDefaults.colors(
+                            thumbColor         = VpAccent,
+                            activeTrackColor   = VpAccent,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.25f),
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+
+                    // Rotate button — TODO: ic_rotate 아이콘 추가 시 교체
+                    VpCtrlBtn(onClick = {
+                        isLandscape = !isLandscape
+                        activity?.requestedOrientation =
+                            if (isLandscape) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                            else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                    }) {
+                        Text("⟳", style = TextStyle(fontSize = 20.sp, color = Color.White))
+                    }
+
+                    VpCtrlBtn(
+                        onClick    = { isScriptOpen = !isScriptOpen },
+                        isActive   = isScriptOpen,
+                    ) {
+                        Image(
+                            painter            = painterResource(R.drawable.ic_caption),
+                            contentDescription = "스크립트",
+                            modifier           = Modifier.size(22.dp),
+                            colorFilter        = ColorFilter.tint(Color.White),
+                        )
+                    }
+                }
+
+                // ⑥ Time row
+                Row(
+                    modifier              = Modifier
+                        .fillMaxWidth()
+                        .background(VpBg)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 8.dp)
+                        .navigationBarsPadding(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text  = vpFmtDuration((positionMs / 1000).toInt()),
+                        style = TextStyle(fontSize = 12.sp, color = VpTextSec, fontFamily = PretendardFamily),
+                    )
+                    Text(
+                        text  = vpFmtDuration((durationMs / 1000).toInt()),
+                        style = TextStyle(fontSize = 12.sp, color = VpTextSec, fontFamily = PretendardFamily),
+                    )
+                }
+            }
+
+            // ② Close button — top-end overlay, circular semi-transparent bg
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(8.dp)
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x66000000))
+                    .clickable(onClick = onClose),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painter            = painterResource(R.drawable.ic_cancel),
+                    contentDescription = "닫기",
+                    modifier           = Modifier.size(18.dp),
+                    colorFilter        = ColorFilter.tint(Color.White),
+                )
+            }
+
+            // ⑧ Script panel — slides in from right, centered vertically
+            Box(modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()) {
+                AnimatedVisibility(
+                    visible = isScriptOpen,
+                    enter   = slideInHorizontally { it },
+                    exit    = slideOutHorizontally { it },
+                ) {
                     ScriptPanel(
-                        modifier          = Modifier
-                            .weight(0.4f)
-                            .fillMaxHeight()
-                            .background(VpScriptBg),
-                        subtitles         = subtitles,
-                        activeIdx         = activeSubtitleIdx,
-                        isLoading         = isSubtitleLoading,
+                        modifier  = Modifier.width(260.dp).fillMaxHeight().background(VpScriptBg),
+                        subtitles = subtitles,
+                        activeIdx = activeSubtitleIdx,
+                        isLoading = isSubtitleLoading,
+                        onSeekTo  = { ms -> player.seekTo(ms) },
                     )
                 }
             }
@@ -313,7 +296,7 @@ fun VideoPlayerScreen(
 }
 
 @Composable
-private fun VpIconButton(
+private fun VpCtrlBtn(
     onClick  : () -> Unit,
     isActive : Boolean = false,
     content  : @Composable () -> Unit,
@@ -335,68 +318,89 @@ private fun ScriptPanel(
     subtitles : List<VideoSubtitle>,
     activeIdx : Int,
     isLoading : Boolean,
+    onSeekTo  : (Long) -> Unit,
 ) {
     val listState = rememberLazyListState()
 
     LaunchedEffect(activeIdx) {
-        if (activeIdx >= 0) {
-            listState.animateScrollToItem(
-                index       = activeIdx,
-                scrollOffset = -80,
-            )
-        }
+        if (activeIdx >= 0) listState.animateScrollToItem(activeIdx)
     }
 
-    Box(modifier = modifier) {
+    Column(modifier = modifier) {
+        // Panel header
+        Box(
+            modifier         = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .background(VpScriptHdr)
+                .padding(start = 16.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(
+                text  = "스크립트",
+                style = TextStyle(
+                    fontSize   = 14.sp,
+                    fontFamily = PretendardFamily,
+                    fontWeight = FontWeight.Medium,
+                    color      = Color.White,
+                ),
+            )
+        }
+
         when {
             isLoading -> {
-                CircularProgressIndicator(
-                    modifier    = Modifier.align(Alignment.Center).size(32.dp),
-                    color       = VpAccent,
-                    strokeWidth = 2.dp,
-                )
+                Box(
+                    modifier         = Modifier.height(280.dp).fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp), color = VpAccent, strokeWidth = 2.dp)
+                }
             }
             subtitles.isEmpty() -> {
-                Text(
-                    text     = "자막 없음",
-                    modifier = Modifier.align(Alignment.Center),
-                    style    = TextStyle(fontSize = 14.sp, color = VpTextSec, fontFamily = PretendardFamily),
-                )
+                Box(
+                    modifier         = Modifier.height(280.dp).fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text  = "자막 없음",
+                        style = TextStyle(fontSize = 14.sp, color = VpTextSec, fontFamily = PretendardFamily),
+                    )
+                }
             }
             else -> {
                 LazyColumn(
                     state          = listState,
-                    modifier       = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 8.dp),
+                    modifier       = Modifier.height(280.dp).fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 4.dp),
                 ) {
                     itemsIndexed(subtitles, key = { i, _ -> i }) { idx, sub ->
                         val isActive = idx == activeIdx
-                        Box(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(if (isActive) VpAccent else Color.Transparent)
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                                .alpha(if (isActive) 1f else 0.55f)
+                                .clickable { onSeekTo(sub.startMs) }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
                         ) {
-                            Column {
-                                Text(
-                                    text  = sub.translated,
-                                    style = TextStyle(
-                                        fontSize   = 16.sp,
-                                        fontFamily = PretendardFamily,
-                                        color      = if (isActive) Color.White else Color(0xFFE0E0E0),
-                                        fontWeight = if (isActive) FontWeight(700) else FontWeight(400),
-                                    ),
-                                )
-                                Spacer(Modifier.height(3.dp))
-                                Text(
-                                    text  = sub.original,
-                                    style = TextStyle(
-                                        fontSize   = 12.sp,
-                                        fontFamily = PretendardFamily,
-                                        color      = if (isActive) Color.White.copy(0.75f) else Color(0xFF777777),
-                                    ),
-                                )
-                            }
+                            Text(
+                                text  = "[${vpFmtDuration((sub.startMs / 1000).toInt())}] ${sub.translated}",
+                                style = TextStyle(
+                                    fontSize   = 13.sp,
+                                    fontFamily = PretendardFamily,
+                                    color      = Color.White,
+                                    lineHeight  = 17.sp,
+                                    fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
+                                ),
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text  = sub.original,
+                                style = TextStyle(
+                                    fontSize   = 11.sp,
+                                    fontFamily = PretendardFamily,
+                                    color      = Color(0xFF888888),
+                                ),
+                            )
                         }
                         if (idx < subtitles.lastIndex) {
                             HorizontalDivider(color = VpDivider, thickness = 0.5.dp)
