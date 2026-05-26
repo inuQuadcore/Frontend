@@ -177,7 +177,7 @@ fun ChatRoomScreen(
             // 시스템 PhotoPicker는 자체 권한 처리 — 별도 권한 요청 불필요.
             multiPhotoLauncher.launch(
                 androidx.activity.result.PickVisualMediaRequest(
-                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                    ActivityResultContracts.PickVisualMedia.ImageAndVideo
                 )
             )
         },
@@ -2037,7 +2037,7 @@ fun MediaPanel(
     onSaveScript : () -> Unit,
 ) {
     val items = listOf(
-        Triple("사진",    R.drawable.ic_option_photo,  onPhoto),
+        Triple("사진/동영상", R.drawable.ic_option_photo, onPhoto),
         Triple("카메라",  R.drawable.ic_option_camera, onCamera),
         Triple("파일",    R.drawable.ic_option_file,   onFile),
         Triple("대화저장", R.drawable.ic_option_script, onSaveScript),
@@ -2114,7 +2114,7 @@ fun PhotoPickerSheet(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
             ) {
                 Text(
-                    text  = "사진",
+                    text  = "사진/동영상",
                     style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(600), color = TextPrimary),
                     modifier = Modifier.align(Alignment.Center),
                 )
