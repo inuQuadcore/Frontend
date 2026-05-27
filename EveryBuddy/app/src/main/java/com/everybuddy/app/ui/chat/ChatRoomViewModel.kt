@@ -8,6 +8,7 @@ import com.everybuddy.app.data.chat.*
 import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.local.ChatRoomPreferences
 import com.everybuddy.app.data.local.MessageDao
+import com.everybuddy.app.data.local.MessageCachedFields
 import com.everybuddy.app.data.local.TokenManager
 import com.everybuddy.app.data.local.formatRestLocalDateTime
 import com.everybuddy.app.data.firebase.ChatMessageListener
@@ -281,7 +282,10 @@ class ChatRoomViewModel @Inject constructor(
             chatRoomId      = chatRoomId,
             enterChatRoomAt = enterChatRoomAt,
             onUpsert        = { entity ->
-                viewModelScope.launch { messageDao.upsertPreservingClientFields(entity) }
+                viewModelScope.launch {
+                    val cached = messageDao.cachedFieldsForIds(listOf(entity.messageId)).firstOrNull()
+                    messageDao.upsert(entity.preserveCache(cached))
+                }
             },
             onRemoved       = { messageId ->
                 viewModelScope.launch { messageDao.delete(messageId) }
@@ -322,10 +326,24 @@ class ChatRoomViewModel @Inject constructor(
                 val data = result.data ?: return
                 val toUpsert = (data.newMessages + data.updatedMessages)
                     .map { it.toChatMessageEntity(chatRoomId) }
-                if (toUpsert.isNotEmpty()) messageDao.upsertAllPreservingClientFields(toUpsert)
+                if (toUpsert.isNotEmpty()) {
+                    val cached = messageDao.cachedFieldsForIds(toUpsert.map { it.messageId })
+                        .associateBy { it.messageId }
+                    messageDao.upsertAll(toUpsert.map { it.preserveCache(cached[it.messageId]) })
+                }
                 if (data.deletedIds.isNotEmpty()) messageDao.deleteAll(data.deletedIds)
             }
             else -> { /* 에러는 silent fail — Room의 옛 메시지만 표시 */ }
+        }
+    }
+
+    fun refresh() {
+        val chatRoomId = _uiState.value.room.id.toLongOrNull() ?: return
+        if (_uiState.value.isRefreshing) return
+        _uiState.update { it.copy(isRefreshing = true) }
+        viewModelScope.launch {
+            syncMessagesFromServer(chatRoomId)
+            _uiState.update { it.copy(isRefreshing = false) }
         }
     }
 
@@ -607,12 +625,20 @@ class ChatRoomViewModel @Inject constructor(
         }
         if (current) return
 
+        // 번역 진행 중 → 완료 시 표시되도록 showTranslation만 미리 예약 (translateMessage 가드 우회 X)
+        if (messageId in state.translatingMessageIds) {
+            _uiState.update { s -> s.copy(showTranslation = s.showTranslation + (messageId to true)) }
+            return
+        }
+
         translateMessage(messageId, autoShow = true)
     }
 
     /**
-     * 메시지 번역 API 호출 후 Room 캐시 저장. Room flow가 emit 갱신 → UI translatedText 채워짐.
-     * autoShow=true면 번역 완료 시 showTranslation도 true로.
+     * 메시지 번역 API 호출 후 Room 캐시 저장.
+     * 번역 완료 시 항상 showTranslation=true로 설정 — autoShow 값과 무관하게 결과를 보여줘야
+     * auto-translate OFF 전환 후에도 번역 텍스트가 사라지지 않고 남아 있게 된다.
+     * messages도 즉시 인메모리 갱신 — Room emit 전 isTranslating=false 구간에 번역이 깜빡이는 현상 방지.
      */
     private fun translateMessage(messageId: String, autoShow: Boolean) {
         val msg = _uiState.value.messages.find { it.id == messageId } ?: return
@@ -658,11 +684,17 @@ class ChatRoomViewModel @Inject constructor(
                 is ApiResult.Success -> {
                     val (translated, source) = result.data
                     messageDao.updateTranslation(msgIdLong, translated, source)
-                    if (autoShow) chatRoomPreferences.setShowTranslation(_uiState.value.room.id, messageId, true)
-                    _uiState.update {
-                        it.copy(
-                            translatingMessageIds = it.translatingMessageIds - messageId,
-                            showTranslation = if (autoShow) it.showTranslation + (messageId to true) else it.showTranslation,
+                    chatRoomPreferences.setShowTranslation(_uiState.value.room.id, messageId, true)
+                    _uiState.update { state ->
+                        state.copy(
+                            translatingMessageIds = state.translatingMessageIds - messageId,
+                            showTranslation       = state.showTranslation + (messageId to true),
+                            messages              = state.messages.map { msg ->
+                                if (msg.id == messageId) msg.copy(
+                                    translatedText = translated,
+                                    sourceText     = source ?: msg.sourceText,
+                                ) else msg
+                            },
                         )
                     }
                 }
