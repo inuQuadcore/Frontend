@@ -2,6 +2,7 @@ package com.everybuddy.app.data.chat
 
 import com.everybuddy.app.data.dto.Message
 import com.everybuddy.app.data.local.ChatMessageEntity
+import com.everybuddy.app.data.local.MessageCachedFields
 import com.everybuddy.app.data.local.epochMsToKstLocalDateTime
 import com.everybuddy.app.data.local.parseRestLocalDateTime
 import com.google.firebase.database.DataSnapshot
@@ -78,6 +79,19 @@ private fun resolveType(messageType: String, mediaType: String?, fileName: Strin
         else          -> MessageType.FILE
     }
 }
+
+/**
+ * 서버/RTDB에서 받은 entity에 기존 DB 캐시(번역·로컬 파일·음성 길이)를 덮어쓰지 않도록 보존.
+ * toChatMessageEntity 변환 결과에는 이 필드들이 null이라 OnConflictStrategy.REPLACE가 번역을 지운다.
+ */
+fun ChatMessageEntity.preserveCache(cached: MessageCachedFields?): ChatMessageEntity =
+    if (cached == null) this
+    else copy(
+        translatedText = translatedText ?: cached.translatedText,
+        sourceText     = sourceText     ?: cached.sourceText,
+        localFilePath  = localFilePath  ?: cached.localFilePath,
+        voiceDuration  = voiceDuration  ?: cached.voiceDuration,
+    )
 
 /** RTDB messages/{chatRoomId}/{messageId} 스냅샷 → Room ChatMessageEntity. */
 fun DataSnapshot.toChatMessageEntity(chatRoomId: Long): ChatMessageEntity? {

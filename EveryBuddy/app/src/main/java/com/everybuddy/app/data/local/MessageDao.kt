@@ -89,6 +89,18 @@ interface MessageDao {
     /** PENDING(음수 tempId) 메시지의 messageId를 서버 PK로 교체할 때 path 캐리오버 용도 readback. */
     @Query("SELECT localFilePath FROM chat_messages WHERE messageId = :messageId")
     suspend fun localFilePath(messageId: Long): String?
+
+    /** upsert 시 번역·로컬 캐시 필드 보존용 readback. */
+    @Query("SELECT messageId, translatedText, sourceText, localFilePath, voiceDuration FROM chat_messages WHERE messageId IN (:ids)")
+    suspend fun cachedFieldsForIds(ids: List<Long>): List<MessageCachedFields>
 }
 
 data class LastMessageInfo(val messageId: Long, val senderId: Long)
+
+data class MessageCachedFields(
+    val messageId      : Long,
+    val translatedText : String?,
+    val sourceText     : String?,
+    val localFilePath  : String?,
+    val voiceDuration  : Int?,
+)

@@ -1,4 +1,5 @@
 @file:Suppress("DEPRECATION")
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.everybuddy.app.ui.chat
 
@@ -35,6 +36,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -214,6 +216,7 @@ fun ChatRoomScreen(
         onCancelReply            = viewModel::cancelReply,
         isStarred                = isStarred,
         onToggleStar             = onToggleStar,
+        onRefresh                = viewModel::refresh,
     )
 }
 
@@ -262,6 +265,7 @@ fun ChatRoomContent(
     onCancelReply             : () -> Unit             = {},
     isStarred                 : Boolean                = false,
     onToggleStar              : () -> Unit             = {},
+    onRefresh                 : () -> Unit             = {},
 ) {
     var showNewFolderScreen   by remember { mutableStateOf(false) }
     var newFolderAutoSelectId by remember { mutableStateOf<String?>(null) }
@@ -407,29 +411,35 @@ fun ChatRoomContent(
 
             HorizontalDivider(color = DividerGray, thickness = 0.5.dp)
 
-            MessageList(
-                messages              = state.messages,
-                myUserId              = state.myUserId,
-                members               = members,
-                userSummaries         = state.userSummaries,
-                isAutoTranslate       = state.isAutoTranslate,
-                showTranslation       = state.showTranslation,
-                translatingMessageIds = state.translatingMessageIds,
-                playingMessageId      = state.playingMessageId,
-                playPositionMs        = state.playPositionMs,
-                modifier              = Modifier.weight(1f),
-                listState             = listState,
-                onPlayVoice           = onPlayVoice,
-                onToggleTranslation   = onToggleTranslation,
-                onTapImage            = onTapImage,
-                onTapVideo            = onTapVideo,
-                onImageAppeared       = onImageAppeared,
-                onLongPressMessage    = onLongPressMessage,
-                onSaveScript          = { msg -> onStartScriptSave(msg.id) },
-                onRetryMessage        = onRetryMessage,
-                searchQuery           = if (isSearchMode) searchQuery else "",
-                highlightedMessageId  = highlightedMessageId,
-            )
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh    = onRefresh,
+                modifier     = Modifier.weight(1f),
+            ) {
+                MessageList(
+                    messages              = state.messages,
+                    myUserId              = state.myUserId,
+                    members               = members,
+                    userSummaries         = state.userSummaries,
+                    isAutoTranslate       = state.isAutoTranslate,
+                    showTranslation       = state.showTranslation,
+                    translatingMessageIds = state.translatingMessageIds,
+                    playingMessageId      = state.playingMessageId,
+                    playPositionMs        = state.playPositionMs,
+                    modifier              = Modifier.fillMaxSize(),
+                    listState             = listState,
+                    onPlayVoice           = onPlayVoice,
+                    onToggleTranslation   = onToggleTranslation,
+                    onTapImage            = onTapImage,
+                    onTapVideo            = onTapVideo,
+                    onImageAppeared       = onImageAppeared,
+                    onLongPressMessage    = onLongPressMessage,
+                    onSaveScript          = { msg -> onStartScriptSave(msg.id) },
+                    onRetryMessage        = onRetryMessage,
+                    searchQuery           = if (isSearchMode) searchQuery else "",
+                    highlightedMessageId  = highlightedMessageId,
+                )
+            }
 
             AnimatedVisibility(
                 visible = state.isMediaPanelOpen && !state.isRecording,

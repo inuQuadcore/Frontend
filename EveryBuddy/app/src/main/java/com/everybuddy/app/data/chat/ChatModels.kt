@@ -168,4 +168,6 @@ data class ChatRoomUiState(
     val videoSubtitles        : Map<String, List<VideoSubtitle>>  = emptyMap(),
     val subtitleLoadingIds    : Set<String>                        = emptySet(),
     val subtitleProgress      : Map<String, Pair<Int, Int>>        = emptyMap(),  // msgId → (current, total)
+
+    val isRefreshing          : Boolean                            = false,
 )
