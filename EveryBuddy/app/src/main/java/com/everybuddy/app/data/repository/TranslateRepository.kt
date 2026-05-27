@@ -4,30 +4,20 @@ import com.everybuddy.app.data.dto.ApiResult
 import com.everybuddy.app.data.dto.SpeechTranslateResponse
 import com.everybuddy.app.data.dto.TextTranslateRequest
 import com.everybuddy.app.data.dto.TextTranslateResponse
-import com.everybuddy.app.data.dto.VideoStreamSegment
 import com.everybuddy.app.data.dto.VideoTranslateResponse
 import com.everybuddy.app.data.network.TranslateApi
 import com.google.gson.Gson
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import javax.inject.Inject
-import javax.inject.Named
 import javax.inject.Singleton
 
 @Singleton
 class TranslateRepository @Inject constructor(
-    private val api          : TranslateApi,
-    private val gson         : Gson,
-    @Named("translate") private val okHttpClient : OkHttpClient,
-    @Named("base_url")  private val baseUrl      : String,
+    private val api  : TranslateApi,
+    private val gson : Gson,
 ) {
     suspend fun translateText(text: String): ApiResult<TextTranslateResponse> =
         safeApiCall(gson, { api.translateText(TextTranslateRequest(text)) })
@@ -75,80 +65,6 @@ class TranslateRepository @Inject constructor(
             body     = file.asRequestBody(mimeType),
         )
         return safeApiCall(gson, { api.translateVideo(part) })
-    }
-
-    /**
-     * 영상 번역 스트리밍 — POST /api/v1/translate/video/stream (SSE)
-     * 구간별로 VideoStreamSegment를 emit. error 필드가 있거나 isFinal=true이면 스트림 종료.
-     * 네트워크 오류·5xx 시 최대 MAX_STREAM_RETRIES회 재시도 (지수 백오프).
-     * 재시도마다 Request를 새로 빌드하므로 JWT 인터셉터가 Authorization 헤더를 매번 주입.
-     */
-    fun translateVideoStream(file: File): Flow<VideoStreamSegment> = flow {
-        val mimeType = when (file.extension.lowercase()) {
-            "mov" -> "video/quicktime"
-            else  -> "video/mp4"
-        }
-        repeat(MAX_STREAM_RETRIES + 1) { attempt ->
-            val requestBody = okhttp3.MultipartBody.Builder()
-                .setType(okhttp3.MultipartBody.FORM)
-                .addFormDataPart("file", file.name, file.asRequestBody(mimeType.toMediaType()))
-                .build()
-            // Request를 매번 새로 빌드 → JWT 인터셉터가 최신 토큰으로 Authorization 헤더 주입
-            val request = Request.Builder()
-                .url("${baseUrl}api/v1/translate/video/stream")
-                .post(requestBody)
-                .addHeader("Accept", "text/event-stream")
-                .build()
-            val call = okHttpClient.newCall(request)
-            try {
-                val response = call.execute()
-                if (!response.isSuccessful) {
-                    response.body?.close()
-                    val canRetry = response.code in 500..599 && attempt < MAX_STREAM_RETRIES
-                    if (!canRetry) {
-                        emit(VideoStreamSegment(error = "HTTP ${response.code}", isFinal = true))
-                        return@flow
-                    }
-                } else {
-                    val source = response.body?.source() ?: run {
-                        emit(VideoStreamSegment(error = "빈 응답", isFinal = true))
-                        return@flow
-                    }
-                    try {
-                        while (!source.exhausted()) {
-                            val line = source.readUtf8Line() ?: break
-                            if (!line.startsWith("data:")) continue
-                            val json = line.removePrefix("data:").trim()
-                            if (json.isEmpty()) continue
-                            val segment = try {
-                                gson.fromJson(json, VideoStreamSegment::class.java)
-                            } catch (_: Exception) { continue }
-                            emit(segment)
-                            if (segment.isFinal) return@flow
-                        }
-                    } finally {
-                        response.body?.close()
-                    }
-                    return@flow
-                }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                call.cancel()
-                throw e
-            } catch (e: java.io.IOException) {
-                if (attempt >= MAX_STREAM_RETRIES) {
-                    emit(VideoStreamSegment(error = e.message ?: "연결 오류", isFinal = true))
-                    return@flow
-                }
-            } catch (e: Exception) {
-                emit(VideoStreamSegment(error = e.message ?: "연결 오류", isFinal = true))
-                return@flow
-            }
-            delay(1000L shl attempt) // 1s, 2s
-        }
-    }
-
-    companion object {
-        private const val MAX_STREAM_RETRIES = 2
     }
 
     private fun guessAudioMediaType(extension: String) =

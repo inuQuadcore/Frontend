@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -61,7 +60,6 @@ fun VideoPlayerScreen(
     senderName        : String,
     subtitles         : List<VideoSubtitle>,
     isSubtitleLoading : Boolean,
-    subtitleProgress  : Pair<Int, Int>? = null,
     onClose           : () -> Unit,
 ) {
     val context = LocalContext.current
@@ -180,29 +178,11 @@ fun VideoPlayerScreen(
                         .padding(16.dp),
                 ) {
                     if (isSubtitleLoading) {
-                        if (subtitleProgress != null) {
-                            Column(
-                                modifier            = Modifier.align(Alignment.Center),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                LinearProgressIndicator(
-                                    progress = { subtitleProgress.first.toFloat() / subtitleProgress.second.coerceAtLeast(1) },
-                                    modifier = Modifier.fillMaxWidth(0.5f),
-                                    color    = VpAccent,
-                                )
-                                Spacer(Modifier.height(6.dp))
-                                Text(
-                                    text  = "번역 중 ${subtitleProgress.first}/${subtitleProgress.second}",
-                                    style = TextStyle(fontSize = 12.sp, color = VpTextSec, fontFamily = PretendardFamily),
-                                )
-                            }
-                        } else {
-                            CircularProgressIndicator(
-                                modifier    = Modifier.align(Alignment.Center).size(22.dp),
-                                color       = Color.White,
-                                strokeWidth = 2.dp,
-                            )
-                        }
+                        CircularProgressIndicator(
+                            modifier    = Modifier.align(Alignment.Center).size(22.dp),
+                            color       = Color.White,
+                            strokeWidth = 2.dp,
+                        )
                     } else {
                         Text(
                             text      = currentSubtitle?.translated ?: "",
@@ -320,13 +300,12 @@ fun VideoPlayerScreen(
                     exit    = slideOutHorizontally { it },
                 ) {
                     ScriptPanel(
-                        modifier         = Modifier.width(260.dp).fillMaxHeight().background(VpScriptBg),
-                        subtitles        = subtitles,
-                        activeIdx        = activeSubtitleIdx,
-                        isLoading        = isSubtitleLoading,
-                        subtitleProgress = subtitleProgress,
-                        onSeekTo         = { ms -> player.seekTo(ms) },
-                        onClose          = { isScriptOpen = false },
+                        modifier  = Modifier.width(260.dp).fillMaxHeight().background(VpScriptBg),
+                        subtitles = subtitles,
+                        activeIdx = activeSubtitleIdx,
+                        isLoading = isSubtitleLoading,
+                        onSeekTo  = { ms -> player.seekTo(ms) },
+                        onClose   = { isScriptOpen = false },
                     )
                 }
             }
@@ -351,13 +330,12 @@ private fun VpCtrlBtn(
 
 @Composable
 private fun ScriptPanel(
-    modifier         : Modifier,
-    subtitles        : List<VideoSubtitle>,
-    activeIdx        : Int,
-    isLoading        : Boolean,
-    subtitleProgress : Pair<Int, Int>? = null,
-    onSeekTo         : (Long) -> Unit,
-    onClose          : () -> Unit,
+    modifier  : Modifier,
+    subtitles : List<VideoSubtitle>,
+    activeIdx : Int,
+    isLoading : Boolean,
+    onSeekTo  : (Long) -> Unit,
+    onClose   : () -> Unit,
 ) {
     val listState = rememberLazyListState()
 
@@ -402,22 +380,7 @@ private fun ScriptPanel(
                     modifier         = Modifier.height(280.dp).fillMaxWidth(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (subtitleProgress != null) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            LinearProgressIndicator(
-                                progress = { subtitleProgress.first.toFloat() / subtitleProgress.second.coerceAtLeast(1) },
-                                modifier = Modifier.fillMaxWidth(0.7f),
-                                color    = VpAccent,
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                text  = "번역 중 ${subtitleProgress.first}/${subtitleProgress.second}",
-                                style = TextStyle(fontSize = 13.sp, color = VpTextSec, fontFamily = PretendardFamily),
-                            )
-                        }
-                    } else {
-                        CircularProgressIndicator(modifier = Modifier.size(32.dp), color = VpAccent, strokeWidth = 2.dp)
-                    }
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp), color = VpAccent, strokeWidth = 2.dp)
                 }
             }
             subtitles.isEmpty() -> {

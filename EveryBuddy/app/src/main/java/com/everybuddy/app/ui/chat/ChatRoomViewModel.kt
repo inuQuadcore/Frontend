@@ -517,49 +517,28 @@ class ChatRoomViewModel @Inject constructor(
                 return@launch
             }
 
-            try {
-                translateRepository.translateVideoStream(file).collect { segment ->
-                    if (segment.error != null) {
-                        _uiState.update { state ->
-                            state.copy(
-                                subtitleLoadingIds = state.subtitleLoadingIds - messageId,
-                                subtitleProgress   = state.subtitleProgress - messageId,
-                                translationError   = segment.error,
-                            )
-                        }
-                        return@collect
-                    }
-                    val newSub = VideoSubtitle(
-                        startMs    = (segment.startSeconds * 1000).toLong(),
-                        endMs      = (segment.endSeconds * 1000).toLong(),
-                        original   = segment.sourceText,
-                        translated = segment.translatedText,
+            val result = translateRepository.translateVideo(file)
+            if (result is ApiResult.Success) {
+                val subs = result.data.segments.map { seg ->
+                    VideoSubtitle(
+                        startMs    = (seg.startSeconds * 1000).toLong(),
+                        endMs      = (seg.endSeconds * 1000).toLong(),
+                        original   = seg.sourceText,
+                        translated = seg.translatedText,
                     )
-                    _uiState.update { state ->
-                        state.copy(
-                            videoSubtitles     = state.videoSubtitles +
-                                (messageId to (state.videoSubtitles[messageId].orEmpty() + newSub)),
-                            subtitleProgress   = when {
-                                segment.isFinal                -> state.subtitleProgress - messageId
-                                segment.totalSegments > 0     -> state.subtitleProgress +
-                                    (messageId to (segment.index to segment.totalSegments))
-                                else                           -> state.subtitleProgress
-                            },
-                            subtitleLoadingIds = if (segment.isFinal)
-                                state.subtitleLoadingIds - messageId
-                            else
-                                state.subtitleLoadingIds,
-                        )
-                    }
                 }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (_: Exception) {
                 _uiState.update { state ->
                     state.copy(
                         subtitleLoadingIds = state.subtitleLoadingIds - messageId,
-                        subtitleProgress   = state.subtitleProgress - messageId,
-                        translationError   = "번역 연결이 끊어졌습니다.",
+                        videoSubtitles     = state.videoSubtitles + (messageId to subs),
+                    )
+                }
+            } else {
+                val errMsg = result.videoTranslateUserMessage().ifBlank { "번역에 실패했습니다." }
+                _uiState.update { state ->
+                    state.copy(
+                        subtitleLoadingIds = state.subtitleLoadingIds - messageId,
+                        translationError   = errMsg,
                     )
                 }
             }
