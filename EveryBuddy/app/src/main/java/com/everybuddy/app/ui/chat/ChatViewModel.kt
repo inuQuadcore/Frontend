@@ -71,12 +71,14 @@ class ChatViewModel @Inject constructor(
         if (userChatRoomsListener != null) return
         viewModelScope.launch {
             val myUserId = tokenManager.userId.firstOrNull() ?: return@launch
+            val initialIds = _listState.value.rooms.mapNotNull { it.id.toLongOrNull() }.toSet()
             val listener = UserChatRoomsListener(
                 userId         = myUserId,
                 onMetaChange   = ::applyRoomMeta,
+                onNewRoom      = { loadChatRooms() },
                 onRoomRemoved  = ::removeRoom,
             )
-            listener.attach()
+            listener.attach(initialIds)
             userChatRoomsListener = listener
         }
     }
