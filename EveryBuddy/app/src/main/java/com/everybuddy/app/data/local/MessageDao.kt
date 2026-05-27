@@ -16,6 +16,42 @@ interface MessageDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(messages: List<ChatMessageEntity>)
 
+    /**
+     * 서버 응답/RTDB 스냅샷에 없는 클라 전용 필드(번역 캐시, 영속 파일 경로, 음성 길이)를
+     * 보존하면서 upsert. REST sync · RTDB onChildAdded 재발사 시 기존 캐시가 null로 덮어써지는 것 방지.
+     */
+    suspend fun upsertPreservingClientFields(entity: ChatMessageEntity) {
+        val existing = clientFieldsFor(entity.messageId)
+        val merged = if (existing == null) entity else entity.copy(
+            translatedText = existing.translatedText ?: entity.translatedText,
+            sourceText     = existing.sourceText     ?: entity.sourceText,
+            localFilePath  = existing.localFilePath  ?: entity.localFilePath,
+            voiceDuration  = existing.voiceDuration  ?: entity.voiceDuration,
+        )
+        upsert(merged)
+    }
+
+    suspend fun upsertAllPreservingClientFields(entities: List<ChatMessageEntity>) {
+        if (entities.isEmpty()) return
+        val existingById = clientFieldsByIds(entities.map { it.messageId }).associateBy { it.messageId }
+        val merged = entities.map { e ->
+            val ex = existingById[e.messageId] ?: return@map e
+            e.copy(
+                translatedText = ex.translatedText ?: e.translatedText,
+                sourceText     = ex.sourceText     ?: e.sourceText,
+                localFilePath  = ex.localFilePath  ?: e.localFilePath,
+                voiceDuration  = ex.voiceDuration  ?: e.voiceDuration,
+            )
+        }
+        upsertAll(merged)
+    }
+
+    @Query("SELECT messageId, translatedText, sourceText, localFilePath, voiceDuration FROM chat_messages WHERE messageId = :messageId")
+    suspend fun clientFieldsFor(messageId: Long): ClientFieldsSnapshot?
+
+    @Query("SELECT messageId, translatedText, sourceText, localFilePath, voiceDuration FROM chat_messages WHERE messageId IN (:messageIds)")
+    suspend fun clientFieldsByIds(messageIds: List<Long>): List<ClientFieldsSnapshot>
+
     @Query("DELETE FROM chat_messages WHERE messageId = :messageId")
     suspend fun delete(messageId: Long)
 
@@ -92,3 +128,11 @@ interface MessageDao {
 }
 
 data class LastMessageInfo(val messageId: Long, val senderId: Long)
+
+data class ClientFieldsSnapshot(
+    val messageId      : Long,
+    val translatedText : String?,
+    val sourceText     : String?,
+    val localFilePath  : String?,
+    val voiceDuration  : Int?,
+)

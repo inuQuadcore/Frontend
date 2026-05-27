@@ -281,7 +281,7 @@ class ChatRoomViewModel @Inject constructor(
             chatRoomId      = chatRoomId,
             enterChatRoomAt = enterChatRoomAt,
             onUpsert        = { entity ->
-                viewModelScope.launch { messageDao.upsert(entity) }
+                viewModelScope.launch { messageDao.upsertPreservingClientFields(entity) }
             },
             onRemoved       = { messageId ->
                 viewModelScope.launch { messageDao.delete(messageId) }
@@ -322,7 +322,7 @@ class ChatRoomViewModel @Inject constructor(
                 val data = result.data ?: return
                 val toUpsert = (data.newMessages + data.updatedMessages)
                     .map { it.toChatMessageEntity(chatRoomId) }
-                if (toUpsert.isNotEmpty()) messageDao.upsertAll(toUpsert)
+                if (toUpsert.isNotEmpty()) messageDao.upsertAllPreservingClientFields(toUpsert)
                 if (data.deletedIds.isNotEmpty()) messageDao.deleteAll(data.deletedIds)
             }
             else -> { /* 에러는 silent fail — Room의 옛 메시지만 표시 */ }
