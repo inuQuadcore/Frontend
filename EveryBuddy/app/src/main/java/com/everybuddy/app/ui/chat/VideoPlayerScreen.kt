@@ -60,15 +60,25 @@ fun VideoPlayerScreen(
     senderName        : String,
     subtitles         : List<VideoSubtitle>,
     isSubtitleLoading : Boolean,
+    isVideoLoading    : Boolean,
     onClose           : () -> Unit,
 ) {
     val context = LocalContext.current
 
-    val player = remember(message.id) {
-        ExoPlayer.Builder(context).build().apply {
-            val url = message.localFilePath?.takeIf { File(it).exists() } ?: message.voiceUrl
-            if (url.isNotBlank()) {
-                val uri = if (url.startsWith("/")) Uri.fromFile(File(url)) else Uri.parse(url)
+    // 로컬 파일이 준비된 후에만 ExoPlayer 생성 — 다운로드 중에는 S3 스트리밍을 피하려 보류한다.
+    // 다운로드 실패 등으로 파일이 없는 채 in-flight도 끝났으면 voiceUrl로 fallback 스트리밍.
+    val localFile = message.localFilePath?.takeIf { File(it).exists() }
+    val playerSource: String? = when {
+        localFile != null            -> localFile
+        isVideoLoading               -> null
+        message.voiceUrl.isNotBlank() -> message.voiceUrl
+        else                          -> null
+    }
+
+    val player = remember(playerSource) {
+        playerSource?.let { src ->
+            ExoPlayer.Builder(context).build().apply {
+                val uri = if (src.startsWith("/")) Uri.fromFile(File(src)) else Uri.parse(src)
                 setMediaItem(MediaItem.fromUri(uri))
                 prepare()
             }
@@ -83,22 +93,23 @@ fun VideoPlayerScreen(
     var isScriptOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(player) {
+        val p = player ?: return@LaunchedEffect
         while (true) {
             delay(100)
-            if (player.playbackState == Player.STATE_ENDED) {
-                player.seekTo(0)
-                player.pause()
+            if (p.playbackState == Player.STATE_ENDED) {
+                p.seekTo(0)
+                p.pause()
                 positionMs = 0
             } else if (!isDragging) {
-                positionMs = player.currentPosition.coerceAtLeast(0)
-                durationMs = player.duration.coerceAtLeast(0)
+                positionMs = p.currentPosition.coerceAtLeast(0)
+                durationMs = p.duration.coerceAtLeast(0)
             }
-            isPlaying = player.isPlaying
+            isPlaying = p.isPlaying
         }
     }
 
-    DisposableEffect(Unit) {
-        onDispose { player.release() }
+    DisposableEffect(player) {
+        onDispose { player?.release() }
     }
 
     val activeSubtitleIdx = remember(positionMs, subtitles) {
@@ -155,18 +166,26 @@ fun VideoPlayerScreen(
                     }
                 }
 
-                // 영상 영역
+                // 영상 영역 — 다운로드 중이거나 player 미생성 시 스피너만 노출
                 Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    AndroidView(
-                        factory = { ctx ->
-                            PlayerView(ctx).apply {
-                                this.player = player
-                                useController = false
-                                setBackgroundColor(android.graphics.Color.BLACK)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    if (player != null) {
+                        AndroidView(
+                            factory = { ctx ->
+                                PlayerView(ctx).apply {
+                                    this.player = player
+                                    useController = false
+                                    setBackgroundColor(android.graphics.Color.BLACK)
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        CircularProgressIndicator(
+                            modifier    = Modifier.align(Alignment.Center).size(32.dp),
+                            color       = Color.White,
+                            strokeWidth = 2.dp,
+                        )
+                    }
                 }
 
                 // 자막 텍스트 영역
@@ -238,7 +257,10 @@ fun VideoPlayerScreen(
                         modifier          = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        VpCtrlBtn(onClick = { if (isPlaying) player.pause() else player.play() }) {
+                        VpCtrlBtn(onClick = {
+                            val p = player ?: return@VpCtrlBtn
+                            if (isPlaying) p.pause() else p.play()
+                        }) {
                             Image(
                                 painter            = painterResource(
                                     if (isPlaying) R.drawable.ic_stop else R.drawable.ic_play
@@ -253,7 +275,7 @@ fun VideoPlayerScreen(
                             value                = seekProgress,
                             onValueChange        = { isDragging = true; dragProgress = it },
                             onValueChangeFinished = {
-                                player.seekTo((dragProgress * durationMs).toLong())
+                                player?.seekTo((dragProgress * durationMs).toLong())
                                 isDragging = false
                             },
                             thumb  = {
@@ -304,7 +326,7 @@ fun VideoPlayerScreen(
                         subtitles = subtitles,
                         activeIdx = activeSubtitleIdx,
                         isLoading = isSubtitleLoading,
-                        onSeekTo  = { ms -> player.seekTo(ms) },
+                        onSeekTo  = { ms -> player?.seekTo(ms) },
                         onClose   = { isScriptOpen = false },
                     )
                 }

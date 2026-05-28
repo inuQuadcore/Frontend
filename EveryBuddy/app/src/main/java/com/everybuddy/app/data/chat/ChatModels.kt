@@ -167,6 +167,7 @@ data class ChatRoomUiState(
     val videoPlayerMessageId  : String?                            = null,
     val videoSubtitles        : Map<String, List<VideoSubtitle>>  = emptyMap(),
     val subtitleLoadingIds    : Set<String>                        = emptySet(),
+    val videoDownloadingIds   : Set<String>                        = emptySet(),
 
     val isRefreshing          : Boolean                            = false,
 )

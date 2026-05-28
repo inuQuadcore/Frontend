@@ -520,6 +520,7 @@ fun ChatRoomContent(
                     senderName        = senderName,
                     subtitles         = state.videoSubtitles[msgId] ?: emptyList(),
                     isSubtitleLoading = msgId in state.subtitleLoadingIds,
+                    isVideoLoading    = msgId in state.videoDownloadingIds,
                     onClose           = onCloseVideoPlayer,
                 )
             }

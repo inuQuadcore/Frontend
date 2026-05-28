@@ -479,27 +479,40 @@ class ChatRoomViewModel @Inject constructor(
         }
     }
 
-    /**
-     * 영상 메시지가 화면에 처음 노출될 때 호출 — 백그라운드로 영속화.
-     * onImageAppeared와 동일 패턴. 영상은 자막 번역 + ExoPlayer 재생 양쪽에서 로컬 파일을 재사용.
-     */
+    /** 영상 메시지가 화면에 처음 노출될 때 호출 — 백그라운드로 영속화. */
     fun onVideoAppeared(messageId: String) {
+        ensureVideoFileDownloaded(messageId)
+    }
+
+    /**
+     * 영상 파일 다운로드 보장. 이미 영속되어 있거나 진행 중이면 noop.
+     * videoDownloadingIds에 플래그를 두어 onVideoAppeared/onOpenVideoPlayer 중복 호출과
+     * VideoPlayerScreen의 로딩 표시 양쪽에서 사용한다.
+     */
+    private fun ensureVideoFileDownloaded(messageId: String) {
         val msg = _uiState.value.messages.find { it.id == messageId } ?: return
         if (!msg.localFilePath.isNullOrBlank() && File(msg.localFilePath).exists()) return
+        if (messageId in _uiState.value.videoDownloadingIds) return
         val url       = msg.voiceUrl.ifBlank { return }
         val msgIdLong = messageId.toLongOrNull() ?: return
+
+        _uiState.update { it.copy(videoDownloadingIds = it.videoDownloadingIds + messageId) }
         viewModelScope.launch {
-            val ext = mediaFileStore.extFromUrlOrName(
-                url      = url,
-                fileName = msg.fileName.takeIf { it.isNotBlank() },
-                fallback = "mp4",
-            )
-            if (mediaFileStore.exists(msgIdLong, ext)) {
-                messageDao.updateLocalFilePath(msgIdLong, mediaFileStore.pathFor(msgIdLong, ext).absolutePath)
-                return@launch
-            }
-            mediaFileStore.downloadAndPersist(url, msgIdLong, ext)?.let { file ->
-                messageDao.updateLocalFilePath(msgIdLong, file.absolutePath)
+            try {
+                val ext = mediaFileStore.extFromUrlOrName(
+                    url      = url,
+                    fileName = msg.fileName.takeIf { it.isNotBlank() },
+                    fallback = "mp4",
+                )
+                if (mediaFileStore.exists(msgIdLong, ext)) {
+                    messageDao.updateLocalFilePath(msgIdLong, mediaFileStore.pathFor(msgIdLong, ext).absolutePath)
+                } else {
+                    mediaFileStore.downloadAndPersist(url, msgIdLong, ext)?.let { file ->
+                        messageDao.updateLocalFilePath(msgIdLong, file.absolutePath)
+                    }
+                }
+            } finally {
+                _uiState.update { it.copy(videoDownloadingIds = it.videoDownloadingIds - messageId) }
             }
         }
     }
@@ -517,6 +530,7 @@ class ChatRoomViewModel @Inject constructor(
 
     fun onOpenVideoPlayer(messageId: String) {
         _uiState.update { it.copy(videoPlayerMessageId = messageId) }
+        ensureVideoFileDownloaded(messageId)
         loadVideoSubtitles(messageId)
     }
 
