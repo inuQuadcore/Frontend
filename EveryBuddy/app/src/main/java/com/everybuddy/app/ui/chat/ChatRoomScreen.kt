@@ -266,6 +266,7 @@ fun ChatRoomContent(
     var localFolders          by remember { mutableStateOf(emptyList<ScriptFolder>()) }
     var editingMessageId      by remember { mutableStateOf<String?>(null) }
     var editingText           by remember { mutableStateOf("") }
+    var pendingDeleteId       by remember { mutableStateOf<String?>(null) }
     var isMenuOpen            by remember { mutableStateOf(false) }
     val inputFocusRequester   = remember { FocusRequester() }
     var isSearchMode          by remember { mutableStateOf(false) }
@@ -532,7 +533,40 @@ fun ChatRoomContent(
                     editingMessageId = msg.id
                     editingText      = msg.text
                 },
-                onDelete     = { onDeleteMessage(msg.id) },
+                onDelete     = { pendingDeleteId = msg.id },
+            )
+        }
+
+        pendingDeleteId?.let { deleteId ->
+            AlertDialog(
+                onDismissRequest = { pendingDeleteId = null },
+                containerColor   = Color.White,
+                shape            = RoundedCornerShape(16.dp),
+                title = {
+                    Text(
+                        "메시지 삭제",
+                        style = TextStyle(fontSize = 17.sp, fontFamily = PretendardFamily, fontWeight = FontWeight.Bold, color = TextPrimary),
+                    )
+                },
+                text = {
+                    Text(
+                        "이 메시지를 삭제하시겠습니까?\n삭제된 메시지는 복구할 수 없습니다.",
+                        style = TextStyle(fontSize = 14.sp, fontFamily = PretendardFamily, color = TextSecondary, lineHeight = 20.sp),
+                    )
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingDeleteId = null }) {
+                        Text("취소", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, color = TextSecondary))
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        onDeleteMessage(deleteId)
+                        pendingDeleteId = null
+                    }) {
+                        Text("삭제", style = TextStyle(fontSize = 15.sp, fontFamily = PretendardFamily, fontWeight = FontWeight.SemiBold, color = Color(0xFFE53935)))
+                    }
+                },
             )
         }
 

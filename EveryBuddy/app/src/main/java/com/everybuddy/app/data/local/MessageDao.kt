@@ -90,6 +90,10 @@ interface MessageDao {
     @Query("UPDATE chat_messages SET subtitlesJson = :subtitlesJson WHERE messageId = :messageId")
     suspend fun updateSubtitles(messageId: Long, subtitlesJson: String?)
 
+    /** 메시지 삭제 상태 영속화. DELETE API 성공 직후 호출 — Room Flow re-emit 시 isDeleted = true 유지. */
+    @Query("UPDATE chat_messages SET messageType = 'DELETED' WHERE messageId = :messageId")
+    suspend fun markAsDeleted(messageId: Long)
+
     /** PENDING(음수 tempId) 메시지의 messageId를 서버 PK로 교체할 때 path 캐리오버 용도 readback. */
     @Query("SELECT localFilePath FROM chat_messages WHERE messageId = :messageId")
     suspend fun localFilePath(messageId: Long): String?

@@ -886,7 +886,29 @@ class ChatRoomViewModel @Inject constructor(
         )}
 
         viewModelScope.launch {
-            messageRepository.deleteMessage(msgIdLong)
+            when (val result = messageRepository.deleteMessage(msgIdLong)) {
+                is ApiResult.Success -> {
+                    // Room DB에 삭제 상태 영속화 — observeRoomAll Flow re-emit 시에도 isDeleted = true 유지
+                    messageDao.markAsDeleted(msgIdLong)
+                }
+                is ApiResult.Error -> {
+                    // API 실패: optimistic update 롤백 + 에러 토스트
+                    _uiState.update { it.copy(
+                        messages         = it.messages.map { m -> if (m.id == messageId) m.copy(isDeleted = false) else m },
+                        translationError = when (result.code) {
+                            403 -> "전송 후 5분이 지난 메시지는 삭제할 수 없어요."
+                            409 -> "이미 삭제된 메시지예요."
+                            else -> "메시지 삭제에 실패했어요. (${result.code})"
+                        },
+                    )}
+                }
+                is ApiResult.NetworkError -> {
+                    _uiState.update { it.copy(
+                        messages         = it.messages.map { m -> if (m.id == messageId) m.copy(isDeleted = false) else m },
+                        translationError = "네트워크 오류로 삭제에 실패했어요.",
+                    )}
+                }
+            }
         }
     }
 
