@@ -194,7 +194,7 @@ fun VideoPlayerScreen(
                         .background(VpBg)
                         .padding(16.dp),
                 ) {
-                    if (isSubtitleLoading) {
+                    if (isSubtitleLoading && subtitles.isEmpty()) {
                         CircularProgressIndicator(
                             modifier    = Modifier.align(Alignment.Center).size(22.dp),
                             color       = Color.White,
@@ -368,7 +368,7 @@ private fun ScriptPanel(
         }
 
         when {
-            isLoading -> {
+            isLoading && subtitles.isEmpty() -> {
                 Box(
                     modifier         = Modifier.height(280.dp).fillMaxWidth(),
                     contentAlignment = Alignment.Center,

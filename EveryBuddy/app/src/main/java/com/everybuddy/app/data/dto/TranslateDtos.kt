@@ -31,3 +31,31 @@ data class VideoSegment(
     @SerializedName("translatedText")   val translatedText   : String = "",
     @SerializedName("inferenceSeconds") val inferenceSeconds : Double = 0.0,
 )
+
+sealed class VideoStreamEvent {
+    data class SegmentResult(
+        val index            : Int,
+        val startSeconds     : Double,
+        val endSeconds       : Double,
+        val timestamp        : String,
+        val sourceText       : String,
+        val sourceLanguage   : String,
+        val translatedText   : String,
+        val inferenceSeconds : Double,
+    ) : VideoStreamEvent()
+
+    data class Completed(val totalSegments: Int) : VideoStreamEvent()
+
+    data class SegmentError(
+        val index   : Int,
+        val code    : Int,
+        val name    : String,
+        val message : String,
+    ) : VideoStreamEvent()
+
+    data class StreamError(
+        val code    : Int,
+        val name    : String,
+        val message : String,
+    ) : VideoStreamEvent()
+}

@@ -14,11 +14,11 @@ import com.everybuddy.app.data.local.formatRestLocalDateTime
 import com.everybuddy.app.data.firebase.ChatMessageListener
 import com.everybuddy.app.data.firebase.ViewingManager
 import com.everybuddy.app.data.local.ChatMessageEntity
+import com.everybuddy.app.data.dto.VideoStreamEvent
 import com.everybuddy.app.data.repository.ChatRoomRepository
 import com.everybuddy.app.data.repository.MessageRepository
 import com.everybuddy.app.data.repository.TranslateRepository
 import com.everybuddy.app.data.repository.translateUserMessage
-import com.everybuddy.app.data.repository.videoTranslateUserMessage
 import com.everybuddy.app.di.ApplicationScope
 import android.media.MediaMetadataRetriever
 import com.google.firebase.database.FirebaseDatabase
@@ -555,7 +555,7 @@ class ChatRoomViewModel @Inject constructor(
                 _uiState.update { it.copy(videoSubtitles = it.videoSubtitles + (messageId to cached)) }
                 return
             }
-            // 역직렬화 실패는 손상 캐시 — DB에서 비우고 API 재호출 경로로 진행.
+            // 역직렬화 실패는 손상 캐시 — DB에서 비우고 스트리밍 경로로 진행.
             val mid = messageId.toLongOrNull()
             if (mid != null) viewModelScope.launch { messageDao.updateSubtitles(mid, null) }
         }
@@ -574,32 +574,53 @@ class ChatRoomViewModel @Inject constructor(
                 return@launch
             }
 
-            val result = translateRepository.translateVideo(file)
-            if (result is ApiResult.Success) {
-                val subs = result.data.segments.map { seg ->
-                    VideoSubtitle(
-                        startMs    = (seg.startSeconds * 1000).toLong(),
-                        endMs      = (seg.endSeconds * 1000).toLong(),
-                        original   = seg.sourceText,
-                        translated = seg.translatedText,
-                    )
+            val partialSubs = mutableListOf<VideoSubtitle>()
+            var streamCompleted = false
+
+            try {
+                translateRepository.translateVideoStream(file).collect { event ->
+                    when (event) {
+                        is VideoStreamEvent.SegmentResult -> {
+                            partialSubs.add(
+                                VideoSubtitle(
+                                    startMs    = (event.startSeconds * 1000).toLong(),
+                                    endMs      = (event.endSeconds * 1000).toLong(),
+                                    original   = event.sourceText,
+                                    translated = event.translatedText,
+                                )
+                            )
+                            _uiState.update { state ->
+                                state.copy(videoSubtitles = state.videoSubtitles + (messageId to partialSubs.toList()))
+                            }
+                        }
+                        is VideoStreamEvent.SegmentError -> {
+                            // 해당 구간만 실패 — 스트림 계속 진행
+                        }
+                        is VideoStreamEvent.Completed -> {
+                            streamCompleted = true
+                            messageId.toLongOrNull()?.let { mid ->
+                                if (partialSubs.isNotEmpty()) messageDao.updateSubtitles(mid, gson.toJson(partialSubs))
+                            }
+                            _uiState.update { state ->
+                                state.copy(subtitleLoadingIds = state.subtitleLoadingIds - messageId)
+                            }
+                        }
+                        is VideoStreamEvent.StreamError -> {
+                            streamCompleted = true
+                            _uiState.update { state ->
+                                state.copy(
+                                    subtitleLoadingIds = state.subtitleLoadingIds - messageId,
+                                    translationError   = event.message.ifBlank { "번역에 실패했습니다." },
+                                )
+                            }
+                        }
+                    }
                 }
-                messageId.toLongOrNull()?.let { mid ->
-                    messageDao.updateSubtitles(mid, gson.toJson(subs))
-                }
+            } catch (_: Exception) { }
+
+            if (!streamCompleted) {
                 _uiState.update { state ->
-                    state.copy(
-                        subtitleLoadingIds = state.subtitleLoadingIds - messageId,
-                        videoSubtitles     = state.videoSubtitles + (messageId to subs),
-                    )
-                }
-            } else {
-                val errMsg = result.videoTranslateUserMessage().ifBlank { "번역에 실패했습니다." }
-                _uiState.update { state ->
-                    state.copy(
-                        subtitleLoadingIds = state.subtitleLoadingIds - messageId,
-                        translationError   = errMsg,
-                    )
+                    state.copy(subtitleLoadingIds = state.subtitleLoadingIds - messageId)
                 }
             }
         }
