@@ -481,9 +481,11 @@ data class MyUiState(
     val toastMessage     : String?      = null,
     val isTagEditOpen    : Boolean      = false,
     val editingTags      : List<UserTag> = emptyList(),
-    val openLanguageCode : String?      = null,
-    val openSubMenu      : String?      = null,   // "guide" | "notice" | "settings" | "version"
-    val isSaving         : Boolean      = false,
+    val openLanguageCode    : String?      = null,
+    val openPrimaryLangEdit : Boolean      = false,
+    val openLearnLangEdit   : Boolean      = false,
+    val openSubMenu         : String?      = null,   // "guide" | "notice" | "settings" | "version"
+    val isSaving            : Boolean      = false,
     val pendingImageUri  : String?      = null,
     val blockedFriends    : List<BlockedFriendItem>  = emptyList(),
     val isLoadingBlocked  : Boolean                  = false,
@@ -562,7 +564,11 @@ class MyViewModel @Inject constructor(
                     )
                 }
                 ?: _uiState.value.profile.tags
-            val langs = (langsDeferred.await() as? ApiResult.Success)?.data?.languages
+            val langsResponse = (langsDeferred.await() as? ApiResult.Success)?.data
+            val primaryLang = langsResponse?.languages
+                ?.firstOrNull { it.isPrimary }?.language.orEmpty()
+            val langs = langsResponse?.languages
+                ?.filter { !it.isPrimary }
                 ?.map { UserLanguage(it.language, it.level) }
                 ?: _uiState.value.profile.learningLanguages
 
@@ -573,7 +579,6 @@ class MyViewModel @Inject constructor(
                     profileImageUrl   = apiProfile.profileImageUrl,
                     country           = apiProfile.country,
                     age               = apiProfile.age,
-                    // API "yyyy-MM-dd" → UI 표시 "yyyy.MM.dd". null/빈값이면 빈 문자열
                     birthday          = apiProfile.birthday?.replace("-", ".").orEmpty(),
                     gender            = when (apiProfile.gender.uppercase()) {
                                             "MALE" -> "남성"; "FEMALE" -> "여성"; else -> apiProfile.gender
@@ -581,6 +586,7 @@ class MyViewModel @Inject constructor(
                     bio               = apiProfile.bio,
                     consecutiveDays   = apiProfile.consecutiveDays,
                     tags              = tags,
+                    primaryLanguage   = primaryLang,
                     learningLanguages = langs,
                 ))
             }
@@ -747,6 +753,49 @@ class MyViewModel @Inject constructor(
                     isSaving     = false,
                     toastMessage = "네트워크 연결을 확인해주세요.",
                 ) }
+            }
+        }
+    }
+
+    fun openPrimaryLangEdit()  { _uiState.update { it.copy(openPrimaryLangEdit = true) } }
+    fun closePrimaryLangEdit() { _uiState.update { it.copy(openPrimaryLangEdit = false) } }
+
+    fun savePrimaryLanguage(language: String) {
+        val s = _uiState.value
+        if (s.isSaving) return
+        _uiState.update { it.copy(isSaving = true) }
+        viewModelScope.launch {
+            val res = userRepository.updateMyPrimaryLanguage(language)
+            when (res) {
+                is ApiResult.Success      -> _uiState.update { it.copy(
+                    profile             = it.profile.copy(primaryLanguage = language),
+                    openPrimaryLangEdit = false,
+                    isSaving            = false,
+                ) }
+                is ApiResult.Error        -> _uiState.update { it.copy(isSaving = false, toastMessage = res.message) }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(isSaving = false, toastMessage = "네트워크 연결을 확인해주세요.") }
+            }
+        }
+    }
+
+    fun openLearnLangEdit()  { _uiState.update { it.copy(openLearnLangEdit = true) } }
+    fun closeLearnLangEdit() { _uiState.update { it.copy(openLearnLangEdit = false) } }
+
+    fun saveLearnLanguages(languages: List<UserLanguage>) {
+        val s = _uiState.value
+        if (s.isSaving) return
+        _uiState.update { it.copy(isSaving = true) }
+        viewModelScope.launch {
+            val dtoList = languages.map { LanguageLevelDto(language = it.language, level = it.level) }
+            val res = userRepository.updateMyInterestLanguages(dtoList)
+            when (res) {
+                is ApiResult.Success      -> _uiState.update { it.copy(
+                    profile           = it.profile.copy(learningLanguages = languages),
+                    openLearnLangEdit = false,
+                    isSaving          = false,
+                ) }
+                is ApiResult.Error        -> _uiState.update { it.copy(isSaving = false, toastMessage = res.message) }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(isSaving = false, toastMessage = "네트워크 연결을 확인해주세요.") }
             }
         }
     }

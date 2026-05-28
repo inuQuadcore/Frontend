@@ -877,15 +877,16 @@ class ChatRoomViewModel @Inject constructor(
 
         val msgIdLong = messageId.toLongOrNull()
         if (msgIdLong == null) {
-            // dummy 메시지: 기존 로컬 제거
             _uiState.update { it.copy(messages = it.messages.filter { m -> m.id != messageId }) }
             return
         }
 
+        _uiState.update { it.copy(
+            messages = it.messages.map { m -> if (m.id == messageId) m.copy(isDeleted = true) else m }
+        )}
+
         viewModelScope.launch {
             messageRepository.deleteMessage(msgIdLong)
-            // 실제 Room 제거는 RTDB onChildRemoved (C10) 또는 다음 sync에 반영.
-            // 백엔드 에러(403/409)는 C21에서 토스트.
         }
     }
 
@@ -917,8 +918,11 @@ class ChatRoomViewModel @Inject constructor(
         val chatRoomId = _uiState.value.room.id.toLongOrNull() ?: return
 
         viewModelScope.launch {
-            fileMessageUploader.upload(chatRoomId, Uri.parse(uri))
-            // 결과 토스트/재시도는 C21에서.
+            when (val result = fileMessageUploader.upload(chatRoomId, Uri.parse(uri))) {
+                is ApiResult.Error        -> _uiState.update { it.copy(translationError = result.message ?: "파일 전송에 실패했습니다.") }
+                is ApiResult.NetworkError -> _uiState.update { it.copy(translationError = "네트워크 오류로 전송에 실패했습니다.") }
+                is ApiResult.Success      -> {}
+            }
         }
     }
 

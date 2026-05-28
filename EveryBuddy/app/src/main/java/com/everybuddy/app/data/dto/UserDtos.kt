@@ -50,3 +50,11 @@ data class UpdateLanguageLevelRequest(
 data class UpdateTagsRequest(
     @SerializedName("tags") val tags : List<String>,
 )
+
+data class UpdatePrimaryLanguageRequest(
+    @SerializedName("language") val language : String,
+)
+
+data class UpdateInterestLanguagesRequest(
+    @SerializedName("languages") val languages : List<LanguageLevel>,
+)

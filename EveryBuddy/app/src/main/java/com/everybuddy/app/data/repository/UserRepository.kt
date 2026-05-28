@@ -72,6 +72,22 @@ class UserRepository @Inject constructor(
     }) { ApiResult.Success(Unit) }
 
     /**
+     * 주 사용 언어 변경 — PATCH /api/v1/users/me/primary-language
+     */
+    suspend fun updateMyPrimaryLanguage(language: String): ApiResult<Unit> =
+        safeApiCall(gson, { api.updateMyPrimaryLanguage(UpdatePrimaryLanguageRequest(language)) }) {
+            ApiResult.Success(Unit)
+        }
+
+    /**
+     * 학습 언어 목록 전체 교체 — PUT /api/v1/users/me/interest-languages
+     */
+    suspend fun updateMyInterestLanguages(languages: List<LanguageLevel>): ApiResult<Unit> =
+        safeApiCall(gson, { api.updateMyInterestLanguages(UpdateInterestLanguagesRequest(languages)) }) {
+            ApiResult.Success(Unit)
+        }
+
+    /**
      * 내 태그 전체 교체 — PUT /api/v1/users/me/tags
      * 빈 리스트 전달 시 전체 삭제
      * 에러: 400(잘못된입력) | 401(인증) | 404(유저없음) | 410(탈퇴)

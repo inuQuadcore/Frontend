@@ -139,11 +139,7 @@ fun ChatRoomScreen(
         if (uris.isNotEmpty()) viewModel.onPhotosPicked(uris)
     }
 
-    val storagePermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) filePickerLauncher.launch("*/*")
-    }
+
 
     if (state.isConversationSelectOpen) {
         ConversationSelectScreen(
@@ -201,13 +197,7 @@ fun ChatRoomScreen(
         onScriptSaved             = viewModel::onScriptSaved,
         onSaveScriptItem          = onSaveScriptItem,
         onOpenCamera             = { cameraPermLauncher.launch(Manifest.permission.CAMERA) },
-        onOpenFile               = {
-            val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-                Manifest.permission.READ_MEDIA_IMAGES
-            else
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            storagePermLauncher.launch(perm)
-        },
+        onOpenFile               = { filePickerLauncher.launch("*/*") },
         onFolderCreated          = onFolderCreated,
         onDeleteMessage          = viewModel::onDeleteMessage,
         onEditMessage            = viewModel::onEditMessage,
@@ -999,7 +989,9 @@ fun MessageList(
                 val statusAuthorName       = statusAuthor?.name.orEmpty()
                 val statusAuthorProfileUrl = statusAuthor?.profileImageUrl
 
-                when (msg.type) {
+                if (msg.isDeleted) {
+                    DeletedMessageRow()
+                } else when (msg.type) {
                     MessageType.TEXT ->
                         TextMessageBubble(
                             message                = msg,
@@ -1092,6 +1084,26 @@ private fun SenderAvatar(
         } else {
             Icon(painterResource(R.drawable.ic_nav_my), null, Modifier.size(size * 0.55f), tint = Color(0xFF555555))
         }
+    }
+}
+
+@Composable
+private fun DeletedMessageRow() {
+    Box(
+        modifier         = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text  = "메시지가 삭제되었습니다.",
+            style = TextStyle(
+                fontSize   = 12.sp,
+                fontFamily = PretendardFamily,
+                color      = TextSecondary,
+                textAlign  = TextAlign.Center,
+            ),
+        )
     }
 }
 

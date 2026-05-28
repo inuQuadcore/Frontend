@@ -52,6 +52,7 @@ fun ChatMessageEntity.toChatMessage(): ChatMessage = ChatMessage(
     fileName         = fileName.orEmpty(),
     fileSize         = fileSize ?: 0L,
     subtitlesJson    = subtitlesJson,
+    isDeleted        = messageType.equals("DELETED", ignoreCase = true),
 )
 
 private val VIDEO_EXTS = setOf("mp4", "mov", "avi", "mkv", "webm", "3gp", "ts")

@@ -28,6 +28,12 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.everybuddy.app.R
 import com.everybuddy.app.ui.explore.*
+import com.everybuddy.app.ui.friend.KoreanChosung
+import com.everybuddy.app.ui.onboarding.LanguageItem
+import com.everybuddy.app.ui.onboarding.LevelBottomSheet
+import com.everybuddy.app.ui.onboarding.OnboardingSearchField
+import com.everybuddy.app.ui.onboarding.SelectableRow
+import com.everybuddy.app.ui.onboarding.sampleLanguages
 import com.everybuddy.app.ui.theme.PretendardFamily
 import kotlinx.coroutines.delay
 
@@ -52,8 +58,8 @@ fun MyPageScreen(
     }
 
     when {
-        uiState.isEditMode           -> ProfileEditScreen(viewModel = viewModel)
-        uiState.isTagEditOpen        -> TagEditScreen(viewModel = viewModel)
+        uiState.isEditMode               -> ProfileEditScreen(viewModel = viewModel)
+        uiState.isTagEditOpen            -> TagEditScreen(viewModel = viewModel)
         uiState.openLanguageCode != null -> LanguageEditSubPage(
             language = uiState.openLanguageCode!!,
             currentLevel = uiState.profile.learningLanguages.find {
@@ -63,7 +69,19 @@ fun MyPageScreen(
             onSave   = { level -> viewModel.saveLanguageLevel(uiState.openLanguageCode!!, level) },
             onBack   = viewModel::closeLanguage,
         )
-        uiState.openSubMenu != null  -> SubMenuScreen(key = uiState.openSubMenu!!, viewModel = viewModel, onBack = viewModel::closeSubMenu)
+        uiState.openPrimaryLangEdit      -> PrimaryLanguageEditSubPage(
+            currentLanguage = uiState.profile.primaryLanguage,
+            isSaving        = uiState.isSaving,
+            onSave          = viewModel::savePrimaryLanguage,
+            onBack          = viewModel::closePrimaryLangEdit,
+        )
+        uiState.openLearnLangEdit        -> LearnLanguageEditSubPage(
+            currentLanguages = uiState.profile.learningLanguages,
+            isSaving         = uiState.isSaving,
+            onSave           = viewModel::saveLearnLanguages,
+            onBack           = viewModel::closeLearnLangEdit,
+        )
+        uiState.openSubMenu != null      -> SubMenuScreen(key = uiState.openSubMenu!!, viewModel = viewModel, onBack = viewModel::closeSubMenu)
         else -> MyPageContent(viewModel = viewModel, onNotification = onNotification, hasNotification = hasNotification)
     }
 }
@@ -185,8 +203,47 @@ private fun MyPageContent(
                 HorizontalDivider(color = C.Border, thickness = 8.dp)
 
                 Spacer(Modifier.height(20.dp))
-                Text("사용 언어", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = C.TextPri), modifier = Modifier.padding(horizontal = 16.dp))
-                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier              = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "언어 변경",
+                        style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.Accent),
+                        modifier = Modifier.clickable { viewModel.openPrimaryLangEdit() },
+                    )
+                    Text(
+                        "사용자 언어",
+                        style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextSec),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                if (profile.primaryLanguage.isNotBlank()) {
+                    val lang = com.everybuddy.app.ui.explore.UserLanguage(profile.primaryLanguage, 5)
+                    LanguageLevelRow(lang = lang, onTap = {}, showChevron = false)
+                }
+
+                Spacer(Modifier.height(20.dp))
+                HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+                Spacer(Modifier.height(20.dp))
+
+                Row(
+                    modifier              = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "언어 변경",
+                        style    = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.Accent),
+                        modifier = Modifier.clickable { viewModel.openLearnLangEdit() },
+                    )
+                    Text(
+                        "학습할 언어",
+                        style = TextStyle(fontSize = 12.sp, fontFamily = PretendardFamily, color = C.TextSec),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
                 profile.learningLanguages.forEach { lang ->
                     LanguageLevelRow(lang = lang, onTap = { viewModel.openLanguage(lang.language) })
                 }
@@ -693,6 +750,176 @@ private fun CountrySelectSubPage(current: String, onSave: (String) -> Unit, onBa
                 colors = ButtonDefaults.buttonColors(containerColor = C.Accent),
             ) {
                 Text("저장", style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color.White))
+            }
+        }
+    }
+}
+
+// 사용자 언어 변경 (단일 선택)
+@Composable
+private fun PrimaryLanguageEditSubPage(
+    currentLanguage : String,
+    isSaving        : Boolean,
+    onSave          : (String) -> Unit,
+    onBack          : () -> Unit,
+) {
+    BackHandler(onBack = onBack)
+    var query by remember { mutableStateOf("") }
+    var selectedLang by remember {
+        mutableStateOf<LanguageItem?>(
+            sampleLanguages.find { it.apiValue.equals(currentLanguage, ignoreCase = true) }
+        )
+    }
+
+    val filtered = remember(query) {
+        if (query.isEmpty()) sampleLanguages
+        else sampleLanguages.filter {
+            KoreanChosung.matches(query, it.nameKo) || it.code.contains(query, ignoreCase = true)
+        }
+    }
+
+    Scaffold(
+        topBar = { SubScreenTopBar(title = "사용자 언어 변경", onBack = onBack) },
+        bottomBar = {
+            Column {
+                HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+                Button(
+                    onClick  = { selectedLang?.let { onSave(it.apiValue) } },
+                    enabled  = selectedLang != null && !isSaving,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .navigationBarsPadding()
+                        .height(52.dp),
+                    shape    = RoundedCornerShape(12.dp),
+                    colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
+                ) {
+                    Text(
+                        "저장",
+                        style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color.White),
+                    )
+                }
+            }
+        },
+        contentWindowInsets = WindowInsets(0),
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+        ) {
+            Spacer(Modifier.height(12.dp))
+            OnboardingSearchField(query = query, hint = "언어를 검색해보세요", onChange = { query = it })
+            Spacer(Modifier.height(8.dp))
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(filtered, key = { it.code }) { lang ->
+                    val selected = selectedLang?.code == lang.code
+                    SelectableRow(
+                        flag     = lang.flag,
+                        label    = "${lang.nameKo} / ${lang.code}",
+                        selected = selected,
+                        onClick  = { selectedLang = if (selected) null else lang },
+                    )
+                }
+            }
+        }
+    }
+}
+
+// 학습 언어 변경 (다중 선택 + 레벨 바텀시트)
+@Composable
+private fun LearnLanguageEditSubPage(
+    currentLanguages : List<UserLanguage>,
+    isSaving         : Boolean,
+    onSave           : (List<UserLanguage>) -> Unit,
+    onBack           : () -> Unit,
+) {
+    BackHandler(onBack = onBack)
+    var query by remember { mutableStateOf("") }
+    var selectedLangs by remember {
+        mutableStateOf(
+            currentLanguages.mapNotNull { ul ->
+                sampleLanguages
+                    .find { it.apiValue.equals(ul.language, ignoreCase = true) }
+                    ?.copy(level = ul.level)
+            }
+        )
+    }
+    var showLevelSheet by remember { mutableStateOf(false) }
+
+    val filtered = remember(query) {
+        if (query.isEmpty()) sampleLanguages
+        else sampleLanguages.filter {
+            KoreanChosung.matches(query, it.nameKo) || it.code.contains(query, ignoreCase = true)
+        }
+    }
+
+    if (showLevelSheet && selectedLangs.isNotEmpty()) {
+        LevelBottomSheet(
+            languages     = selectedLangs,
+            onLevelChange = { lang, level ->
+                selectedLangs = selectedLangs.map { if (it.code == lang.code) it.copy(level = level) else it }
+            },
+            onConfirm = {
+                showLevelSheet = false
+                onSave(selectedLangs.map { UserLanguage(it.apiValue, it.level) })
+            },
+            onDismiss = { showLevelSheet = false },
+        )
+    }
+
+    Scaffold(
+        topBar = { SubScreenTopBar(title = "학습 언어 변경", onBack = onBack) },
+        bottomBar = {
+            Column {
+                HorizontalDivider(color = C.Border, thickness = 0.5.dp)
+                Button(
+                    onClick  = { showLevelSheet = true },
+                    enabled  = selectedLangs.isNotEmpty() && !isSaving,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .navigationBarsPadding()
+                        .height(52.dp),
+                    shape    = RoundedCornerShape(12.dp),
+                    colors   = ButtonDefaults.buttonColors(containerColor = C.Accent),
+                ) {
+                    Text(
+                        "저장",
+                        style = TextStyle(fontSize = 16.sp, fontFamily = PretendardFamily, fontWeight = FontWeight(700), color = Color.White),
+                    )
+                }
+            }
+        },
+        contentWindowInsets = WindowInsets(0),
+        containerColor = Color.White,
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+        ) {
+            Spacer(Modifier.height(12.dp))
+            OnboardingSearchField(query = query, hint = "언어를 검색해보세요", onChange = { query = it })
+            Spacer(Modifier.height(8.dp))
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(filtered, key = { it.code }) { lang ->
+                    val selected = selectedLangs.any { it.code == lang.code }
+                    SelectableRow(
+                        flag     = lang.flag,
+                        label    = "${lang.nameKo} / ${lang.code}",
+                        selected = selected,
+                        onClick  = {
+                            selectedLangs = if (selected)
+                                selectedLangs.filter { it.code != lang.code }
+                            else
+                                selectedLangs + lang.copy(level = 1)
+                        },
+                    )
+                }
             }
         }
     }

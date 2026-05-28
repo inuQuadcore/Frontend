@@ -158,17 +158,18 @@ data class FilterSettings(
 }
 
 data class MyProfile(
-    val userId          : Long    = 0L,
-    val name            : String  = "",
-    val profileImageUrl : String? = null,
-    val age             : Int     = 0,
-    val gender          : String  = "",
-    val country         : String  = "",
-    val bio             : String  = "",
+    val userId           : Long    = 0L,
+    val name             : String  = "",
+    val profileImageUrl  : String? = null,
+    val age              : Int     = 0,
+    val gender           : String  = "",
+    val country          : String  = "",
+    val bio              : String  = "",
+    val primaryLanguage  : String  = "",
     val learningLanguages: List<UserLanguage> = emptyList(),
-    val tags            : List<UserTag>       = emptyList(),
-    val birthday        : String  = "",
-    val consecutiveDays : Int     = 0,
+    val tags             : List<UserTag>      = emptyList(),
+    val birthday         : String  = "",
+    val consecutiveDays  : Int     = 0,
 ) {
     fun countryFlag() = countryFlag(country)
     fun countryName() = countryName(country)

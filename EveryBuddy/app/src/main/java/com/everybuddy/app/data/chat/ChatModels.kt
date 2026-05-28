@@ -112,6 +112,7 @@ data class ChatMessage(
     val fileName         : String          = "",
     val fileSize         : Long            = 0L,
     val subtitlesJson    : String?         = null,                  // 영상 자막 직렬화 JSON. null이면 미번역 — ChatRoomViewModel에서 lazy hydrate.
+    val isDeleted        : Boolean         = false,                 // 삭제된 메시지 — UI에서 "메시지가 삭제되었습니다." 표시
 )
 
 data class ChatRoomUiState(

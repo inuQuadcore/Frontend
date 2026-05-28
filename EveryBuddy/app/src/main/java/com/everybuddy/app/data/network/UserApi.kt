@@ -1,6 +1,8 @@
 package com.everybuddy.app.data.network
 
+import com.everybuddy.app.data.dto.UpdateInterestLanguagesRequest
 import com.everybuddy.app.data.dto.UpdateLanguageLevelRequest
+import com.everybuddy.app.data.dto.UpdatePrimaryLanguageRequest
 import com.everybuddy.app.data.dto.UpdateTagsRequest
 import com.everybuddy.app.data.dto.UserLanguagesResponse
 import com.everybuddy.app.data.dto.UserProfileResponse
@@ -102,6 +104,26 @@ interface UserApi {
      */
     @DELETE("api/v1/users/me")
     suspend fun deleteMyAccount(): Response<Unit>
+
+    /**
+     * PATCH /api/v1/users/me/primary-language — 주 사용 언어 변경
+     * Request: { "language": "KOREAN" }
+     * 204: 성공 | 400: 잘못된 언어 값 | 401: 인증 | 404: 유저 없음 | 410: 탈퇴
+     */
+    @PATCH("api/v1/users/me/primary-language")
+    suspend fun updateMyPrimaryLanguage(
+        @Body request: UpdatePrimaryLanguageRequest,
+    ): Response<Unit>
+
+    /**
+     * PUT /api/v1/users/me/interest-languages — 학습 언어 목록 전체 교체
+     * Request: { "languages": [{ "language": "ENGLISH", "level": 2 }] }
+     * 204: 성공 | 400: 잘못된 입력 | 401: 인증 | 404: 유저 없음 | 410: 탈퇴
+     */
+    @PUT("api/v1/users/me/interest-languages")
+    suspend fun updateMyInterestLanguages(
+        @Body request: UpdateInterestLanguagesRequest,
+    ): Response<Unit>
 
     /**
      * POST /api/v1/users/me/attendance — 출석 기록
