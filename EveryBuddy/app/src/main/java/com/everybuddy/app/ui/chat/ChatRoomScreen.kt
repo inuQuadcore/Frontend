@@ -172,6 +172,7 @@ fun ChatRoomScreen(
         onTapVideo             = viewModel::onOpenVideoPlayer,
         onCloseVideoPlayer     = viewModel::onCloseVideoPlayer,
         onImageAppeared          = viewModel::onImageAppeared,
+        onVideoAppeared          = viewModel::onVideoAppeared,
         onCloseFullscreenImage   = viewModel::onCloseFullscreenImage,
         onToggleAutoTranslate    = viewModel::onToggleAutoTranslate,
         onToggleMuteRoom         = {
@@ -237,6 +238,7 @@ fun ChatRoomContent(
     onTapVideo               : (String) -> Unit           = {},
     onCloseVideoPlayer       : () -> Unit                 = {},
     onImageAppeared           : (String) -> Unit           = {},
+    onVideoAppeared           : (String) -> Unit           = {},
     onCloseFullscreenImage    : () -> Unit                 = {},
     onToggleAutoTranslate     : () -> Unit,
     onToggleMuteRoom          : () -> Unit            = {},
@@ -433,6 +435,7 @@ fun ChatRoomContent(
                     onTapImage            = onTapImage,
                     onTapVideo            = onTapVideo,
                     onImageAppeared       = onImageAppeared,
+                    onVideoAppeared       = onVideoAppeared,
                     onLongPressMessage    = onLongPressMessage,
                     onSaveScript          = { msg -> onStartScriptSave(msg.id) },
                     onRetryMessage        = onRetryMessage,
@@ -958,6 +961,7 @@ fun MessageList(
     onTapImage            : (String) -> Unit       = {},
     onTapVideo            : (String) -> Unit       = {},
     onImageAppeared       : (String) -> Unit       = {},
+    onVideoAppeared       : (String) -> Unit       = {},
     onLongPressMessage    : (ChatMessage) -> Unit = {},
     onSaveScript          : (ChatMessage) -> Unit,
     onRetryMessage        : (String) -> Unit = {},
@@ -1048,6 +1052,7 @@ fun MessageList(
                             senderName            = senderName,
                             senderProfileImageUrl = senderProfileImageUrl,
                             onTap                 = { onTapVideo(msg.id) },
+                            onAppeared            = { onVideoAppeared(msg.id) },
                             onLongPress           = { onLongPressMessage(msg) },
                         )
 
@@ -1771,8 +1776,11 @@ fun VideoMessageBubble(
     senderName            : String  = "",
     senderProfileImageUrl : String? = null,
     onTap                 : () -> Unit = {},
+    onAppeared            : () -> Unit = {},
     onLongPress           : () -> Unit = {},
 ) {
+    LaunchedEffect(message.id) { onAppeared() }
+
     val timeFormatter = remember { DateTimeFormatter.ofPattern("a hh:mm") }
     val timeText = remember(message.timestamp) { message.timestamp.format(timeFormatter) }
 

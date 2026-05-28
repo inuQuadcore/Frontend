@@ -479,6 +479,31 @@ class ChatRoomViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 영상 메시지가 화면에 처음 노출될 때 호출 — 백그라운드로 영속화.
+     * onImageAppeared와 동일 패턴. 영상은 자막 번역 + ExoPlayer 재생 양쪽에서 로컬 파일을 재사용.
+     */
+    fun onVideoAppeared(messageId: String) {
+        val msg = _uiState.value.messages.find { it.id == messageId } ?: return
+        if (!msg.localFilePath.isNullOrBlank() && File(msg.localFilePath).exists()) return
+        val url       = msg.voiceUrl.ifBlank { return }
+        val msgIdLong = messageId.toLongOrNull() ?: return
+        viewModelScope.launch {
+            val ext = mediaFileStore.extFromUrlOrName(
+                url      = url,
+                fileName = msg.fileName.takeIf { it.isNotBlank() },
+                fallback = "mp4",
+            )
+            if (mediaFileStore.exists(msgIdLong, ext)) {
+                messageDao.updateLocalFilePath(msgIdLong, mediaFileStore.pathFor(msgIdLong, ext).absolutePath)
+                return@launch
+            }
+            mediaFileStore.downloadAndPersist(url, msgIdLong, ext)?.let { file ->
+                messageDao.updateLocalFilePath(msgIdLong, file.absolutePath)
+            }
+        }
+    }
+
     /** 이미지 탭 — 풀스크린 뷰어 오픈. localFilePath 우선, 없으면 fileUrl. */
     fun onTapImage(messageId: String) {
         val msg = _uiState.value.messages.find { it.id == messageId } ?: return
@@ -546,7 +571,6 @@ class ChatRoomViewModel @Inject constructor(
     }
 
     private suspend fun resolveVideoFileForTranslation(message: ChatMessage): File? {
-        // 이미 로컬에 영속된 파일이 있으면 바로 사용
         message.localFilePath?.let { path ->
             val f = File(path)
             if (f.exists() && f.length() > 0) return f
@@ -557,12 +581,15 @@ class ChatRoomViewModel @Inject constructor(
             fileName = message.fileName.takeIf { it.isNotBlank() },
             fallback = "mp4",
         )
-        // mediaFileStore 영속 경로 확인
         val persisted = mediaFileStore.pathFor(mid, ext)
-        if (persisted.exists() && persisted.length() > 0) return persisted
-        // S3에서 다운로드 후 영속화 (이후 재생에도 재사용)
+        if (persisted.exists() && persisted.length() > 0) {
+            messageDao.updateLocalFilePath(mid, persisted.absolutePath)
+            return persisted
+        }
         val url = message.voiceUrl.ifBlank { return null }
-        return mediaFileStore.downloadAndPersist(url, mid, ext)
+        return mediaFileStore.downloadAndPersist(url, mid, ext)?.also { file ->
+            messageDao.updateLocalFilePath(mid, file.absolutePath)
+        }
     }
 
     fun onPlayVoice(messageId: String) {
