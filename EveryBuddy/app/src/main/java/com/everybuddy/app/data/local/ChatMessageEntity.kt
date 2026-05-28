@@ -42,4 +42,7 @@ data class ChatMessageEntity(
     // null이면 아직 다운로드 안 됨 → fileUrl로 fallback.
     val localFilePath  : String?        = null,
     val voiceDuration  : Int?           = null,
+    // 영상 자막 JSON. POST /api/v1/translate/video 응답을 List<VideoSubtitle> 직렬화해 보관.
+    // null이면 아직 번역 미시도, "[]"면 번역 성공 + 자막 0개(VAD 무음 등).
+    val subtitlesJson  : String?        = null,
 )

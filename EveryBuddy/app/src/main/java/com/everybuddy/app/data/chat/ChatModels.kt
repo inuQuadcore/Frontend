@@ -111,6 +111,7 @@ data class ChatMessage(
     val localFilePath    : String?         = null,                  // 영속화된 미디어 로컬 경로. null이면 voiceUrl/fileUrl로 fallback.
     val fileName         : String          = "",
     val fileSize         : Long            = 0L,
+    val subtitlesJson    : String?         = null,                  // 영상 자막 직렬화 JSON. null이면 미번역 — ChatRoomViewModel에서 lazy hydrate.
 )
 
 data class ChatRoomUiState(

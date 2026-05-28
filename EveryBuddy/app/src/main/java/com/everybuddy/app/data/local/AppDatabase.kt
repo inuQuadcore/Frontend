@@ -10,7 +10,7 @@ import androidx.room.TypeConverters
         FolderEntity::class,
         FolderRoomEntity::class,
     ],
-    version       = 6,                                   // v6: ChatMessageEntity.voiceDuration 추가 (음성 길이 DB 영속)
+    version       = 7,                                   // v7: ChatMessageEntity.subtitlesJson 추가 (영상 자막 영속)
     exportSchema  = false,
 )
 @TypeConverters(LocalDateTimeConverter::class)

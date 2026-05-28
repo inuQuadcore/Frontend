@@ -22,6 +22,8 @@ import com.everybuddy.app.data.repository.videoTranslateUserMessage
 import com.everybuddy.app.di.ApplicationScope
 import android.media.MediaMetadataRetriever
 import com.google.firebase.database.FirebaseDatabase
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -54,6 +56,7 @@ class ChatRoomViewModel @Inject constructor(
     private val translateRepository : TranslateRepository,
     private val chatRoomPreferences : ChatRoomPreferences,
     private val mediaFileStore      : MediaFileStore,
+    private val gson                : Gson,
     @ApplicationScope private val appScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -542,6 +545,21 @@ class ChatRoomViewModel @Inject constructor(
         if (_uiState.value.videoSubtitles.containsKey(messageId)) return
         if (messageId in _uiState.value.subtitleLoadingIds) return
         val message = _uiState.value.messages.firstOrNull { it.id == messageId } ?: return
+
+        // DB 영속 캐시 hit — 재진입 시 API 재호출 없이 즉시 표시.
+        message.subtitlesJson?.let { json ->
+            val cached = runCatching {
+                gson.fromJson<List<VideoSubtitle>>(json, object : TypeToken<List<VideoSubtitle>>() {}.type)
+            }.getOrNull()
+            if (cached != null) {
+                _uiState.update { it.copy(videoSubtitles = it.videoSubtitles + (messageId to cached)) }
+                return
+            }
+            // 역직렬화 실패는 손상 캐시 — DB에서 비우고 API 재호출 경로로 진행.
+            val mid = messageId.toLongOrNull()
+            if (mid != null) viewModelScope.launch { messageDao.updateSubtitles(mid, null) }
+        }
+
         _uiState.update { it.copy(subtitleLoadingIds = it.subtitleLoadingIds + messageId) }
 
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -565,6 +583,9 @@ class ChatRoomViewModel @Inject constructor(
                         original   = seg.sourceText,
                         translated = seg.translatedText,
                     )
+                }
+                messageId.toLongOrNull()?.let { mid ->
+                    messageDao.updateSubtitles(mid, gson.toJson(subs))
                 }
                 _uiState.update { state ->
                     state.copy(

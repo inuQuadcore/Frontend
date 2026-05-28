@@ -86,12 +86,16 @@ interface MessageDao {
     @Query("UPDATE chat_messages SET voiceDuration = :duration WHERE messageId = :messageId")
     suspend fun updateVoiceDuration(messageId: Long, duration: Int)
 
+    /** 영상 자막 JSON 영속화. Translate API 성공 응답을 직렬화해 저장 — 재진입 시 API 재호출 회피. */
+    @Query("UPDATE chat_messages SET subtitlesJson = :subtitlesJson WHERE messageId = :messageId")
+    suspend fun updateSubtitles(messageId: Long, subtitlesJson: String?)
+
     /** PENDING(음수 tempId) 메시지의 messageId를 서버 PK로 교체할 때 path 캐리오버 용도 readback. */
     @Query("SELECT localFilePath FROM chat_messages WHERE messageId = :messageId")
     suspend fun localFilePath(messageId: Long): String?
 
     /** upsert 시 번역·로컬 캐시 필드 보존용 readback. */
-    @Query("SELECT messageId, translatedText, sourceText, localFilePath, voiceDuration FROM chat_messages WHERE messageId IN (:ids)")
+    @Query("SELECT messageId, translatedText, sourceText, localFilePath, voiceDuration, subtitlesJson FROM chat_messages WHERE messageId IN (:ids)")
     suspend fun cachedFieldsForIds(ids: List<Long>): List<MessageCachedFields>
 }
 
@@ -103,4 +107,5 @@ data class MessageCachedFields(
     val sourceText     : String?,
     val localFilePath  : String?,
     val voiceDuration  : Int?,
+    val subtitlesJson  : String?,
 )

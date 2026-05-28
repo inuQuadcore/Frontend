@@ -51,6 +51,7 @@ fun ChatMessageEntity.toChatMessage(): ChatMessage = ChatMessage(
     localFilePath    = localFilePath,
     fileName         = fileName.orEmpty(),
     fileSize         = fileSize ?: 0L,
+    subtitlesJson    = subtitlesJson,
 )
 
 private val VIDEO_EXTS = setOf("mp4", "mov", "avi", "mkv", "webm", "3gp", "ts")
@@ -91,6 +92,7 @@ fun ChatMessageEntity.preserveCache(cached: MessageCachedFields?): ChatMessageEn
         sourceText     = sourceText     ?: cached.sourceText,
         localFilePath  = localFilePath  ?: cached.localFilePath,
         voiceDuration  = voiceDuration  ?: cached.voiceDuration,
+        subtitlesJson  = subtitlesJson  ?: cached.subtitlesJson,
     )
 
 /** RTDB messages/{chatRoomId}/{messageId} 스냅샷 → Room ChatMessageEntity. */
