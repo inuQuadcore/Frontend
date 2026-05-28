@@ -85,8 +85,10 @@ fun VideoPlayerScreen(
         }
     }
 
-    var positionMs   by remember { mutableLongStateOf(0L) }
-    var durationMs   by remember { mutableLongStateOf(0L) }
+    // position/duration은 root에서 .value를 읽지 않는다 — 자식 컴포저블이 직접 구독해야
+    // 100ms tick에 root 전체(AndroidView/ScriptPanel 포함)가 리컴포즈되는 사태를 피한다.
+    val positionState = remember { mutableLongStateOf(0L) }
+    val durationState = remember { mutableLongStateOf(0L) }
     var isPlaying    by remember { mutableStateOf(false) }
     var isDragging   by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableFloatStateOf(0f) }
@@ -99,10 +101,10 @@ fun VideoPlayerScreen(
             if (p.playbackState == Player.STATE_ENDED) {
                 p.seekTo(0)
                 p.pause()
-                positionMs = 0
+                positionState.longValue = 0
             } else if (!isDragging) {
-                positionMs = p.currentPosition.coerceAtLeast(0)
-                durationMs = p.duration.coerceAtLeast(0)
+                positionState.longValue = p.currentPosition.coerceAtLeast(0)
+                durationState.longValue = p.duration.coerceAtLeast(0)
             }
             isPlaying = p.isPlaying
         }
@@ -112,14 +114,10 @@ fun VideoPlayerScreen(
         onDispose { player?.release() }
     }
 
-    val activeSubtitleIdx = remember(positionMs, subtitles) {
-        subtitles.indexOfLast { it.startMs <= positionMs }
+    // derivedStateOf — 활성 인덱스가 실제로 바뀌는 순간(~1초)에만 구독자가 리컴포즈된다.
+    val activeSubtitleIdxState = remember(subtitles) {
+        derivedStateOf { subtitles.indexOfLast { it.startMs <= positionState.longValue } }
     }
-    val currentSubtitle = subtitles.getOrNull(activeSubtitleIdx)
-
-    val seekProgress = if (isDragging) dragProgress
-                       else if (durationMs > 0) positionMs.toFloat() / durationMs
-                       else 0f
 
     Dialog(
         onDismissRequest = onClose,
@@ -203,18 +201,7 @@ fun VideoPlayerScreen(
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Text(
-                            text      = currentSubtitle?.translated ?: "",
-                            textAlign = TextAlign.Center,
-                            style     = TextStyle(
-                                fontSize   = 15.sp,
-                                fontFamily = PretendardFamily,
-                                color      = Color.White,
-                                lineHeight  = 21.sp,
-                                textAlign  = TextAlign.Center,
-                            ),
-                            modifier  = Modifier.fillMaxWidth(),
-                        )
+                        VpSubtitleText(activeIdxState = activeSubtitleIdxState, subtitles = subtitles)
                     }
                 }
 
@@ -271,32 +258,18 @@ fun VideoPlayerScreen(
                             )
                         }
 
-                        Slider(
-                            value                = seekProgress,
-                            onValueChange        = { isDragging = true; dragProgress = it },
-                            onValueChangeFinished = {
-                                player?.seekTo((dragProgress * durationMs).toLong())
+                        VpSeekBar(
+                            positionState = positionState,
+                            durationState = durationState,
+                            isDragging    = isDragging,
+                            dragProgress  = dragProgress,
+                            onDragChange  = { isDragging = true; dragProgress = it },
+                            onDragFinish  = {
+                                val p = player
+                                if (p != null) p.seekTo((dragProgress * durationState.longValue).toLong())
                                 isDragging = false
                             },
-                            thumb  = {
-                                Image(
-                                    painter            = painterResource(R.drawable.ic_dot_filled),
-                                    contentDescription = null,
-                                    modifier           = Modifier.size(16.dp),
-                                    colorFilter        = ColorFilter.tint(VpAccent),
-                                )
-                            },
-                            track  = { sliderState ->
-                                SliderDefaults.Track(
-                                    sliderState = sliderState,
-                                    modifier    = Modifier.height(3.dp),
-                                    colors      = SliderDefaults.colors(
-                                        activeTrackColor   = VpAccent,
-                                        inactiveTrackColor = Color.White.copy(alpha = 0.25f),
-                                    ),
-                                )
-                            },
-                            modifier = Modifier.weight(1f),
+                            modifier      = Modifier.weight(1f),
                         )
 
                     }
@@ -306,10 +279,7 @@ fun VideoPlayerScreen(
                         modifier              = Modifier.fillMaxWidth().padding(end = 8.dp),
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        Text(
-                            text  = "${vpFmtDuration((positionMs / 1000).toInt())}/${vpFmtDuration((durationMs / 1000).toInt())}",
-                            style = TextStyle(fontSize = 12.sp, color = VpTextSec, fontFamily = PretendardFamily),
-                        )
+                        VpTimeText(positionState = positionState, durationState = durationState)
                     }
                 }
             }
@@ -322,12 +292,12 @@ fun VideoPlayerScreen(
                     exit    = slideOutHorizontally { it },
                 ) {
                     ScriptPanel(
-                        modifier  = Modifier.width(260.dp).fillMaxHeight().background(VpScriptBg),
-                        subtitles = subtitles,
-                        activeIdx = activeSubtitleIdx,
-                        isLoading = isSubtitleLoading,
-                        onSeekTo  = { ms -> player?.seekTo(ms) },
-                        onClose   = { isScriptOpen = false },
+                        modifier       = Modifier.width(260.dp).fillMaxHeight().background(VpScriptBg),
+                        subtitles      = subtitles,
+                        activeIdxState = activeSubtitleIdxState,
+                        isLoading      = isSubtitleLoading,
+                        onSeekTo       = { ms -> player?.seekTo(ms) },
+                        onClose        = { isScriptOpen = false },
                     )
                 }
             }
@@ -352,14 +322,15 @@ private fun VpCtrlBtn(
 
 @Composable
 private fun ScriptPanel(
-    modifier  : Modifier,
-    subtitles : List<VideoSubtitle>,
-    activeIdx : Int,
-    isLoading : Boolean,
-    onSeekTo  : (Long) -> Unit,
-    onClose   : () -> Unit,
+    modifier       : Modifier,
+    subtitles      : List<VideoSubtitle>,
+    activeIdxState : State<Int>,
+    isLoading      : Boolean,
+    onSeekTo       : (Long) -> Unit,
+    onClose        : () -> Unit,
 ) {
     val listState = rememberLazyListState()
+    val activeIdx by activeIdxState
 
     LaunchedEffect(activeIdx) {
         if (activeIdx >= 0) listState.animateScrollToItem(activeIdx)
@@ -459,6 +430,78 @@ private fun ScriptPanel(
             }
         }
     }
+}
+
+/** 자막 한 줄 — activeIdxState만 읽으므로 인덱스가 바뀌는 순간(~1초)에만 리컴포즈된다. */
+@Composable
+private fun VpSubtitleText(activeIdxState: State<Int>, subtitles: List<VideoSubtitle>) {
+    val idx by activeIdxState
+    Text(
+        text      = subtitles.getOrNull(idx)?.translated ?: "",
+        textAlign = TextAlign.Center,
+        style     = TextStyle(
+            fontSize    = 15.sp,
+            fontFamily  = PretendardFamily,
+            color       = Color.White,
+            lineHeight  = 21.sp,
+            textAlign   = TextAlign.Center,
+        ),
+        modifier  = Modifier.fillMaxWidth(),
+    )
+}
+
+/** Slider만 100ms tick에 리컴포즈되도록 격리. position 읽기는 함수 내부에서. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VpSeekBar(
+    positionState : LongState,
+    durationState : LongState,
+    isDragging    : Boolean,
+    dragProgress  : Float,
+    onDragChange  : (Float) -> Unit,
+    onDragFinish  : () -> Unit,
+    modifier      : Modifier = Modifier,
+) {
+    val pos = positionState.longValue
+    val dur = durationState.longValue
+    val seekProgress = if (isDragging) dragProgress
+                       else if (dur > 0) pos.toFloat() / dur
+                       else 0f
+    Slider(
+        value                 = seekProgress,
+        onValueChange         = onDragChange,
+        onValueChangeFinished = onDragFinish,
+        thumb  = {
+            Image(
+                painter            = painterResource(R.drawable.ic_dot_filled),
+                contentDescription = null,
+                modifier           = Modifier.size(16.dp),
+                colorFilter        = ColorFilter.tint(VpAccent),
+            )
+        },
+        track  = { sliderState ->
+            SliderDefaults.Track(
+                sliderState = sliderState,
+                modifier    = Modifier.height(3.dp),
+                colors      = SliderDefaults.colors(
+                    activeTrackColor   = VpAccent,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.25f),
+                ),
+            )
+        },
+        modifier = modifier,
+    )
+}
+
+/** 재생시간 표시 — 시간 텍스트만 100ms tick에 리컴포즈. */
+@Composable
+private fun VpTimeText(positionState: LongState, durationState: LongState) {
+    val pos = positionState.longValue
+    val dur = durationState.longValue
+    Text(
+        text  = "${vpFmtDuration((pos / 1000).toInt())}/${vpFmtDuration((dur / 1000).toInt())}",
+        style = TextStyle(fontSize = 12.sp, color = VpTextSec, fontFamily = PretendardFamily),
+    )
 }
 
 private fun vpFmtDuration(seconds: Int): String {
